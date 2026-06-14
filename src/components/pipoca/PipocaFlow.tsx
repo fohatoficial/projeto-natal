@@ -18,10 +18,14 @@ import {
 type Step =
   | "choose"
   | "orient"
-  | "camera"
+  | "camera_identity"
+  | "orient_appearance"
+  | "camera_appearance"
   | "confirm"
   | "processing"
   | "result";
+
+type CameraVariant = "identity" | "appearance";
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
@@ -48,10 +52,13 @@ const UX = "[PIPOCA_UX]";
 type Prepared = {
   sessionId: string;
   captureId: string;
-  path: string;
-  token: string;
+  uploads: {
+    identity: { path: string; token: string };
+    appearance: { path: string; token: string };
+  };
 };
 type UploadStatus = "idle" | "preparing" | "uploading" | "confirming" | "error";
+const CAPTURE_LOG = "[PIPOCA_CAPTURE]";
 const UPLOAD_LOG = "[PIPOCA_UPLOAD]";
 
 function getDeviceId(): string | null {
