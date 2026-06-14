@@ -1,26 +1,41 @@
+// Tipos do catálogo Pipoca & Cena.
+// Os dados agora vêm do Supabase (tabela public.pipoca_films).
+
 export type Movie = {
   id: string;
   title: string;
-  shortDescription: string;
-  cardDescription: string;
-  posterUrl: string;
+  slug: string;
+  synopsis_short: string | null;
+  cover_url: string | null;
+  catalog_url: string | null;
   active: boolean;
+  display_order: number;
+
+  // Campos derivados para compatibilidade com componentes existentes (MovieCard).
+  posterUrl: string;
+  cardDescription: string;
+  shortDescription: string;
 };
 
-// Estrutura preparada para múltiplos filmes — basta adicionar novos itens.
-export const movies: Movie[] = [
-  {
-    id: "deus-e-o-diabo",
-    title: "Deus e o Diabo na Terra do Sol",
-    shortDescription:
-      "Um clássico do cinema brasileiro, marcado pelo sertão, pela travessia e pela força simbólica do Cinema Novo.",
-    cardDescription:
-      "Um clássico do cinema brasileiro, marcado pelo sertão, pela travessia e pela força simbólica do Cinema Novo.",
-    posterUrl:
-      "/__l5e/assets-v1/de37c2a3-37e1-4362-939b-17608c38ef7b/deus-e-o-diabo.jpg",
-    active: true,
-  },
-];
+const FALLBACK_POSTER =
+  "/__l5e/assets-v1/de37c2a3-37e1-4362-939b-17608c38ef7b/deus-e-o-diabo.jpg";
 
-export const getActiveMovies = () => movies.filter((m) => m.active);
-export const getMovieById = (id: string) => movies.find((m) => m.id === id);
+export function mapFilmRow(row: {
+  id: string;
+  title: string;
+  slug: string;
+  synopsis_short: string | null;
+  cover_url: string | null;
+  catalog_url: string | null;
+  active: boolean;
+  display_order: number;
+}): Movie {
+  const poster = row.cover_url && row.cover_url.trim() ? row.cover_url : FALLBACK_POSTER;
+  const description = row.synopsis_short ?? "";
+  return {
+    ...row,
+    posterUrl: poster,
+    cardDescription: description,
+    shortDescription: description,
+  };
+}

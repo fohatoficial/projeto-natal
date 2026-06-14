@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { StageShell } from "@/components/pipoca/StageShell";
 import { MovieCard } from "@/components/pipoca/MovieCard";
-import { getActiveMovies, type Movie } from "@/lib/pipoca/movies";
+import type { Movie } from "@/lib/pipoca/movies";
+import { usePipocaFilms } from "@/lib/pipoca/usePipocaFilms";
 
 type Step =
   | "intro"
@@ -31,7 +32,7 @@ const LOADING_PHRASES = [
 export function PipocaFlow() {
   const [step, setStep] = useState<Step>("intro");
   const [selected, setSelected] = useState<Movie | null>(null);
-  const movies = useMemo(() => getActiveMovies(), []);
+  const { films: movies, loading, error } = usePipocaFilms();
 
   const reset = () => {
     setSelected(null);
@@ -45,6 +46,8 @@ export function PipocaFlow() {
         {step === "choose" && (
           <Choose
             movies={movies}
+            loading={loading}
+            error={error}
             onPick={(m) => {
               setSelected(m);
               setStep("chosen");
@@ -158,7 +161,17 @@ function Intro({ onStart }: { onStart: () => void }) {
   );
 }
 
-function Choose({ movies, onPick }: { movies: Movie[]; onPick: (m: Movie) => void }) {
+function Choose({
+  movies,
+  loading,
+  error,
+  onPick,
+}: {
+  movies: Movie[];
+  loading: boolean;
+  error: string | null;
+  onPick: (m: Movie) => void;
+}) {
   return (
     <div className="flex-1 flex flex-col gap-8 pt-4">
       <Title kicker="Passo 1 de 4" title="Escolha seu filme" />
@@ -167,11 +180,17 @@ function Choose({ movies, onPick }: { movies: Movie[]; onPick: (m: Movie) => voi
         personalizada.
       </p>
       <div className="flex-1 flex items-center justify-center">
-        <div className="grid gap-6 w-full">
-          {movies.map((m) => (
-            <MovieCard key={m.id} movie={m} onChoose={onPick} />
-          ))}
-        </div>
+        {loading ? (
+          <p className="text-sm text-white/60 tracking-wide">Carregando filmes...</p>
+        ) : error ? (
+          <p className="text-sm text-white/80 text-center max-w-sm">{error}</p>
+        ) : (
+          <div className="grid gap-6 w-full">
+            {movies.map((m) => (
+              <MovieCard key={m.id} movie={m} onChoose={onPick} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
