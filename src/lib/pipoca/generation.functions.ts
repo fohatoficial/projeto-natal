@@ -94,26 +94,35 @@ function buildPromptText(rawPrompt: unknown, filmTitle?: string | null): string 
 
   const parts: string[] = [];
 
-  // 1. Identity vs environment — clear priority declaration
+  // 1. Three references — explicit role declaration
   parts.push(
-    "Image 1 is the IDENTITY REFERENCE. The visitor's face, skin tone, hair, age, and recognizable features must be faithfully preserved.",
+    "Image 1 is the primary FACE IDENTITY REFERENCE. It is a tight crop of the visitor's face and shoulders and is the absolute source of truth for who the person is.",
   );
   parts.push(
-    "Image 2 is the ENVIRONMENT AND COMPOSITION REFERENCE. Match its framing, lighting direction, depth, spatial layout, and atmosphere.",
+    "Image 2 is the secondary FULL APPEARANCE REFERENCE. It shows the same visitor in full and helps preserve overall look, body proportions, posture and visual coherence with image 1.",
+  );
+  parts.push(
+    "Image 3 is the ENVIRONMENT AND COMPOSITION REFERENCE. Match its framing, lighting direction, depth, spatial layout, and atmosphere.",
   );
 
-  // 2. Hard rules — non-negotiable
+  // 2. Hard rules — non-negotiable, identity first
   parts.push(
-    "HARD RULES (highest priority): exactly one person in the final image — and that person is the visitor from image 1.",
+    "HARD RULES (highest priority): preserve the EXACT facial identity from image 1.",
   );
   parts.push(
-    "The visitor must remain highly recognizable as the same person: same face, same skin, same identity.",
+    "Preserve face shape, eyes, nose, mouth, jawline, skin tone, facial hair, glasses (if present) and hair / hairline exactly as in image 1.",
   );
   parts.push(
-    "The visitor must be naturally integrated into the environment of image 2 — no pasted look, no cutout composite, no flat overlay.",
+    "The final person must be clearly recognizable as the same person from image 1 — not a similar person, not a stylized version, the same person.",
   );
   parts.push(
-    "Body scale, posture, light on the skin, contact shadows, and depth of field must all match the surrounding scene.",
+    "Exactly one person in the final image, and that person is the visitor from images 1 and 2.",
+  );
+  parts.push(
+    "The visitor must be naturally integrated into the environment of image 3 — no pasted look, no cutout composite, no flat overlay.",
+  );
+  parts.push(
+    "Body scale, posture, light on the skin, contact shadows, and depth of field must all match the surrounding scene from image 3.",
   );
 
   // 3. Cinema Novo style — strongly monochrome
