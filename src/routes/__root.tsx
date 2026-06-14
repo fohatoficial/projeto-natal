@@ -86,6 +86,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "author", content: "Tela Brasil" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:title", content: "Pipoca & Cena — Tela Brasil" },
+      { name: "twitter:title", content: "Pipoca & Cena — Tela Brasil" },
+      { name: "description", content: "Tela Brasil: Cine Scene Creator lets users star in movie scenes." },
+      { property: "og:description", content: "Tela Brasil: Cine Scene Creator lets users star in movie scenes." },
+      { name: "twitter:description", content: "Tela Brasil: Cine Scene Creator lets users star in movie scenes." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d62278a8-0123-485a-b09f-94488a9d83df/id-preview-5695388c--a41771ec-482f-4dc3-9092-09c6c271363e.lovable.app-1781437037003.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d62278a8-0123-485a-b09f-94488a9d83df/id-preview-5695388c--a41771ec-482f-4dc3-9092-09c6c271363e.lovable.app-1781437037003.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
