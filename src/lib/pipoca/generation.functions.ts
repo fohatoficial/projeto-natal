@@ -1,6 +1,59 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+const FACE_LOG = "[PIPOCA_FACE]";
+const GEN_LOG = "[PIPOCA_GENERATION]";
+
+/**
+ * Build a face-focused crop from the original visitor photo.
+ *
+ * Heuristic (no facial detection in this step):
+ *  - assume the visitor is roughly centered in the totem capture;
+ *  - take ~60% of the width centered horizontally;
+ *  - take ~55% of the height, positioned slightly above center so face + shoulders
+ *    are included while feet / lower body are dropped;
+ *  - resize the result to 1024px on the longer side.
+ *
+ * Uses @cf-wasm/photon (WASM) so it runs inside the Cloudflare Worker SSR runtime
+ * — `sharp` is a native addon and is not supported there.
+ */
+async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<Uint8Array> {
+  const photon = await import("@cf-wasm/photon");
+  const img = photon.PhotonImage.new_from_byteslice(originalBytes);
+  try {
+    const w = img.get_width();
+    const h = img.get_height();
+
+    const cropW = Math.round(w * 0.6);
+    const cropH = Math.round(h * 0.55);
+    const x = Math.max(0, Math.round((w - cropW) / 2));
+    // shift up: top of the crop sits at ~12% of the image height instead of centered
+    const y = Math.max(0, Math.round(h * 0.12));
+    const y2 = Math.min(h, y + cropH);
+    const x2 = Math.min(w, x + cropW);
+
+    const cropped = photon.crop(img, x, y, x2, y2);
+    try {
+      const targetSide = 1024;
+      const cw = cropped.get_width();
+      const ch = cropped.get_height();
+      const scale = targetSide / Math.max(cw, ch);
+      const outW = Math.max(1, Math.round(cw * scale));
+      const outH = Math.max(1, Math.round(ch * scale));
+      const resized = photon.resize(cropped, outW, outH, 1);
+      try {
+        return resized.get_bytes_jpeg(92);
+      } finally {
+        resized.free();
+      }
+    } finally {
+      cropped.free();
+    }
+  } finally {
+    img.free();
+  }
+}
+
 const LOG = "[PIPOCA_SERVER]";
 const REPLICATE_MODEL = "black-forest-labs/flux-2-pro";
 const ORIGINALS_BUCKET = "pipoca-visitor-originals";
