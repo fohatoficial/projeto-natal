@@ -310,14 +310,6 @@ export function PipocaFlow() {
           onNext={() => {
             transitionTo(() => setStep("camera_appearance"));
           }}
-          onBack={() => {
-            transitionTo(() => {
-              if (identityPhoto) URL.revokeObjectURL(identityPhoto.url);
-              setIdentityPhoto(null);
-              identityUploadedRef.current = false;
-              setStep("camera_identity");
-            });
-          }}
         />
       )}
       {step === "camera_appearance" && (
