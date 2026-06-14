@@ -859,7 +859,6 @@ function OrientAppearance({
   onNext,
 }: {
   onNext: () => void;
-  onBack: () => void;
 }) {
   const firedRef = useRef(false);
   useEffect(() => {
