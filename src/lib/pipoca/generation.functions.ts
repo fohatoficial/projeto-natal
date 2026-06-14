@@ -436,7 +436,16 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .update({
         status: "processing",
         provider_job_id: prediction.id,
-        metadata: { model: REPLICATE_MODEL, attempt: attemptNumber },
+        metadata: {
+          model: REPLICATE_MODEL,
+          attempt: attemptNumber,
+          face_crop_path: faceCropPath,
+          face_crop_reused: faceCropReused,
+          face_crop_fallback: faceCropFallback,
+          face_crop_dimensions:
+            faceCropWidth && faceCropHeight ? `${faceCropWidth}x${faceCropHeight}` : null,
+          input_image_count: 3,
+        },
       })
       .eq("id", generation.id);
 
