@@ -41,23 +41,73 @@ function buildPromptText(rawPrompt: unknown, filmTitle?: string | null): string 
 
   const parts: string[] = [];
 
+  // 1. Identity vs environment — clear priority declaration
   parts.push(
-    "Reference image 1 is the visitor's identity reference: keep their face, skin tone, hair, and recognizable features faithful.",
+    "Image 1 is the IDENTITY REFERENCE. The visitor's face, skin tone, hair, age, and recognizable features must be faithfully preserved.",
   );
   parts.push(
-    "Reference image 2 is the base scene reference: match its composition, lighting, color grading, environment, and overall atmosphere.",
+    "Image 2 is the ENVIRONMENT AND COMPOSITION REFERENCE. Match its framing, lighting direction, depth, spatial layout, and atmosphere.",
   );
-  parts.push("There must be exactly one person in the final image — the visitor from reference 1.");
-  parts.push("The visitor must remain clearly recognizable as the same person.");
-  parts.push("Place the visitor inside the environment from reference 2 as if it were a film still.");
+
+  // 2. Hard rules — non-negotiable
   parts.push(
-    "Subtly include the iconic wide-brim cangaceiro hat and a small wooden cross — present but never overpowering.",
+    "HARD RULES (highest priority): exactly one person in the final image — and that person is the visitor from image 1.",
   );
-  parts.push("Vertical 4:5 framing, cinematic composition, shallow depth of field, warm sertão tones.");
   parts.push(
-    `Cinematic scene from the Brazilian sertão inspired by "Deus e o Diabo na Terra do Sol"${
+    "The visitor must remain highly recognizable as the same person: same face, same skin, same identity.",
+  );
+  parts.push(
+    "The visitor must be naturally integrated into the environment of image 2 — no pasted look, no cutout composite, no flat overlay.",
+  );
+  parts.push(
+    "Body scale, posture, light on the skin, contact shadows, and depth of field must all match the surrounding scene.",
+  );
+
+  // 3. Cinema Novo style — strongly monochrome
+  parts.push(
+    "STYLE: predominantly black and white, nearly monochromatic, with only a very subtle earthy tint.",
+  );
+  parts.push(
+    "Strong contrast, deep shadows, luminous highlights, visible film grain, slightly desaturated.",
+  );
+  parts.push(
+    "Austere Brazilian Cinema Novo mood in the spirit of Glauber Rocha — serious, iconic, mythic. Not casual. Not touristic. Not editorial fashion.",
+  );
+
+  // 4. Wardrobe — rustic, timeless, non-modern
+  parts.push(
+    "WARDROBE: rustic, timeless, non-modern. Clothing must feel rooted in the northeastern Brazilian sertão.",
+  );
+  parts.push(
+    "Avoid bright casual modern clothing. Avoid contemporary t-shirt look. Avoid modern jeans, sneakers, or streetwear.",
+  );
+
+  // 5. Hat — subtle cangaço, never cowboy
+  parts.push(
+    "HAT: a subtle northeastern leather hat inspired by cangaço — wide-brim, weathered, earthy, native to the sertão.",
+  );
+  parts.push(
+    "The hat must NOT be a cowboy hat. Must NOT be western. Must NOT be theatrical, costume-like, or exaggerated.",
+  );
+  parts.push(
+    "The hat must feel native to the scene, present but understated — never overpowering the face.",
+  );
+
+  // 6. Cross — visible but secondary
+  parts.push(
+    "A small wooden cross may appear in the composition — visible but visually secondary, never the focal point.",
+  );
+
+  // 7. Composition
+  parts.push(
+    "Vertical 4:5 framing, cinematic composition, shallow depth of field. The visitor anchored in the environment as if captured in a film still.",
+  );
+
+  // 8. Film / scene context
+  parts.push(
+    `Cinematic scene from the arid Brazilian sertão, in the spirit of "Deus e o Diabo na Terra do Sol"${
       filmTitle ? ` and the film "${filmTitle}"` : ""
-    }: arid landscape, dramatic sunlight, dust in the air, 1960s Cinema Novo aesthetic, photoreal, high quality.`,
+    }: dramatic sunlight, dust in the air, 1960s Cinema Novo aesthetic, photoreal, high quality.`,
   );
 
   if (parsed && typeof parsed === "object") {
@@ -71,7 +121,7 @@ function buildPromptText(rawPrompt: unknown, filmTitle?: string | null): string 
     if (scene) parts.push(`Scene details: ${scene}.`);
     if (mood) parts.push(`Mood: ${mood}.`);
     if (style) parts.push(`Visual style: ${style}.`);
-    if (wardrobe) parts.push(`Wardrobe: ${wardrobe}.`);
+    if (wardrobe) parts.push(`Wardrobe notes from scene pack: ${wardrobe}.`);
     if (extra) parts.push(extra);
   } else if (typeof parsed === "string" && parsed.trim()) {
     parts.push(parsed.trim());
