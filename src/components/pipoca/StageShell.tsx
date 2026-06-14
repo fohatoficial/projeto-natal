@@ -10,12 +10,10 @@ type Props = {
 export function StageShell({ children, subtitle = "Pipoca & Cena", showStripe = true }: Props) {
   return (
     <div
-      className="h-[100dvh] w-screen bg-cinema text-white relative overflow-hidden flex flex-col select-none"
+      className="pipoca-stage w-screen bg-cinema text-white relative flex flex-col min-h-[100dvh]"
       style={{
         touchAction: "manipulation",
         overscrollBehavior: "none",
-        WebkitUserSelect: "none",
-        WebkitTouchCallout: "none",
       }}
     >
       {/* ambient backdrop */}
@@ -24,7 +22,7 @@ export function StageShell({ children, subtitle = "Pipoca & Cena", showStripe = 
 
       <div className="relative z-10 flex-1 flex flex-col min-h-0">
         <BrandHeader subtitle={subtitle} />
-        <main className="flex-1 flex flex-col px-[60px] pb-6 min-h-0 overflow-hidden">
+        <main className="pipoca-main flex-1 flex flex-col px-5 sm:px-8 lg:px-[60px] pb-6 min-h-0">
           {children}
         </main>
         {showStripe ? <div className="brand-stripe shrink-0" /> : null}
