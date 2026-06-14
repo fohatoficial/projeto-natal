@@ -18,10 +18,14 @@ import {
 type Step =
   | "choose"
   | "orient"
-  | "camera"
+  | "camera_identity"
+  | "orient_appearance"
+  | "camera_appearance"
   | "confirm"
   | "processing"
   | "result";
+
+type CameraVariant = "identity" | "appearance";
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
@@ -48,10 +52,13 @@ const UX = "[PIPOCA_UX]";
 type Prepared = {
   sessionId: string;
   captureId: string;
-  path: string;
-  token: string;
+  uploads: {
+    identity: { path: string; token: string };
+    appearance: { path: string; token: string };
+  };
 };
 type UploadStatus = "idle" | "preparing" | "uploading" | "confirming" | "error";
+const CAPTURE_LOG = "[PIPOCA_CAPTURE]";
 const UPLOAD_LOG = "[PIPOCA_UPLOAD]";
 
 function getDeviceId(): string | null {
@@ -73,7 +80,8 @@ const GEN_LOG = "[PIPOCA_GENERATION]";
 export function PipocaFlow() {
   const [step, setStep] = useState<Step>("choose");
   const [selected, setSelected] = useState<Movie | null>(null);
-  const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [identityPhoto, setIdentityPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [appearancePhoto, setAppearancePhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [prepared, setPrepared] = useState<Prepared | null>(null);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
@@ -81,7 +89,8 @@ export function PipocaFlow() {
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
-  const uploadedRef = useRef(false);
+  const identityUploadedRef = useRef(false);
+  const appearanceUploadedRef = useRef(false);
   const generationStartedRef = useRef(false);
   const { films, loading, error } = usePipocaFilms();
 
@@ -92,9 +101,10 @@ export function PipocaFlow() {
 
   useEffect(() => {
     return () => {
-      if (photo) URL.revokeObjectURL(photo.url);
+      if (identityPhoto) URL.revokeObjectURL(identityPhoto.url);
+      if (appearancePhoto) URL.revokeObjectURL(appearancePhoto.url);
     };
-  }, [photo]);
+  }, [identityPhoto, appearancePhoto]);
 
   function transitionTo(swap: () => void) {
     setTransitioning(true);
@@ -102,11 +112,19 @@ export function PipocaFlow() {
     window.setTimeout(() => setTransitioning(false), 950);
   }
 
+  const clearPhotos = () => {
+    if (identityPhoto) URL.revokeObjectURL(identityPhoto.url);
+    if (appearancePhoto) URL.revokeObjectURL(appearancePhoto.url);
+    setIdentityPhoto(null);
+    setAppearancePhoto(null);
+    identityUploadedRef.current = false;
+    appearanceUploadedRef.current = false;
+  };
+
   const reset = () =>
     transitionTo(() => {
       console.log(`${UX} fluxo reiniciado`);
-      if (photo) URL.revokeObjectURL(photo.url);
-      setPhoto(null);
+      clearPhotos();
       setSelected(null);
       setPrepared(null);
       setUploadStatus("idle");
@@ -114,7 +132,6 @@ export function PipocaFlow() {
       setGenerationId(null);
       setGeneratedUrl(null);
       setGenError(null);
-      uploadedRef.current = false;
       generationStartedRef.current = false;
       setStep("choose");
     });
@@ -123,7 +140,7 @@ export function PipocaFlow() {
     async (sessionId: string, captureId: string) => {
       if (generationStartedRef.current) return;
       generationStartedRef.current = true;
-      console.log(`${GEN_LOG} iniciando`);
+      console.log(`${GEN_LOG} usando identidade, aparência e cenário`);
       try {
         const res = await createGenFn({ data: { sessionId, captureId } });
         setGenerationId(res.generationId);
@@ -138,13 +155,12 @@ export function PipocaFlow() {
   );
 
   const runUpload = useCallback(async () => {
-    if (!photo || !selected) return;
+    if (!identityPhoto || !appearancePhoto || !selected) return;
     setUploadError(null);
     let current = prepared;
     try {
       if (!current) {
         setUploadStatus("preparing");
-        console.log(`${UPLOAD_LOG} preparando`);
         const res = await prepareFn({
           data: {
             filmId: selected.id,
@@ -156,16 +172,34 @@ export function PipocaFlow() {
         setPrepared(current);
       }
 
-      if (!uploadedRef.current) {
-        setUploadStatus("uploading");
-        console.log(`${UPLOAD_LOG} enviando`);
+      setUploadStatus("uploading");
+
+      if (!identityUploadedRef.current) {
         const { error: upErr } = await supabase.storage
           .from("pipoca-visitor-originals")
-          .uploadToSignedUrl(current.path, current.token, photo.blob, {
-            contentType: "image/jpeg",
-          });
+          .uploadToSignedUrl(
+            current.uploads.identity.path,
+            current.uploads.identity.token,
+            identityPhoto.blob,
+            { contentType: "image/jpeg" },
+          );
         if (upErr) throw upErr;
-        uploadedRef.current = true;
+        identityUploadedRef.current = true;
+        console.log(`${UPLOAD_LOG} identidade enviada`);
+      }
+
+      if (!appearanceUploadedRef.current) {
+        const { error: upErr } = await supabase.storage
+          .from("pipoca-visitor-originals")
+          .uploadToSignedUrl(
+            current.uploads.appearance.path,
+            current.uploads.appearance.token,
+            appearancePhoto.blob,
+            { contentType: "image/jpeg" },
+          );
+        if (upErr) throw upErr;
+        appearanceUploadedRef.current = true;
+        console.log(`${UPLOAD_LOG} aparência enviada`);
       }
 
       setUploadStatus("confirming");
@@ -173,22 +207,24 @@ export function PipocaFlow() {
         data: {
           sessionId: current.sessionId,
           captureId: current.captureId,
-          path: current.path,
         },
       });
-      console.log(`${UPLOAD_LOG} concluído`);
       setUploadStatus("idle");
       transitionTo(() => setStep("processing"));
-      // Kick off real generation right after entering the processing step.
       void startGeneration(current.sessionId, current.captureId);
     } catch (err) {
-      const stage =
-        !current ? "prepare" : !uploadedRef.current ? "upload" : "confirm";
+      const stage = !current
+        ? "prepare"
+        : !identityUploadedRef.current
+          ? "upload-identidade"
+          : !appearanceUploadedRef.current
+            ? "upload-aparencia"
+            : "confirm";
       console.warn(`${UPLOAD_LOG} falhou`, { stage });
       setUploadStatus("error");
       setUploadError(stage);
     }
-  }, [photo, selected, prepared, prepareFn, confirmFn, startGeneration]);
+  }, [identityPhoto, appearancePhoto, selected, prepared, prepareFn, confirmFn, startGeneration]);
 
   const retryGeneration = useCallback(() => {
     if (!prepared) return;
@@ -198,21 +234,19 @@ export function PipocaFlow() {
     void startGeneration(prepared.sessionId, prepared.captureId);
   }, [prepared, startGeneration]);
 
-  const retakePhoto = () =>
+  const retakeAll = () =>
     transitionTo(() => {
-      console.log(`${UX} foto descartada`);
-      if (photo) URL.revokeObjectURL(photo.url);
-      setPhoto(null);
-      // new attempt = new session for cleanliness
+      console.log(`${UX} fotos descartadas`);
+      clearPhotos();
+      // New attempt = new session for cleanliness.
       setPrepared(null);
-      uploadedRef.current = false;
       generationStartedRef.current = false;
       setGenerationId(null);
       setGeneratedUrl(null);
       setGenError(null);
       setUploadStatus("idle");
       setUploadError(null);
-      setStep("camera");
+      setStep("camera_identity");
     });
 
   return (
@@ -235,11 +269,10 @@ export function PipocaFlow() {
         <Orient
           movie={selected}
           onNext={() => {
-            console.log(`${UX} pronto para câmera`);
-            transitionTo(() => setStep("camera"));
+            console.log(`${UX} pronto para câmera de identidade`);
+            transitionTo(() => setStep("camera_identity"));
           }}
           onBack={() => {
-            console.log(`${UX} voltar para escolha`);
             transitionTo(() => {
               setSelected(null);
               setStep("choose");
@@ -247,27 +280,58 @@ export function PipocaFlow() {
           }}
         />
       )}
-      {step === "camera" && (
+      {step === "camera_identity" && (
         <Camera
+          variant="identity"
           onCaptured={(p) => {
-            console.log(`${UX} foto capturada`);
-            setPhoto(p);
-            transitionTo(() => setStep("confirm"));
+            console.log(`${CAPTURE_LOG} foto de identidade capturada`);
+            setIdentityPhoto(p);
+            transitionTo(() => setStep("orient_appearance"));
           }}
           onBack={() =>
             transitionTo(() => {
-              console.log(`${UX} câmera cancelada`);
               setStep("orient");
             })
           }
         />
       )}
-      {step === "confirm" && photo && (
+      {step === "orient_appearance" && (
+        <OrientAppearance
+          onNext={() => {
+            transitionTo(() => setStep("camera_appearance"));
+          }}
+          onBack={() => {
+            transitionTo(() => {
+              if (identityPhoto) URL.revokeObjectURL(identityPhoto.url);
+              setIdentityPhoto(null);
+              identityUploadedRef.current = false;
+              setStep("camera_identity");
+            });
+          }}
+        />
+      )}
+      {step === "camera_appearance" && (
+        <Camera
+          variant="appearance"
+          onCaptured={(p) => {
+            console.log(`${CAPTURE_LOG} foto de aparência capturada`);
+            setAppearancePhoto(p);
+            transitionTo(() => setStep("confirm"));
+          }}
+          onBack={() =>
+            transitionTo(() => {
+              setStep("orient_appearance");
+            })
+          }
+        />
+      )}
+      {step === "confirm" && identityPhoto && appearancePhoto && (
         <Confirm
-          photoUrl={photo.url}
-          onRetake={retakePhoto}
+          identityUrl={identityPhoto.url}
+          appearanceUrl={appearancePhoto.url}
+          onRetake={retakeAll}
           onUse={() => {
-            console.log(`${UX} foto confirmada`);
+            console.log(`${UX} fotos confirmadas`);
             void runUpload();
           }}
         />
@@ -293,7 +357,6 @@ export function PipocaFlow() {
         />
       )}
 
-      {/* Generation error overlay */}
       {step === "processing" && genError && (
         <GenerationError
           onRetry={retryGeneration}
@@ -301,21 +364,18 @@ export function PipocaFlow() {
         />
       )}
 
-      {/* Upload progress overlay */}
       {uploadStatus !== "idle" && uploadStatus !== "error" && (
         <UploadOverlay status={uploadStatus} />
       )}
 
-      {/* Upload error overlay */}
       {uploadStatus === "error" && (
         <UploadError
           stage={uploadError}
           onRetry={() => void runUpload()}
-          onRetake={retakePhoto}
+          onRetake={retakeAll}
         />
       )}
 
-      {/* Wedge transition overlay */}
       {transitioning && (
         <div className="fixed inset-0 z-[60] pointer-events-none overflow-hidden" aria-hidden>
           <div
@@ -331,6 +391,7 @@ export function PipocaFlow() {
     </div>
   );
 }
+
 
 function GenerationError({
   onRetry,
@@ -750,11 +811,12 @@ function Orient({
         </div>
 
         <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
-          Entre em <span className="text-gold">cena</span>
+          Vamos tirar <span className="text-gold">duas fotos</span>
         </h1>
         <p className="text-sm sm:text-base text-white/70 max-w-md animate-fade-up">
-          Sua foto será capturada automaticamente.
+          Primeiro, uma foto de perto para reconhecer seu rosto. Depois, uma foto mais distante para registrar sua postura.
         </p>
+
 
         {/* Tips grid */}
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3 w-full max-w-md">
@@ -781,12 +843,52 @@ function Orient({
   );
 }
 
-/* ---------- Step 3: Camera ---------- */
+/* ---------- Step 2b: Orient appearance (between identity and appearance captures) ---------- */
+
+function OrientAppearance({
+  onNext,
+  onBack,
+}: {
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <Screen aurora>
+      <Header subtitle="Segunda foto" />
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-4 sm:gap-5">
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-gold/60 grid place-items-center animate-badge-in">
+          <svg viewBox="0 0 24 24" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" stroke="#F8BA32" strokeWidth="2">
+            <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
+          Agora, <span className="text-gold">dê um passo para trás</span>
+        </h1>
+        <p className="text-sm sm:text-base text-white/75 max-w-md animate-fade-up">
+          Enquadre-se da cintura para cima e mantenha o olhar para a câmera.
+        </p>
+        <ul className="text-xs sm:text-sm text-white/65 space-y-1 max-w-sm">
+          <li>• Apenas uma pessoa</li>
+          <li>• Postura natural, expressão neutra</li>
+          <li>• Não sorria</li>
+        </ul>
+      </div>
+      <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
+        <PrimaryCta onClick={onNext}>Estou pronto</PrimaryCta>
+        <GhostBtn onClick={onBack}>Refazer a primeira foto</GhostBtn>
+      </div>
+    </Screen>
+  );
+}
+
+/* ---------- Step 3 / 5: Camera (variant-aware) ---------- */
 
 function Camera({
+  variant,
   onCaptured,
   onBack,
 }: {
+  variant: CameraVariant;
   onCaptured: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
 }) {
@@ -796,10 +898,10 @@ function Camera({
 
   useEffect(() => {
     if (ready && count === null && !startedRef.current) {
-      console.log(`${UX} contagem iniciada`);
+      console.log(`${UX} contagem iniciada`, { variant });
       setCount(COUNTDOWN_SECONDS);
     }
-  }, [ready, count]);
+  }, [ready, count, variant]);
 
   useEffect(() => {
     if (count === null) return;
@@ -818,14 +920,31 @@ function Camera({
 
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
+  const title =
+    variant === "identity" ? "Enquadre seu rosto" : "Enquadre-se da cintura para cima";
+  const hint =
+    variant === "identity"
+      ? "Posicione o rosto dentro da marcação e olhe diretamente para a câmera."
+      : "Mantenha cabeça, ombros e tronco visíveis, centralizados na marcação.";
+  const subtitle = variant === "identity" ? "Foto de rosto" : "Foto de corpo";
+
+  // Guide mask geometry — pure visual overlay, no crop applied to the captured file.
+  // Identity: tighter oval covering head + shoulders.
+  // Appearance: taller, wider rounded frame covering bust + waist.
+  const maskClass =
+    variant === "identity"
+      ? "w-3/5 h-[62%] rounded-[48%]"
+      : "w-[78%] h-[88%] rounded-[36%]";
+
   return (
     <Screen>
-      <Header subtitle="Câmera" />
+      <Header subtitle={subtitle} />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-3 sm:gap-4">
         <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-white leading-[0.95] animate-fade-up">
-          Olhe para a câmera
+          {title}
         </h1>
+        <p className="text-xs sm:text-sm text-white/70 max-w-md">{hint}</p>
 
         <div className="relative w-full max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
           <video
@@ -844,7 +963,7 @@ function Camera({
           ) : null}
 
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="w-2/3 h-3/4 rounded-[45%] border-2 border-gold/80 animate-pulse-soft" />
+            <div className={`${maskClass} border-2 border-gold/80 animate-pulse-soft`} />
           </div>
 
           {(["tl", "tr", "bl", "br"] as const).map((p) => (
@@ -885,6 +1004,7 @@ function Camera({
     </Screen>
   );
 }
+
 
 function CameraError({
   kind,
@@ -942,11 +1062,13 @@ function CameraError({
 /* ---------- Step 4: Confirm ---------- */
 
 function Confirm({
-  photoUrl,
+  identityUrl,
+  appearanceUrl,
   onRetake,
   onUse,
 }: {
-  photoUrl: string;
+  identityUrl: string;
+  appearanceUrl: string;
   onRetake: () => void;
   onUse: () => void;
 }) {
@@ -954,30 +1076,49 @@ function Confirm({
     <Screen aurora>
       <Header subtitle="Pré-visualização" />
 
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-3 sm:gap-4">
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-3 gap-3 sm:gap-4">
         <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
-          Gostou da sua <span className="text-gold">foto</span>?
+          Usar estas <span className="text-gold">fotos</span>?
         </h1>
 
-        <div className="tb-card bg-card w-full max-w-[420px] aspect-[4/5] overflow-hidden mx-auto shadow-2xl animate-pop-in">
-          <div className="relative w-full h-full">
-            <img
-              src={photoUrl}
-              alt="Sua foto"
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ transform: "scaleX(-1)" }}
-            />
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-[520px]">
+          <div className="flex flex-col items-center gap-1.5 animate-pop-in">
+            <div className="tb-card bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl">
+              <img
+                src={identityUrl}
+                alt="Foto de rosto"
+                className="w-full h-full object-cover"
+                style={{ transform: "scaleX(-1)" }}
+              />
+            </div>
+            <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
+              Foto de rosto
+            </span>
+          </div>
+          <div className="flex flex-col items-center gap-1.5 animate-pop-in">
+            <div className="tb-card bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl">
+              <img
+                src={appearanceUrl}
+                alt="Foto de corpo"
+                className="w-full h-full object-cover"
+                style={{ transform: "scaleX(-1)" }}
+              />
+            </div>
+            <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
+              Foto de corpo
+            </span>
           </div>
         </div>
       </div>
 
       <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
-        <PrimaryCta onClick={onUse}>Usar esta foto</PrimaryCta>
+        <PrimaryCta onClick={onUse}>Usar estas fotos</PrimaryCta>
         <GhostBtn onClick={onRetake}>Tirar novamente</GhostBtn>
       </div>
     </Screen>
   );
 }
+
 
 /* ---------- Step 5: Processing ---------- */
 
