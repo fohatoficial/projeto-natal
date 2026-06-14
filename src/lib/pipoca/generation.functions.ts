@@ -200,16 +200,18 @@ function buildPromptText(rawPrompt: unknown, filmTitle?: string | null): string 
 
 async function createReplicatePrediction(input: {
   prompt: string;
-  faceCropUrl: string;
-  visitorImageUrl: string;
+  identityUrl: string;
+  appearanceUrl: string;
   sceneImageUrl: string;
 }): Promise<ReplicatePrediction> {
   const token = getReplicateToken();
   const body = {
     input: {
       prompt: input.prompt,
-      // Order matters: face-crop = identity, original = appearance, scene = environment
-      input_images: [input.faceCropUrl, input.visitorImageUrl, input.sceneImageUrl],
+      // Order matters: identity, appearance, environment.
+      // On Photon fallback, identity and appearance both come from the
+      // original photo for this single attempt (face-crop.jpg stays absent).
+      input_images: [input.identityUrl, input.appearanceUrl, input.sceneImageUrl],
       aspect_ratio: "4:5",
       output_format: "jpg",
       output_quality: 95,
@@ -307,7 +309,17 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     let faceCropWidth: number | null = null;
     let faceCropHeight: number | null = null;
 
-    // 1) Try to reuse an existing face crop from a previous attempt for this capture.
+    // 1) Always need a signed URL for the original photo — it is used as
+    //    the full-appearance reference on every attempt, and as the identity
+    //    reference when the Photon crop falls back.
+    const { data: signedVisitor, error: signVisitorErr } = await supabaseAdmin.storage
+      .from(ORIGINALS_BUCKET)
+      .createSignedUrl(capture.original_photo_path, SIGNED_REF_TTL);
+    if (signVisitorErr || !signedVisitor?.signedUrl) {
+      throw new Error("Falha ao gerar URL da foto original");
+    }
+
+    // 2) Try to reuse an existing face crop from a previous attempt for this capture.
     let existingCropOk = false;
     try {
       const { data: existing, error: existingErr } = await supabaseAdmin.storage
@@ -322,8 +334,19 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       // ignore — will regenerate below
     }
 
-    if (!existingCropOk) {
-      // 2) Download original photo (required to either crop or fallback).
+    // faceCropSignedUrl stays null in fallback mode; the original photo stands in.
+    let faceCropSignedUrl: string | null = null;
+
+    if (existingCropOk) {
+      const { data: signedFace, error: signFaceErr } = await supabaseAdmin.storage
+        .from(ORIGINALS_BUCKET)
+        .createSignedUrl(faceCropPath, SIGNED_REF_TTL);
+      if (signFaceErr || !signedFace?.signedUrl) {
+        throw new Error("Falha ao gerar URL do face crop");
+      }
+      faceCropSignedUrl = signedFace.signedUrl;
+    } else {
+      // 3) Download original photo (required to either crop or fallback).
       const { data: originalBlob, error: dlErr } = await supabaseAdmin.storage
         .from(ORIGINALS_BUCKET)
         .download(capture.original_photo_path);
@@ -335,46 +358,56 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         throw new Error("Foto original vazia ou inválida");
       }
 
-      // 3) Try Photon crop; on any failure, fall back to the original bytes.
-      let cropBytes: Uint8Array;
+      // 4) Try Photon crop. On any failure we MUST NOT upload the original
+      //    photo to face-crop.jpg — that would let retries treat it as a true
+      //    crop. We just skip the upload and let the original stand in for
+      //    this single attempt; the next retry will retry Photon because
+      //    face-crop.jpg will still be absent.
       try {
         const result = await buildFaceCropJpeg(originalBytes);
         if (!result.bytes || result.bytes.byteLength < MIN_VALID_BYTES) {
           throw new Error("JPEG do crop vazio");
         }
-        cropBytes = result.bytes;
+
+        const { error: faceUpErr } = await supabaseAdmin.storage
+          .from(ORIGINALS_BUCKET)
+          .upload(faceCropPath, result.bytes, { contentType: "image/jpeg", upsert: true });
+        if (faceUpErr) throw new Error(`Falha ao salvar face crop: ${faceUpErr.message}`);
+
         faceCropWidth = result.width;
         faceCropHeight = result.height;
-        console.log(`${FACE_LOG} crop novo gerado`, {
-          bytes: cropBytes.byteLength,
+        console.log(`${FACE_LOG} crop novo gerado e salvo`, {
+          bytes: result.bytes.byteLength,
           width: faceCropWidth,
           height: faceCropHeight,
         });
-      } catch (e) {
-        faceCropFallback = true;
-        cropBytes = originalBytes;
-        const reason = e instanceof Error ? e.message : "erro desconhecido";
-        console.warn(`${FACE_LOG} fallback para original`, { reason });
-      }
 
-      // 4) Upload (upsert) the crop / fallback to the deterministic path.
-      const { error: faceUpErr } = await supabaseAdmin.storage
-        .from(ORIGINALS_BUCKET)
-        .upload(faceCropPath, cropBytes, { contentType: "image/jpeg", upsert: true });
-      if (faceUpErr) throw new Error(`Falha ao salvar face crop: ${faceUpErr.message}`);
-      console.log(`${FACE_LOG} crop salvo com sucesso`, { fallback: faceCropFallback });
+        const { data: signedFace, error: signFaceErr } = await supabaseAdmin.storage
+          .from(ORIGINALS_BUCKET)
+          .createSignedUrl(faceCropPath, SIGNED_REF_TTL);
+        if (signFaceErr || !signedFace?.signedUrl) {
+          throw new Error("Falha ao gerar URL do face crop");
+        }
+        faceCropSignedUrl = signedFace.signedUrl;
+      } catch (e) {
+        // Fallback: original photo as identity reference only for THIS attempt.
+        // face-crop.jpg is intentionally left non-existent so the next retry
+        // can attempt Photon again.
+        faceCropFallback = true;
+        const reason = e instanceof Error ? e.message : "erro desconhecido";
+        console.warn(`${FACE_LOG} fallback para original — face-crop.jpg NÃO será salvo`, {
+          reason,
+        });
+        faceCropSignedUrl = null;
+      }
     }
 
-    // 5) Signed URLs for the two private references (Replicate will fetch these).
-    const [{ data: signedFace, error: signFaceErr }, { data: signedVisitor, error: signErr }] =
-      await Promise.all([
-        supabaseAdmin.storage.from(ORIGINALS_BUCKET).createSignedUrl(faceCropPath, SIGNED_REF_TTL),
-        supabaseAdmin.storage
-          .from(ORIGINALS_BUCKET)
-          .createSignedUrl(capture.original_photo_path, SIGNED_REF_TTL),
-      ]);
-    if (signFaceErr || !signedFace?.signedUrl) throw new Error("Falha ao gerar URL do face crop");
-    if (signErr || !signedVisitor?.signedUrl) throw new Error("Falha ao gerar URL da foto original");
+    // 5) Build the three input image references.
+    //    - With a real crop: identity = face-crop, appearance = original.
+    //    - On fallback: identity and appearance both come from the original
+    //      photo for this single attempt. face-crop.jpg stays absent.
+    const identityUrl = faceCropSignedUrl ?? signedVisitor.signedUrl;
+    const appearanceUrl = signedVisitor.signedUrl;
 
     const promptText = buildPromptText(scenePack.prompt, film?.title);
 
@@ -400,15 +433,18 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
 
     console.log(`${GEN_LOG} usando 3 referências`, {
       generationId: generation.id,
-      order: ["face-crop", "original", "scene-base"],
+      order: faceCropFallback
+        ? ["original (fallback)", "original", "scene-base"]
+        : ["face-crop", "original", "scene-base"],
+      fallback: faceCropFallback,
     });
 
     let prediction: ReplicatePrediction;
     try {
       prediction = await createReplicatePrediction({
         prompt: promptText,
-        faceCropUrl: signedFace.signedUrl,
-        visitorImageUrl: signedVisitor.signedUrl,
+        identityUrl,
+        appearanceUrl,
         sceneImageUrl: scenePack.reference_image_url,
       });
     } catch (e) {
