@@ -196,6 +196,7 @@ function buildPromptText(rawPrompt: unknown, filmTitle?: string | null): string 
 
 async function createReplicatePrediction(input: {
   prompt: string;
+  faceCropUrl: string;
   visitorImageUrl: string;
   sceneImageUrl: string;
 }): Promise<ReplicatePrediction> {
@@ -203,7 +204,8 @@ async function createReplicatePrediction(input: {
   const body = {
     input: {
       prompt: input.prompt,
-      input_images: [input.visitorImageUrl, input.sceneImageUrl],
+      // Order matters: face-crop = identity, original = appearance, scene = environment
+      input_images: [input.faceCropUrl, input.visitorImageUrl, input.sceneImageUrl],
       aspect_ratio: "4:5",
       output_format: "jpg",
       output_quality: 95,
