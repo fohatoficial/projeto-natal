@@ -322,13 +322,48 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       throw new Error("Sessão sem filme/scene pack");
     }
 
-    const { data: scenePack, error: spErr } = await supabaseAdmin
+    // Support multiple active scene packs per film. The schema already carries
+    // the link via session.scene_pack_id (chosen at session creation), so for
+    // backward compatibility we honour that pick first. If for any reason the
+    // session-linked pack is not active/usable, we fall back to a random pick
+    // among the active packs for the film.
+    let scenePack:
+      | { id: string; prompt: unknown; reference_image_url: string | null }
+      | null = null;
+
+    const { data: linkedPack } = await supabaseAdmin
       .from("pipoca_scene_packs")
-      .select("id, prompt, reference_image_url")
+      .select("id, prompt, reference_image_url, active, status, film_id")
       .eq("id", session.scene_pack_id)
       .maybeSingle();
-    if (spErr || !scenePack) throw new Error("Scene pack não encontrado");
+
+    const isUsable = (p: any) =>
+      p && p.reference_image_url && p.active === true && p.status === "active";
+
+    if (isUsable(linkedPack)) {
+      scenePack = linkedPack as any;
+    } else if (session.selected_film_id) {
+      const { data: candidates, error: candErr } = await supabaseAdmin
+        .from("pipoca_scene_packs")
+        .select("id, prompt, reference_image_url, active, status")
+        .eq("film_id", session.selected_film_id)
+        .eq("active", true)
+        .eq("status", "active");
+      if (candErr) throw new Error("Falha ao buscar scene packs");
+      const usable = (candidates ?? []).filter(isUsable);
+      if (usable.length === 0) throw new Error("Nenhum scene pack ativo para o filme");
+      const picked = usable[Math.floor(Math.random() * usable.length)];
+      scenePack = picked as any;
+      console.log(`${LOG} scene pack escolhido entre múltiplos ativos`, {
+        film_id: session.selected_film_id,
+        total_active: usable.length,
+        chosen_scene_pack_id: picked.id,
+      });
+    }
+
+    if (!scenePack) throw new Error("Scene pack não encontrado");
     if (!scenePack.reference_image_url) throw new Error("Cena-base sem reference_image_url");
+    const chosenScenePackId = scenePack.id;
 
     const { data: film } = await supabaseAdmin
       .from("pipoca_films")
