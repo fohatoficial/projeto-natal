@@ -558,6 +558,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           face_crop_dimensions:
             faceCropWidth && faceCropHeight ? `${faceCropWidth}x${faceCropHeight}` : null,
           input_image_count: 3,
+          scene_pack_id: chosenScenePackId,
         },
       })
       .eq("id", generation.id);
