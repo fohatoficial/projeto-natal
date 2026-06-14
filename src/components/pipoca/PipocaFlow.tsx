@@ -558,25 +558,23 @@ function PosterCard({
   return (
     <button
       onClick={() => onPick(movie)}
-      className="tb-card bg-card relative overflow-hidden text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl w-full h-full group"
+      className="tb-card bg-card relative overflow-hidden text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl w-full h-full group film-grain vignette"
     >
-      <div className="absolute inset-0 film-grain vignette">
-        <img
-          src={movie.posterUrl}
-          alt={movie.title}
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-        />
-        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent" />
-        <div className="absolute top-3 left-4">
-          <span className="inline-block bg-gold text-cinema text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded">
-            Tela Brasil
-          </span>
-        </div>
-        <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4">
-          <h3 className="font-display text-xl sm:text-2xl md:text-3xl leading-tight text-white">
-            {movie.title}
-          </h3>
-        </div>
+      <img
+        src={movie.posterUrl}
+        alt={movie.title}
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+      />
+      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
+      <div className="absolute top-3 left-4 z-10">
+        <span className="inline-block bg-gold text-cinema text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded">
+          Tela Brasil
+        </span>
+      </div>
+      <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 z-10">
+        <h3 className="font-display text-xl sm:text-2xl md:text-3xl leading-tight text-white">
+          {movie.title}
+        </h3>
       </div>
     </button>
   );
