@@ -692,14 +692,15 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     // Deterministic monochrome post-processing — applied to EVERY generation
     // before it lands in the bucket. Falls back to the raw bytes if Photon
     // misbehaves so the user still gets their image.
-    let finalBuf = rawBuf;
+    let finalBuf: Uint8Array = rawBuf;
     let postProcess: "monochrome" | "raw-fallback" = "monochrome";
     let postProcessError: string | null = null;
     try {
-      finalBuf = await applyMonochromeFinish(rawBuf);
-      if (!finalBuf || finalBuf.byteLength < 1024) {
+      const processed = await applyMonochromeFinish(rawBuf);
+      if (!processed || processed.byteLength < 1024) {
         throw new Error("pós-processamento devolveu JPEG vazio");
       }
+      finalBuf = new Uint8Array(processed);
     } catch (e) {
       postProcess = "raw-fallback";
       postProcessError = e instanceof Error ? e.message : "erro desconhecido";
