@@ -17,7 +17,10 @@ const GEN_LOG = "[PIPOCA_GENERATION]";
  * Uses @cf-wasm/photon (WASM) so it runs inside the Cloudflare Worker SSR runtime
  * — `sharp` is a native addon and is not supported there.
  */
-async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<Uint8Array> {
+type FaceCropResult = { bytes: Uint8Array; width: number; height: number };
+
+async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<FaceCropResult> {
+  // Dynamic import keeps @cf-wasm/photon out of the browser bundle entirely.
   const photon = await import("@cf-wasm/photon");
   const img = photon.PhotonImage.new_from_byteslice(originalBytes);
   try {
@@ -42,7 +45,8 @@ async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<Uint8Array>
       const outH = Math.max(1, Math.round(ch * scale));
       const resized = photon.resize(cropped, outW, outH, 1);
       try {
-        return resized.get_bytes_jpeg(92);
+        const bytes = resized.get_bytes_jpeg(92);
+        return { bytes, width: outW, height: outH };
       } finally {
         resized.free();
       }
@@ -295,34 +299,73 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .eq("capture_id", capture.id);
     const attemptNumber = (priorCount ?? 0) + 1;
 
-    // 1) Download the original visitor photo (private bucket) so we can derive a face crop.
-    const { data: originalBlob, error: dlErr } = await supabaseAdmin.storage
-      .from(ORIGINALS_BUCKET)
-      .download(capture.original_photo_path);
-    if (dlErr || !originalBlob) throw new Error("Falha ao baixar foto original");
-    const originalBytes = new Uint8Array(await originalBlob.arrayBuffer());
-    console.log(`${FACE_LOG} original baixada`, { bytes: originalBytes.byteLength });
+    const MIN_VALID_BYTES = 2048;
+    const faceCropPath = `${session.id}/${capture.id}/face-crop.jpg`;
 
-    // 2) Build a face-focused crop using a stable geometric heuristic (no face detector here).
-    let faceCropBytes: Uint8Array;
+    let faceCropReused = false;
+    let faceCropFallback = false;
+    let faceCropWidth: number | null = null;
+    let faceCropHeight: number | null = null;
+
+    // 1) Try to reuse an existing face crop from a previous attempt for this capture.
+    let existingCropOk = false;
     try {
-      faceCropBytes = await buildFaceCropJpeg(originalBytes);
-      console.log(`${FACE_LOG} face crop gerado`, { bytes: faceCropBytes.byteLength });
-    } catch (e) {
-      // If photon fails for any reason, fall back to the original bytes so the flow still runs.
-      console.warn(`${FACE_LOG} face crop fallback para original`);
-      faceCropBytes = originalBytes;
+      const { data: existing, error: existingErr } = await supabaseAdmin.storage
+        .from(ORIGINALS_BUCKET)
+        .download(faceCropPath);
+      if (!existingErr && existing && existing.size >= MIN_VALID_BYTES) {
+        existingCropOk = true;
+        faceCropReused = true;
+        console.log(`${FACE_LOG} crop existente reutilizado`, { bytes: existing.size });
+      }
+    } catch {
+      // ignore — will regenerate below
     }
 
-    // 3) Save the face crop at a deterministic path inside the same private bucket.
-    const faceCropPath = `${session.id}/${capture.id}/face-crop.jpg`;
-    const { error: faceUpErr } = await supabaseAdmin.storage
-      .from(ORIGINALS_BUCKET)
-      .upload(faceCropPath, faceCropBytes, { contentType: "image/jpeg", upsert: true });
-    if (faceUpErr) throw new Error(`Falha ao salvar face crop: ${faceUpErr.message}`);
-    console.log(`${FACE_LOG} face crop salvo`);
+    if (!existingCropOk) {
+      // 2) Download original photo (required to either crop or fallback).
+      const { data: originalBlob, error: dlErr } = await supabaseAdmin.storage
+        .from(ORIGINALS_BUCKET)
+        .download(capture.original_photo_path);
+      if (dlErr || !originalBlob) {
+        throw new Error("Falha ao baixar foto original");
+      }
+      const originalBytes = new Uint8Array(await originalBlob.arrayBuffer());
+      if (originalBytes.byteLength < MIN_VALID_BYTES) {
+        throw new Error("Foto original vazia ou inválida");
+      }
 
-    // 4) Signed URLs for the two private references (Replicate will fetch these).
+      // 3) Try Photon crop; on any failure, fall back to the original bytes.
+      let cropBytes: Uint8Array;
+      try {
+        const result = await buildFaceCropJpeg(originalBytes);
+        if (!result.bytes || result.bytes.byteLength < MIN_VALID_BYTES) {
+          throw new Error("JPEG do crop vazio");
+        }
+        cropBytes = result.bytes;
+        faceCropWidth = result.width;
+        faceCropHeight = result.height;
+        console.log(`${FACE_LOG} crop novo gerado`, {
+          bytes: cropBytes.byteLength,
+          width: faceCropWidth,
+          height: faceCropHeight,
+        });
+      } catch (e) {
+        faceCropFallback = true;
+        cropBytes = originalBytes;
+        const reason = e instanceof Error ? e.message : "erro desconhecido";
+        console.warn(`${FACE_LOG} fallback para original`, { reason });
+      }
+
+      // 4) Upload (upsert) the crop / fallback to the deterministic path.
+      const { error: faceUpErr } = await supabaseAdmin.storage
+        .from(ORIGINALS_BUCKET)
+        .upload(faceCropPath, cropBytes, { contentType: "image/jpeg", upsert: true });
+      if (faceUpErr) throw new Error(`Falha ao salvar face crop: ${faceUpErr.message}`);
+      console.log(`${FACE_LOG} crop salvo com sucesso`, { fallback: faceCropFallback });
+    }
+
+    // 5) Signed URLs for the two private references (Replicate will fetch these).
     const [{ data: signedFace, error: signFaceErr }, { data: signedVisitor, error: signErr }] =
       await Promise.all([
         supabaseAdmin.storage.from(ORIGINALS_BUCKET).createSignedUrl(faceCropPath, SIGNED_REF_TTL),
@@ -332,7 +375,6 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       ]);
     if (signFaceErr || !signedFace?.signedUrl) throw new Error("Falha ao gerar URL do face crop");
     if (signErr || !signedVisitor?.signedUrl) throw new Error("Falha ao gerar URL da foto original");
-    console.log(`${FACE_LOG} signed URLs prontas`);
 
     const promptText = buildPromptText(scenePack.prompt, film?.title);
 
@@ -394,7 +436,16 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .update({
         status: "processing",
         provider_job_id: prediction.id,
-        metadata: { model: REPLICATE_MODEL, attempt: attemptNumber },
+        metadata: {
+          model: REPLICATE_MODEL,
+          attempt: attemptNumber,
+          face_crop_path: faceCropPath,
+          face_crop_reused: faceCropReused,
+          face_crop_fallback: faceCropFallback,
+          face_crop_dimensions:
+            faceCropWidth && faceCropHeight ? `${faceCropWidth}x${faceCropHeight}` : null,
+          input_image_count: 3,
+        },
       })
       .eq("id", generation.id);
 
