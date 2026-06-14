@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import type { Movie } from "@/lib/pipoca/movies";
 import { usePipocaFilms } from "@/lib/pipoca/usePipocaFilms";
 import { useCamera, type CameraErrorKind } from "@/lib/pipoca/useCamera";
