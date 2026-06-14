@@ -3,10 +3,10 @@ const LOGO_URL =
 
 export function BrandHeader({ subtitle }: { subtitle?: string }) {
   return (
-    <header className="flex flex-col items-center gap-2 pt-8 pb-4">
-      <img src={LOGO_URL} alt="Tela Brasil" className="h-8 opacity-90" />
+    <header className="flex flex-col items-center gap-2 pt-6 pb-3 shrink-0">
+      <img src={LOGO_URL} alt="Tela Brasil" className="h-10 opacity-90" />
       {subtitle ? (
-        <span className="text-[11px] uppercase tracking-[0.32em] text-gold/80">
+        <span className="text-[12px] uppercase tracking-[0.32em] text-gold/80">
           {subtitle}
         </span>
       ) : null}
