@@ -295,13 +295,44 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .eq("capture_id", capture.id);
     const attemptNumber = (priorCount ?? 0) + 1;
 
-    // Signed download URL for the visitor's private photo (consumed by Replicate)
-    const { data: signedVisitor, error: signErr } = await supabaseAdmin.storage
+    // 1) Download the original visitor photo (private bucket) so we can derive a face crop.
+    const { data: originalBlob, error: dlErr } = await supabaseAdmin.storage
       .from(ORIGINALS_BUCKET)
-      .createSignedUrl(capture.original_photo_path, SIGNED_REF_TTL);
-    if (signErr || !signedVisitor?.signedUrl) {
-      throw new Error("Falha ao gerar URL da foto original");
+      .download(capture.original_photo_path);
+    if (dlErr || !originalBlob) throw new Error("Falha ao baixar foto original");
+    const originalBytes = new Uint8Array(await originalBlob.arrayBuffer());
+    console.log(`${FACE_LOG} original baixada`, { bytes: originalBytes.byteLength });
+
+    // 2) Build a face-focused crop using a stable geometric heuristic (no face detector here).
+    let faceCropBytes: Uint8Array;
+    try {
+      faceCropBytes = await buildFaceCropJpeg(originalBytes);
+      console.log(`${FACE_LOG} face crop gerado`, { bytes: faceCropBytes.byteLength });
+    } catch (e) {
+      // If photon fails for any reason, fall back to the original bytes so the flow still runs.
+      console.warn(`${FACE_LOG} face crop fallback para original`);
+      faceCropBytes = originalBytes;
     }
+
+    // 3) Save the face crop at a deterministic path inside the same private bucket.
+    const faceCropPath = `${session.id}/${capture.id}/face-crop.jpg`;
+    const { error: faceUpErr } = await supabaseAdmin.storage
+      .from(ORIGINALS_BUCKET)
+      .upload(faceCropPath, faceCropBytes, { contentType: "image/jpeg", upsert: true });
+    if (faceUpErr) throw new Error(`Falha ao salvar face crop: ${faceUpErr.message}`);
+    console.log(`${FACE_LOG} face crop salvo`);
+
+    // 4) Signed URLs for the two private references (Replicate will fetch these).
+    const [{ data: signedFace, error: signFaceErr }, { data: signedVisitor, error: signErr }] =
+      await Promise.all([
+        supabaseAdmin.storage.from(ORIGINALS_BUCKET).createSignedUrl(faceCropPath, SIGNED_REF_TTL),
+        supabaseAdmin.storage
+          .from(ORIGINALS_BUCKET)
+          .createSignedUrl(capture.original_photo_path, SIGNED_REF_TTL),
+      ]);
+    if (signFaceErr || !signedFace?.signedUrl) throw new Error("Falha ao gerar URL do face crop");
+    if (signErr || !signedVisitor?.signedUrl) throw new Error("Falha ao gerar URL da foto original");
+    console.log(`${FACE_LOG} signed URLs prontas`);
 
     const promptText = buildPromptText(scenePack.prompt, film?.title);
 
@@ -325,10 +356,16 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       attempt: attemptNumber,
     });
 
+    console.log(`${GEN_LOG} usando 3 referências`, {
+      generationId: generation.id,
+      order: ["face-crop", "original", "scene-base"],
+    });
+
     let prediction: ReplicatePrediction;
     try {
       prediction = await createReplicatePrediction({
         prompt: promptText,
+        faceCropUrl: signedFace.signedUrl,
         visitorImageUrl: signedVisitor.signedUrl,
         sceneImageUrl: scenePack.reference_image_url,
       });
