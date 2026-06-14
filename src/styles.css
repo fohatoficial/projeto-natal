@@ -84,12 +84,22 @@
   .border-gold { border-color: #F8BA32; }
   .bg-cinema { background-color: #06122e; }
 
-  .brand-pattern {
-    background-image: url("/__l5e/assets-v1/c6d609ea-ed2f-42a5-a99f-1b967cf5f49f/pattern_brand.svg");
-    background-size: 900px auto;
-    background-repeat: repeat;
-    background-position: center;
+  /* Kiosk/totem mode: only on tall portrait displays we lock scroll
+     and force the layout to fit the viewport. On phones/desktops
+     the experience scrolls naturally. */
+  @media (min-height: 900px) and (orientation: portrait) {
+    .pipoca-stage {
+      height: 100dvh;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    .pipoca-main { overflow: hidden; }
+    .pipoca-fit { flex: 1 1 0%; min-height: 0; }
   }
+
+
 
   .brand-stripe {
     height: 4px;
