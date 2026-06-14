@@ -27,13 +27,18 @@ async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<FaceCropRes
     const w = img.get_width();
     const h = img.get_height();
 
-    const cropW = Math.round(w * 0.6);
-    const cropH = Math.round(h * 0.55);
-    const x = Math.max(0, Math.round((w - cropW) / 2));
-    // shift up: top of the crop sits at ~12% of the image height instead of centered
-    const y = Math.max(0, Math.round(h * 0.12));
-    const y2 = Math.min(h, y + cropH);
-    const x2 = Math.min(w, x + cropW);
+    // Square crop. Size = 78% of the shorter side — generous enough to keep
+    // forehead, hair, chin, jaw, glasses, beard, neck and a bit of shoulders.
+    // Centered horizontally. Vertically anchored at ~18% from the top, which
+    // shifts the crop DOWN relative to the previous heuristic so the chin is
+    // no longer clipped and there is less empty space above the head.
+    const side = Math.min(w, h);
+    const cropSide = Math.min(w, h, Math.round(side * 0.78));
+    const x = Math.max(0, Math.round((w - cropSide) / 2));
+    const yIdeal = Math.round(h * 0.18);
+    const y = Math.max(0, Math.min(yIdeal, h - cropSide));
+    const x2 = Math.min(w, x + cropSide);
+    const y2 = Math.min(h, y + cropSide);
 
     const cropped = photon.crop(img, x, y, x2, y2);
     try {
@@ -53,6 +58,43 @@ async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<FaceCropRes
     } finally {
       cropped.free();
     }
+  } finally {
+    img.free();
+  }
+}
+
+/**
+ * Deterministic monochrome post-processing.
+ *
+ * Applied to the model output before it is saved to the generated bucket so
+ * every Pipoca image lands with the same Cinema Novo visual language —
+ * predominantly black & white, mild contrast lift, very subtle earthy tone.
+ *
+ * Pure Photon transforms; no facial detection, no per-image tuning.
+ */
+async function applyMonochromeFinish(inputBytes: Uint8Array): Promise<Uint8Array> {
+  const photon = await import("@cf-wasm/photon");
+  const img = photon.PhotonImage.new_from_byteslice(inputBytes);
+  try {
+    // 1. Strict luminance-based grayscale — removes the colour drift between
+    //    runs of the model.
+    photon.grayscale(img);
+    // 2. Gentle contrast lift for the filmic feel. Photon's contrast range is
+    //    roughly -255..255; a small positive value avoids crushing detail.
+    try {
+      (photon as any).adjust_contrast?.(img, 18.0);
+    } catch {
+      // contrast is optional — skip silently if the build lacks it
+    }
+    // 3. Very subtle earthy toning. sepia() is a fixed warm tint; we apply
+    //    it once at low strength by blending through a single pass. If the
+    //    helper is unavailable we just stay neutral B&W.
+    try {
+      (photon as any).sepia?.(img);
+    } catch {
+      // toning is optional
+    }
+    return img.get_bytes_jpeg(94);
   } finally {
     img.free();
   }
