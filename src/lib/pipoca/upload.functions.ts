@@ -2,6 +2,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 const LOG = "[PIPOCA_SERVER]";
+const ORIGINALS_BUCKET = "pipoca-visitor-originals";
+const MIN_VALID_BYTES = 2048;
+
+const IDENTITY_NAME = "identity-close.jpg";
+const APPEARANCE_NAME = "appearance-medium.jpg";
 
 const PrepareInput = z.object({
   filmId: z.string().uuid(),
@@ -45,7 +50,6 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (sessionError || !session) throw new Error("Falha ao criar sessão");
-    console.log(`${LOG} sessão criada`, { sessionId: session.id });
 
     const { data: capture, error: captureError } = await supabaseAdmin
       .from("pipoca_captures")
@@ -56,34 +60,46 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (captureError || !capture) throw new Error("Falha ao criar captura");
-    console.log(`${LOG} captura criada`, { captureId: capture.id });
 
-    const path = `${session.id}/${capture.id}/original.jpg`;
+    const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
+    const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;
 
+    // We still record identity-close.jpg in `original_photo_path` for backward
+    // compatibility with the existing schema (no new column was created).
     const { error: updateError } = await supabaseAdmin
       .from("pipoca_captures")
-      .update({ original_photo_path: path })
+      .update({ original_photo_path: identityPath })
       .eq("id", capture.id);
     if (updateError) throw new Error("Falha ao registrar caminho");
 
-    const { data: signed, error: signedError } = await supabaseAdmin.storage
-      .from("pipoca-visitor-originals")
-      .createSignedUploadUrl(path);
-    if (signedError || !signed) throw new Error("Falha ao criar URL de upload");
-    console.log(`${LOG} signed upload criado`, { path });
+    const { data: signedIdentity, error: sIdErr } = await supabaseAdmin.storage
+      .from(ORIGINALS_BUCKET)
+      .createSignedUploadUrl(identityPath);
+    if (sIdErr || !signedIdentity) throw new Error("Falha ao criar URL de upload (identidade)");
 
-    return {
+    const { data: signedAppearance, error: sApErr } = await supabaseAdmin.storage
+      .from(ORIGINALS_BUCKET)
+      .createSignedUploadUrl(appearancePath);
+    if (sApErr || !signedAppearance) throw new Error("Falha ao criar URL de upload (aparência)");
+
+    console.log(`${LOG} dois uploads assinados criados`, {
       sessionId: session.id,
       captureId: capture.id,
-      path,
-      token: signed.token,
+    });
+
+    return {
+      sessionId: session.id as string,
+      captureId: capture.id as string,
+      uploads: {
+        identity: { path: identityPath, token: signedIdentity.token },
+        appearance: { path: appearancePath, token: signedAppearance.token },
+      },
     };
   });
 
 const ConfirmInput = z.object({
   sessionId: z.string().uuid(),
   captureId: z.string().uuid(),
-  path: z.string().min(1),
 });
 
 export const confirmPipocaCaptureUpload = createServerFn({ method: "POST" })
@@ -93,17 +109,43 @@ export const confirmPipocaCaptureUpload = createServerFn({ method: "POST" })
 
     const { data: capture, error: capErr } = await supabaseAdmin
       .from("pipoca_captures")
-      .select("id, session_id, original_photo_path")
+      .select("id, session_id")
       .eq("id", data.captureId)
       .maybeSingle();
     if (capErr) throw new Error("Falha ao validar captura");
     if (!capture) throw new Error("Captura não encontrada");
     if (capture.session_id !== data.sessionId) throw new Error("Sessão inválida");
-    if (capture.original_photo_path !== data.path) throw new Error("Caminho inválido");
+
+    // Server-derived paths only — never trust client.
+    const folder = `${data.sessionId}/${data.captureId}`;
+    const identityPath = `${folder}/${IDENTITY_NAME}`;
+    const appearancePath = `${folder}/${APPEARANCE_NAME}`;
+
+    // List the capture folder and verify both files exist with minimum size.
+    const { data: listing, error: listErr } = await supabaseAdmin.storage
+      .from(ORIGINALS_BUCKET)
+      .list(folder, { limit: 100 });
+    if (listErr) throw new Error("Falha ao listar uploads");
+
+    const idEntry = listing?.find((f) => f.name === IDENTITY_NAME);
+    const apEntry = listing?.find((f) => f.name === APPEARANCE_NAME);
+    const idSize = (idEntry?.metadata as { size?: number } | undefined)?.size ?? 0;
+    const apSize = (apEntry?.metadata as { size?: number } | undefined)?.size ?? 0;
+
+    if (!idEntry || idSize < MIN_VALID_BYTES) {
+      throw new Error("Foto de identidade ausente ou inválida");
+    }
+    if (!apEntry || apSize < MIN_VALID_BYTES) {
+      throw new Error("Foto de aparência ausente ou inválida");
+    }
 
     const { error: updCapErr } = await supabaseAdmin
       .from("pipoca_captures")
-      .update({ validation_status: "uploaded", validation_error: null })
+      .update({
+        validation_status: "uploaded",
+        validation_error: null,
+        original_photo_path: identityPath,
+      })
       .eq("id", data.captureId);
     if (updCapErr) throw new Error("Falha ao confirmar captura");
 
@@ -113,10 +155,15 @@ export const confirmPipocaCaptureUpload = createServerFn({ method: "POST" })
       .eq("id", data.sessionId);
     if (updSesErr) throw new Error("Falha ao confirmar sessão");
 
-    console.log(`${LOG} upload confirmado`, {
+    console.log(`${LOG} duas fotos confirmadas`, {
       sessionId: data.sessionId,
       captureId: data.captureId,
     });
 
-    return { success: true as const, sessionId: data.sessionId, captureId: data.captureId };
+    return {
+      success: true as const,
+      sessionId: data.sessionId,
+      captureId: data.captureId,
+      paths: { identity: identityPath, appearance: appearancePath },
+    };
   });
