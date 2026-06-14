@@ -161,7 +161,17 @@ function Intro({ onStart }: { onStart: () => void }) {
   );
 }
 
-function Choose({ movies, onPick }: { movies: Movie[]; onPick: (m: Movie) => void }) {
+function Choose({
+  movies,
+  loading,
+  error,
+  onPick,
+}: {
+  movies: Movie[];
+  loading: boolean;
+  error: string | null;
+  onPick: (m: Movie) => void;
+}) {
   return (
     <div className="flex-1 flex flex-col gap-8 pt-4">
       <Title kicker="Passo 1 de 4" title="Escolha seu filme" />
@@ -170,11 +180,17 @@ function Choose({ movies, onPick }: { movies: Movie[]; onPick: (m: Movie) => voi
         personalizada.
       </p>
       <div className="flex-1 flex items-center justify-center">
-        <div className="grid gap-6 w-full">
-          {movies.map((m) => (
-            <MovieCard key={m.id} movie={m} onChoose={onPick} />
-          ))}
-        </div>
+        {loading ? (
+          <p className="text-sm text-white/60 tracking-wide">Carregando filmes...</p>
+        ) : error ? (
+          <p className="text-sm text-white/80 text-center max-w-sm">{error}</p>
+        ) : (
+          <div className="grid gap-6 w-full">
+            {movies.map((m) => (
+              <MovieCard key={m.id} movie={m} onChoose={onPick} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
