@@ -1,5 +1,5 @@
 const LOGO_URL =
-  "/__l5e/assets-v1/84768233-758c-45c3-8737-c88d8b5d689f/logo_tela_brasil_light.svg";
+  "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
 
 export function BrandHeader({ subtitle }: { subtitle?: string }) {
   return (

@@ -18,7 +18,7 @@ export type Movie = {
 };
 
 const FALLBACK_POSTER =
-  "/__l5e/assets-v1/de37c2a3-37e1-4362-939b-17608c38ef7b/deus-e-o-diabo.jpg";
+  "/__l5e/assets-v1/81005976-aa68-4880-90ed-e70f253ec886/deus-e-o-diabo.jpg";
 
 export function mapFilmRow(row: {
   id: string;
