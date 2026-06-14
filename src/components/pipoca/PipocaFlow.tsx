@@ -40,11 +40,6 @@ const UX = "[PIPOCA_UX]";
 
 /* ---------- Root ---------- */
 
-export function PipocaFlow() {
-  const [step, setStep] = useState<Step>("choose");
-  const [selected, setSelected] = useState<Movie | null>(null);
-  const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
-  const [transitioning, setTransitioning] = useState(false);
 type Prepared = {
   sessionId: string;
   captureId: string;
