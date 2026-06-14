@@ -857,35 +857,40 @@ function Orient({
 
 function OrientAppearance({
   onNext,
-  onBack,
 }: {
   onNext: () => void;
   onBack: () => void;
 }) {
+  const firedRef = useRef(false);
+  useEffect(() => {
+    if (firedRef.current) return;
+    const t = window.setTimeout(() => {
+      firedRef.current = true;
+      onNext();
+    }, 2000);
+    return () => window.clearTimeout(t);
+  }, [onNext]);
+
   return (
     <Screen aurora>
       <Header subtitle="Segunda foto" />
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-4 sm:gap-5">
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-5 sm:gap-6">
         <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-gold/60 grid place-items-center animate-badge-in">
           <svg viewBox="0 0 24 24" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" stroke="#F8BA32" strokeWidth="2">
             <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
+        <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl text-white leading-[0.95] animate-fade-up">
           Agora, <span className="text-gold">dê um passo para trás</span>
         </h1>
-        <p className="text-sm sm:text-base text-white/75 max-w-md animate-fade-up">
-          Enquadre-se da cintura para cima e mantenha o olhar para a câmera.
+        <p className="text-base sm:text-lg text-white/80 max-w-md animate-fade-up">
+          Vamos registrar seu corpo da cintura para cima.
         </p>
-        <ul className="text-xs sm:text-sm text-white/65 space-y-1 max-w-sm">
-          <li>• Apenas uma pessoa</li>
-          <li>• Postura natural, expressão neutra</li>
-          <li>• Não sorria</li>
-        </ul>
       </div>
-      <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
-        <PrimaryCta onClick={onNext}>Estou pronto</PrimaryCta>
-        <GhostBtn onClick={onBack}>Refazer a primeira foto</GhostBtn>
+      <div className="relative z-10 shrink-0">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-white/50">
+          Preparando câmera…
+        </p>
       </div>
     </Screen>
   );
