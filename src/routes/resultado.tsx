@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { StageShell } from "@/components/pipoca/StageShell";
-import { getActiveMovies } from "@/lib/pipoca/movies";
+import { mapFilmRow } from "@/lib/pipoca/movies";
 
 export const Route = createFileRoute("/resultado")({
   head: () => ({
@@ -23,8 +23,17 @@ export const Route = createFileRoute("/resultado")({
 });
 
 function ResultadoPage() {
-  // MVP: apenas 1 filme ativo. Estrutura preparada para múltiplos depois.
-  const movie = getActiveMovies()[0];
+  // Página de resultado standalone: usa placeholder até receber dados do fluxo.
+  const movie = mapFilmRow({
+    id: "",
+    title: "Tela Brasil",
+    slug: "",
+    synopsis_short: null,
+    cover_url: null,
+    catalog_url: null,
+    active: true,
+    display_order: 0,
+  });
 
   return (
     <StageShell subtitle="Pipoca & Cena · Sua cena">
