@@ -593,11 +593,21 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     const { data: gen, error: gErr } = await supabaseAdmin
       .from("pipoca_generations")
       .select(
-        "id, session_id, status, provider_job_id, final_image_path, created_at",
+        "id, session_id, status, provider_job_id, final_image_path, created_at, metadata",
       )
       .eq("id", data.generationId)
       .maybeSingle();
     if (gErr || !gen) throw new Error("Geração não encontrada");
+
+    // Helper: merge into existing metadata so previously-stored fields
+    // (face_crop_*, input_image_count, scene_pack_id, model, attempt…) are
+    // never wiped by a subsequent partial update.
+    const mergeMetadata = (extra: Record<string, unknown>) => ({
+      ...(typeof gen.metadata === "object" && gen.metadata !== null
+        ? (gen.metadata as Record<string, unknown>)
+        : {}),
+      ...extra,
+    });
 
     // Already completed: just re-sign the existing file
     if (gen.status === "completed" && gen.final_image_path) {
