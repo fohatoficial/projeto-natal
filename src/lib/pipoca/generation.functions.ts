@@ -655,7 +655,11 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
       const errMsg = pred.error ?? "Falha na geração";
       await supabaseAdmin
         .from("pipoca_generations")
-        .update({ status: "failed", error_message: errMsg })
+        .update({
+          status: "failed",
+          error_message: errMsg,
+          metadata: mergeMetadata({ replicate_status: pred.status }),
+        })
         .eq("id", gen.id);
       await supabaseAdmin
         .from("pipoca_sessions")
@@ -670,7 +674,11 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     if (!outputUrl || typeof outputUrl !== "string") {
       await supabaseAdmin
         .from("pipoca_generations")
-        .update({ status: "failed", error_message: "Sem output" })
+        .update({
+          status: "failed",
+          error_message: "Sem output",
+          metadata: mergeMetadata({ replicate_status: pred.status }),
+        })
         .eq("id", gen.id);
       return { status: "failed", error: "Saída vazia do modelo" };
     }
@@ -679,14 +687,38 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     if (!imgRes.ok) {
       throw new Error(`Falha ao baixar imagem: ${imgRes.status}`);
     }
-    const buf = new Uint8Array(await imgRes.arrayBuffer());
+    const rawBuf = new Uint8Array(await imgRes.arrayBuffer());
+
+    // Deterministic monochrome post-processing — applied to EVERY generation
+    // before it lands in the bucket. Falls back to the raw bytes if Photon
+    // misbehaves so the user still gets their image.
+    let finalBuf = rawBuf;
+    let postProcess: "monochrome" | "raw-fallback" = "monochrome";
+    let postProcessError: string | null = null;
+    try {
+      finalBuf = await applyMonochromeFinish(rawBuf);
+      if (!finalBuf || finalBuf.byteLength < 1024) {
+        throw new Error("pós-processamento devolveu JPEG vazio");
+      }
+    } catch (e) {
+      postProcess = "raw-fallback";
+      postProcessError = e instanceof Error ? e.message : "erro desconhecido";
+      finalBuf = rawBuf;
+      console.warn(`${LOG} pós-processamento B&W falhou — usando saída crua`, {
+        reason: postProcessError,
+      });
+    }
+
     const finalPath = `${gen.session_id}/${gen.id}/final.jpg`;
 
     const { error: upErr } = await supabaseAdmin.storage
       .from(GENERATED_BUCKET)
-      .upload(finalPath, buf, { contentType: "image/jpeg", upsert: true });
+      .upload(finalPath, finalBuf, { contentType: "image/jpeg", upsert: true });
     if (upErr) throw new Error(`Upload final falhou: ${upErr.message}`);
-    console.log(`${LOG} imagem final salva`, { generationId: gen.id });
+    console.log(`${LOG} imagem final salva`, {
+      generationId: gen.id,
+      postProcess,
+    });
 
     const processingMs =
       typeof pred.metrics?.predict_time === "number"
@@ -699,6 +731,10 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
         status: "completed",
         final_image_path: finalPath,
         error_message: null,
+        metadata: mergeMetadata({
+          post_process: postProcess,
+          post_process_error: postProcessError,
+        }),
         ...(processingMs !== null ? { processing_time_ms: processingMs } : {}),
       })
       .eq("id", gen.id);
