@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { StageShell } from "@/components/pipoca/StageShell";
 import { MovieCard } from "@/components/pipoca/MovieCard";
-import { getActiveMovies, type Movie } from "@/lib/pipoca/movies";
+import type { Movie } from "@/lib/pipoca/movies";
+import { usePipocaFilms } from "@/lib/pipoca/usePipocaFilms";
 
 type Step =
   | "intro"
@@ -31,7 +32,7 @@ const LOADING_PHRASES = [
 export function PipocaFlow() {
   const [step, setStep] = useState<Step>("intro");
   const [selected, setSelected] = useState<Movie | null>(null);
-  const movies = useMemo(() => getActiveMovies(), []);
+  const { films: movies, loading, error } = usePipocaFilms();
 
   const reset = () => {
     setSelected(null);
@@ -45,6 +46,8 @@ export function PipocaFlow() {
         {step === "choose" && (
           <Choose
             movies={movies}
+            loading={loading}
+            error={error}
             onPick={(m) => {
               setSelected(m);
               setStep("chosen");
