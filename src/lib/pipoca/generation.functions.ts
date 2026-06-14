@@ -17,7 +17,10 @@ const GEN_LOG = "[PIPOCA_GENERATION]";
  * Uses @cf-wasm/photon (WASM) so it runs inside the Cloudflare Worker SSR runtime
  * — `sharp` is a native addon and is not supported there.
  */
-async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<Uint8Array> {
+type FaceCropResult = { bytes: Uint8Array; width: number; height: number };
+
+async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<FaceCropResult> {
+  // Dynamic import keeps @cf-wasm/photon out of the browser bundle entirely.
   const photon = await import("@cf-wasm/photon");
   const img = photon.PhotonImage.new_from_byteslice(originalBytes);
   try {
@@ -42,7 +45,8 @@ async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<Uint8Array>
       const outH = Math.max(1, Math.round(ch * scale));
       const resized = photon.resize(cropped, outW, outH, 1);
       try {
-        return resized.get_bytes_jpeg(92);
+        const bytes = resized.get_bytes_jpeg(92);
+        return { bytes, width: outW, height: outH };
       } finally {
         resized.free();
       }
