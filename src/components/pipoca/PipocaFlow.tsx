@@ -981,19 +981,70 @@ function Confirm({
 
 /* ---------- Step 5: Processing ---------- */
 
-function Processing({ movie, onDone }: { movie: Movie; onDone: () => void }) {
+type StatusFn = (args: { data: { generationId: string } }) => Promise<
+  | { status: "queued" | "processing" }
+  | { status: "failed"; error: string }
+  | { status: "completed"; generationId: string; imageUrl: string }
+>;
+
+function Processing({
+  movie,
+  generationId,
+  errored,
+  pollFn,
+  onDone,
+  onError,
+}: {
+  movie: Movie;
+  generationId: string | null;
+  errored: boolean;
+  pollFn: StatusFn;
+  onDone: (imageUrl: string) => void;
+  onError: (msg: string) => void;
+}) {
   const [phraseIdx, setPhraseIdx] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setPhraseIdx((i) => (i + 1) % LOADING_PHRASES.length);
     }, 1600);
-    const done = setTimeout(onDone, LOADING_PHRASES.length * 1600);
-    return () => {
-      clearInterval(interval);
-      clearTimeout(done);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!generationId || errored) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        console.log(`${GEN_LOG} polling`, { generationId });
+        const res = await pollFn({ data: { generationId } });
+        if (cancelled) return;
+        if (res.status === "completed") {
+          console.log(`${GEN_LOG} concluída`);
+          onDone(res.imageUrl);
+          return;
+        }
+        if (res.status === "failed") {
+          console.warn(`${GEN_LOG} falhou`);
+          onError(res.error || "Falha na geração");
+          return;
+        }
+        timer = setTimeout(tick, 2500);
+      } catch (e) {
+        if (cancelled) return;
+        console.warn(`${GEN_LOG} erro ao consultar`, e);
+        timer = setTimeout(tick, 4000);
+      }
     };
-  }, [onDone]);
+    timer = setTimeout(tick, 1500);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [generationId, errored, pollFn, onDone, onError]);
 
   return (
     <Screen aurora>
@@ -1036,15 +1087,16 @@ function Processing({ movie, onDone }: { movie: Movie; onDone: () => void }) {
   );
 }
 
+
 /* ---------- Step 6: Result + QR ---------- */
 
 function Result({
   movie,
-  photoUrl,
+  imageUrl,
   onRestart,
 }: {
   movie: Movie;
-  photoUrl: string | null;
+  imageUrl: string | null;
   onRestart: () => void;
 }) {
   return (
@@ -1059,10 +1111,9 @@ function Result({
         <div className="tb-card bg-card w-full max-w-[340px] aspect-[3/4] overflow-hidden mx-auto shadow-2xl animate-pop-in">
           <div className="relative w-full h-full film-grain vignette">
             <img
-              src={photoUrl ?? movie.posterUrl}
+              src={imageUrl ?? movie.posterUrl}
               alt="Cena gerada"
               className="absolute inset-0 w-full h-full object-cover"
-              style={photoUrl ? { transform: "scaleX(-1)" } : undefined}
             />
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 to-transparent p-3">
               <span className="text-[10px] uppercase tracking-[0.3em] text-gold">
@@ -1073,6 +1124,7 @@ function Result({
               </h3>
             </div>
           </div>
+
         </div>
 
         <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-2.5 sm:p-3 w-full max-w-sm animate-fade-up">
