@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-router";
 import type { Movie } from "@/lib/pipoca/movies";
 import { usePipocaFilms } from "@/lib/pipoca/usePipocaFilms";
 import { useCamera, type CameraErrorKind } from "@/lib/pipoca/useCamera";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  createPipocaCaptureUpload,
+  confirmPipocaCaptureUpload,
+} from "@/lib/pipoca/upload.functions";
+
 
 type Step =
   | "choose"
