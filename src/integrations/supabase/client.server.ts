@@ -22,9 +22,11 @@ const supabaseUrl =
   process.env.VITE_SUPABASE_URL ??
   "https://brsplarbpylygnsakyjf.supabase.co";
 
+// Note: Lovable reserves the "SUPABASE_" prefix for managed secrets, so the
+// external project's service_role is stored as PIPOCA_SUPABASE_SERVICE_ROLE_KEY.
 export const supabaseAdmin = createClient(
   supabaseUrl,
-  getEnv("SUPABASE_SERVICE_ROLE_KEY"),
+  getEnv("PIPOCA_SUPABASE_SERVICE_ROLE_KEY"),
   {
     auth: {
       persistSession: false,
