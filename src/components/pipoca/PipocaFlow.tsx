@@ -99,12 +99,22 @@ export function PipocaFlow() {
   const createGenFn = useServerFn(createPipocaGeneration);
   const statusGenFn = useServerFn(getPipocaGenerationStatus);
 
+  // Keep refs in sync so the unmount cleanup can revoke without re-running
+  // the effect (and prematurely revoking) whenever a photo state changes.
+  const identityRef = useRef<{ blob: Blob; url: string } | null>(null);
+  const appearanceRef = useRef<{ blob: Blob; url: string } | null>(null);
+  useEffect(() => {
+    identityRef.current = identityPhoto;
+  }, [identityPhoto]);
+  useEffect(() => {
+    appearanceRef.current = appearancePhoto;
+  }, [appearancePhoto]);
   useEffect(() => {
     return () => {
-      if (identityPhoto) URL.revokeObjectURL(identityPhoto.url);
-      if (appearancePhoto) URL.revokeObjectURL(appearancePhoto.url);
+      if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
+      if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
     };
-  }, [identityPhoto, appearancePhoto]);
+  }, []);
 
   function transitionTo(swap: () => void) {
     setTransitioning(true);
