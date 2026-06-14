@@ -811,11 +811,12 @@ function Orient({
         </div>
 
         <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
-          Entre em <span className="text-gold">cena</span>
+          Vamos tirar <span className="text-gold">duas fotos</span>
         </h1>
         <p className="text-sm sm:text-base text-white/70 max-w-md animate-fade-up">
-          Sua foto será capturada automaticamente.
+          Primeiro, uma foto de perto para reconhecer seu rosto. Depois, uma foto mais distante para registrar sua postura.
         </p>
+
 
         {/* Tips grid */}
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3 w-full max-w-md">
@@ -842,12 +843,52 @@ function Orient({
   );
 }
 
-/* ---------- Step 3: Camera ---------- */
+/* ---------- Step 2b: Orient appearance (between identity and appearance captures) ---------- */
+
+function OrientAppearance({
+  onNext,
+  onBack,
+}: {
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <Screen aurora>
+      <Header subtitle="Segunda foto" />
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-4 sm:gap-5">
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-gold/60 grid place-items-center animate-badge-in">
+          <svg viewBox="0 0 24 24" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" stroke="#F8BA32" strokeWidth="2">
+            <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
+          Agora, <span className="text-gold">dê um passo para trás</span>
+        </h1>
+        <p className="text-sm sm:text-base text-white/75 max-w-md animate-fade-up">
+          Enquadre-se da cintura para cima e mantenha o olhar para a câmera.
+        </p>
+        <ul className="text-xs sm:text-sm text-white/65 space-y-1 max-w-sm">
+          <li>• Apenas uma pessoa</li>
+          <li>• Postura natural, expressão neutra</li>
+          <li>• Não sorria</li>
+        </ul>
+      </div>
+      <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
+        <PrimaryCta onClick={onNext}>Estou pronto</PrimaryCta>
+        <GhostBtn onClick={onBack}>Refazer a primeira foto</GhostBtn>
+      </div>
+    </Screen>
+  );
+}
+
+/* ---------- Step 3 / 5: Camera (variant-aware) ---------- */
 
 function Camera({
+  variant,
   onCaptured,
   onBack,
 }: {
+  variant: CameraVariant;
   onCaptured: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
 }) {
@@ -857,10 +898,10 @@ function Camera({
 
   useEffect(() => {
     if (ready && count === null && !startedRef.current) {
-      console.log(`${UX} contagem iniciada`);
+      console.log(`${UX} contagem iniciada`, { variant });
       setCount(COUNTDOWN_SECONDS);
     }
-  }, [ready, count]);
+  }, [ready, count, variant]);
 
   useEffect(() => {
     if (count === null) return;
@@ -879,14 +920,31 @@ function Camera({
 
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
+  const title =
+    variant === "identity" ? "Enquadre seu rosto" : "Enquadre-se da cintura para cima";
+  const hint =
+    variant === "identity"
+      ? "Posicione o rosto dentro da marcação e olhe diretamente para a câmera."
+      : "Mantenha cabeça, ombros e tronco visíveis, centralizados na marcação.";
+  const subtitle = variant === "identity" ? "Foto de rosto" : "Foto de corpo";
+
+  // Guide mask geometry — pure visual overlay, no crop applied to the captured file.
+  // Identity: tighter oval covering head + shoulders.
+  // Appearance: taller, wider rounded frame covering bust + waist.
+  const maskClass =
+    variant === "identity"
+      ? "w-3/5 h-[62%] rounded-[48%]"
+      : "w-[78%] h-[88%] rounded-[36%]";
+
   return (
     <Screen>
-      <Header subtitle="Câmera" />
+      <Header subtitle={subtitle} />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-3 sm:gap-4">
         <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-white leading-[0.95] animate-fade-up">
-          Olhe para a câmera
+          {title}
         </h1>
+        <p className="text-xs sm:text-sm text-white/70 max-w-md">{hint}</p>
 
         <div className="relative w-full max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
           <video
@@ -905,7 +963,7 @@ function Camera({
           ) : null}
 
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="w-2/3 h-3/4 rounded-[45%] border-2 border-gold/80 animate-pulse-soft" />
+            <div className={`${maskClass} border-2 border-gold/80 animate-pulse-soft`} />
           </div>
 
           {(["tl", "tr", "bl", "br"] as const).map((p) => (
@@ -946,6 +1004,7 @@ function Camera({
     </Screen>
   );
 }
+
 
 function CameraError({
   kind,
@@ -1003,11 +1062,13 @@ function CameraError({
 /* ---------- Step 4: Confirm ---------- */
 
 function Confirm({
-  photoUrl,
+  identityUrl,
+  appearanceUrl,
   onRetake,
   onUse,
 }: {
-  photoUrl: string;
+  identityUrl: string;
+  appearanceUrl: string;
   onRetake: () => void;
   onUse: () => void;
 }) {
@@ -1015,30 +1076,49 @@ function Confirm({
     <Screen aurora>
       <Header subtitle="Pré-visualização" />
 
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-3 sm:gap-4">
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-3 gap-3 sm:gap-4">
         <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
-          Gostou da sua <span className="text-gold">foto</span>?
+          Usar estas <span className="text-gold">fotos</span>?
         </h1>
 
-        <div className="tb-card bg-card w-full max-w-[420px] aspect-[4/5] overflow-hidden mx-auto shadow-2xl animate-pop-in">
-          <div className="relative w-full h-full">
-            <img
-              src={photoUrl}
-              alt="Sua foto"
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ transform: "scaleX(-1)" }}
-            />
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-[520px]">
+          <div className="flex flex-col items-center gap-1.5 animate-pop-in">
+            <div className="tb-card bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl">
+              <img
+                src={identityUrl}
+                alt="Foto de rosto"
+                className="w-full h-full object-cover"
+                style={{ transform: "scaleX(-1)" }}
+              />
+            </div>
+            <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
+              Foto de rosto
+            </span>
+          </div>
+          <div className="flex flex-col items-center gap-1.5 animate-pop-in">
+            <div className="tb-card bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl">
+              <img
+                src={appearanceUrl}
+                alt="Foto de corpo"
+                className="w-full h-full object-cover"
+                style={{ transform: "scaleX(-1)" }}
+              />
+            </div>
+            <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
+              Foto de corpo
+            </span>
           </div>
         </div>
       </div>
 
       <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
-        <PrimaryCta onClick={onUse}>Usar esta foto</PrimaryCta>
+        <PrimaryCta onClick={onUse}>Usar estas fotos</PrimaryCta>
         <GhostBtn onClick={onRetake}>Tirar novamente</GhostBtn>
       </div>
     </Screen>
   );
 }
+
 
 /* ---------- Step 5: Processing ---------- */
 
