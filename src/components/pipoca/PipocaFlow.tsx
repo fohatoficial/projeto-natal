@@ -25,7 +25,6 @@ const LOADING_PHRASES = [
 const PAGE_SIZE = 4;
 const COUNTDOWN_SECONDS = 10;
 
-// Constante de inatividade preparada para uso futuro (não ativa nesta etapa).
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const PIPOCA_INACTIVITY_TIMEOUT_MS = 90_000;
 
@@ -55,7 +54,7 @@ export function PipocaFlow() {
     <StageShell>
       <div
         key={step}
-        className="flex-1 flex flex-col min-h-0 animate-fade-in w-full mx-auto"
+        className="pipoca-fit w-full mx-auto animate-fade-in flex flex-col gap-5"
         style={{ maxWidth: 820 }}
       >
         {step === "choose" && (
@@ -142,7 +141,7 @@ function PrimaryButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="w-full mx-auto bg-gold text-cinema font-semibold tracking-wider uppercase rounded-md py-6 text-base hover:brightness-110 active:scale-[0.99] transition disabled:opacity-50"
+      className="w-full mx-auto bg-gold text-cinema font-semibold tracking-wider uppercase rounded-md py-5 sm:py-6 text-base hover:brightness-110 active:scale-[0.99] transition disabled:opacity-50"
     >
       {children}
     </button>
@@ -159,10 +158,18 @@ function GhostButton({
   return (
     <button
       onClick={onClick}
-      className="w-full mx-auto border border-white/25 text-white/90 font-medium tracking-wider uppercase rounded-md py-5 text-sm hover:bg-white/5 active:scale-[0.99] transition"
+      className="w-full mx-auto border border-white/25 text-white/90 font-medium tracking-wider uppercase rounded-md py-4 sm:py-5 text-sm hover:bg-white/5 active:scale-[0.99] transition"
     >
       {children}
     </button>
+  );
+}
+
+function Badge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 text-gold px-3 py-1.5 text-[11px] uppercase tracking-[0.2em]">
+      {children}
+    </span>
   );
 }
 
@@ -186,22 +193,20 @@ function Choose({
   const onlyOne = movies.length === 1;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 gap-4 pt-2">
-      <div className="text-center shrink-0">
-        <span className="text-[12px] uppercase tracking-[0.3em] text-gold">
-          Pipoca &amp; Cena
-        </span>
-        <h1 className="font-display text-5xl md:text-6xl text-white mt-2 leading-[0.95]">
+    <div className="flex-1 flex flex-col min-h-0 gap-5">
+      <header className="text-center shrink-0 flex flex-col items-center gap-3">
+        <Badge>Pipoca &amp; Cena</Badge>
+        <h1 className="font-display text-4xl sm:text-5xl md:text-6xl text-white leading-[0.95]">
           Escolha seu filme
         </h1>
-        <p className="mt-3 text-base text-white/75 max-w-xl mx-auto">
-          Toque em uma obra do catálogo Tela Brasil para entrar em cena.
+        <p className="text-sm sm:text-base text-white/70 max-w-md">
+          Toque em uma obra para entrar em cena.
         </p>
-      </div>
+      </header>
 
       <div className="flex-1 min-h-0 flex items-center justify-center">
         {loading ? (
-          <p className="text-base text-white/60 tracking-wide">
+          <p className="text-base text-white/60 tracking-wide animate-pulse-soft">
             Carregando filmes…
           </p>
         ) : error ? (
@@ -209,37 +214,44 @@ function Choose({
         ) : movies.length === 0 ? (
           <p className="text-base text-white/70">Nenhum filme disponível.</p>
         ) : onlyOne ? (
-          <div className="h-full flex items-center justify-center w-full">
-            <div className="h-full max-h-full aspect-[3/4]">
-              <PosterCard movie={slice[0]} onPick={onPick} />
-            </div>
+          <div className="w-full max-w-[360px] mx-auto aspect-[3/4]">
+            <PosterCard movie={slice[0]} onPick={onPick} />
           </div>
         ) : (
-          <div className="h-full w-full grid grid-cols-2 grid-rows-2 gap-4">
+          <div className="w-full grid grid-cols-2 gap-3 sm:gap-4 auto-rows-fr">
             {slice.map((m) => (
-              <PosterCard key={m.id} movie={m} onPick={onPick} />
+              <div key={m.id} className="aspect-[3/4]">
+                <PosterCard movie={m} onPick={onPick} />
+              </div>
             ))}
           </div>
         )}
       </div>
 
       {totalPages > 1 ? (
-        <div className="flex items-center justify-between gap-4 shrink-0 pt-2">
+        <div className="flex items-center justify-between gap-4 shrink-0">
           <button
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0}
-            className="w-20 h-20 rounded-full border border-white/25 grid place-items-center text-white text-3xl disabled:opacity-30 active:scale-95"
+            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border border-white/25 grid place-items-center text-white text-2xl sm:text-3xl disabled:opacity-30 active:scale-95"
             aria-label="Página anterior"
           >
             ‹
           </button>
-          <span className="text-sm uppercase tracking-[0.3em] text-white/70">
-            {page + 1} / {totalPages}
-          </span>
+          <div className="flex items-center gap-2">
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <span
+                key={i}
+                className={`h-2 rounded-full transition-all ${
+                  i === page ? "w-8 bg-gold" : "w-2 bg-white/25"
+                }`}
+              />
+            ))}
+          </div>
           <button
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            className="w-20 h-20 rounded-full border border-white/25 grid place-items-center text-white text-3xl disabled:opacity-30 active:scale-95"
+            className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border border-white/25 grid place-items-center text-white text-2xl sm:text-3xl disabled:opacity-30 active:scale-95"
             aria-label="Próxima página"
           >
             ›
@@ -260,20 +272,22 @@ function PosterCard({
   return (
     <button
       onClick={() => onPick(movie)}
-      className="tb-card bg-card relative overflow-hidden text-left active:scale-[0.99] transition shadow-2xl w-full h-full"
+      className="tb-card bg-card relative overflow-hidden text-left active:scale-[0.99] transition shadow-2xl w-full h-full group"
     >
       <div className="absolute inset-0 film-grain vignette">
         <img
           src={movie.posterUrl}
           alt={movie.title}
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 p-4">
-          <span className="text-[10px] uppercase tracking-[0.3em] text-gold">
-            Catálogo Tela Brasil
+        <div className="absolute top-3 left-3">
+          <span className="inline-block bg-gold/95 text-cinema text-[9px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded">
+            Tela Brasil
           </span>
-          <h3 className="font-display text-2xl md:text-3xl leading-tight mt-1 text-white">
+        </div>
+        <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4">
+          <h3 className="font-display text-xl sm:text-2xl md:text-3xl leading-tight text-white">
             {movie.title}
           </h3>
         </div>
@@ -297,54 +311,55 @@ function Orient({
     console.log(`${UX} tela de instruções aberta`);
   }, []);
 
+  const tips = [
+    { icon: "👤", label: "Rosto visível" },
+    { icon: "💡", label: "Boa iluminação" },
+    { icon: "🎯", label: "Olhe para a câmera" },
+    { icon: "👥", label: "Apenas 1 pessoa" },
+  ];
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 gap-5 pt-2">
-      <div className="flex items-center gap-4 shrink-0 bg-white/5 border border-white/10 rounded-xl p-3">
-        <div className="w-16 h-20 rounded overflow-hidden flex-shrink-0">
+    <div className="flex-1 flex flex-col min-h-0 gap-5">
+      <div className="flex items-center gap-3 shrink-0 bg-white/5 border border-white/10 rounded-xl p-3">
+        <div className="w-14 h-18 rounded overflow-hidden flex-shrink-0">
           <img
             src={movie.posterUrl}
             alt={movie.title}
             className="w-full h-full object-cover"
           />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-[10px] uppercase tracking-[0.25em] text-gold">
             Filme escolhido
           </p>
-          <p className="text-base text-white truncate">{movie.title}</p>
-          <p className="text-xs text-white/60 truncate">
-            Sua cena será inspirada nesta obra.
+          <p className="text-base text-white truncate font-display tracking-wide">
+            {movie.title}
           </p>
         </div>
       </div>
 
-      <div className="text-center shrink-0">
-        <h1 className="font-display text-5xl text-white leading-[0.95]">
-          Prepare-se para entrar em cena
+      <header className="text-center shrink-0">
+        <h1 className="font-display text-4xl sm:text-5xl text-white leading-[0.95]">
+          Prepare-se
         </h1>
-      </div>
+        <p className="mt-2 text-sm text-white/65">
+          Sua foto será capturada automaticamente.
+        </p>
+      </header>
 
-      <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-6">
-        <div className="relative w-52 h-52">
-          <div className="absolute inset-0 rounded-full border-2 border-dashed border-gold/60 animate-pulse-soft" />
-          <div className="absolute inset-6 rounded-full border border-white/15" />
-          <div className="absolute inset-0 grid place-items-center text-gold">
-            <svg viewBox="0 0 24 24" className="w-20 h-20" fill="currentColor">
-              <path d="M12 12.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM4 20c0-3.314 3.582-6 8-6s8 2.686 8 6v.5H4V20z" />
-            </svg>
-          </div>
-        </div>
-
-        <div className="text-center max-w-xl space-y-3 px-2">
-          <p className="text-lg text-white">
-            Fique em frente à câmera, com o rosto visível e bem iluminado.
-          </p>
-          <p className="text-base text-white/65">
-            Mantenha uma expressão natural e olhe diretamente para a câmera.
-          </p>
-          <p className="mt-4 inline-block text-sm uppercase tracking-[0.25em] text-gold border border-gold/40 rounded-md px-4 py-2">
-            Experiência individual — apenas uma pessoa na foto
-          </p>
+      <div className="flex-1 min-h-0 flex items-center justify-center">
+        <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+          {tips.map((t) => (
+            <div
+              key={t.label}
+              className="flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-4 text-center"
+            >
+              <span className="text-3xl">{t.icon}</span>
+              <span className="text-xs uppercase tracking-[0.18em] text-white/80">
+                {t.label}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -356,7 +371,7 @@ function Orient({
   );
 }
 
-/* ---------- Step 3: Camera (real, auto-countdown) ---------- */
+/* ---------- Step 3: Camera ---------- */
 
 function Camera({
   onCaptured,
@@ -369,7 +384,6 @@ function Camera({
   const [count, setCount] = useState<number | null>(null);
   const startedRef = useRef(false);
 
-  // Start countdown automatically when camera is ready
   useEffect(() => {
     if (ready && count === null && !startedRef.current) {
       console.log(`${UX} contagem iniciada`);
@@ -395,18 +409,16 @@ function Camera({
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 gap-4 pt-2">
-      <div className="text-center shrink-0">
-        <h1 className="font-display text-4xl md:text-5xl text-white leading-[0.95]">
+    <div className="flex-1 flex flex-col min-h-0 gap-4">
+      <header className="text-center shrink-0">
+        <Badge>📷 Câmera</Badge>
+        <h1 className="font-display text-3xl sm:text-4xl text-white leading-[0.95] mt-2">
           Olhe para a câmera
         </h1>
-        <p className="mt-2 text-sm text-white/70">
-          A foto será tirada automaticamente.
-        </p>
-      </div>
+      </header>
 
-      <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4">
-        <div className="relative h-full max-h-full aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black">
+      <div className="flex-1 min-h-0 flex items-center justify-center">
+        <div className="relative w-full max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black mx-auto">
           <video
             ref={videoRef}
             autoPlay
@@ -417,7 +429,7 @@ function Camera({
           />
 
           {!ready && !errorKind ? (
-            <div className="absolute inset-0 grid place-items-center text-white/70 text-sm tracking-wide">
+            <div className="absolute inset-0 grid place-items-center text-white/70 text-sm tracking-wide animate-pulse-soft">
               Iniciando câmera…
             </div>
           ) : null}
@@ -439,7 +451,10 @@ function Camera({
 
           {count !== null && count > 0 ? (
             <div className="absolute inset-0 grid place-items-center bg-black/30 backdrop-blur-[1px]">
-              <span className="font-display text-white text-[200px] leading-none">
+              <span
+                key={count}
+                className="font-display text-white text-[140px] sm:text-[180px] leading-none animate-fade-in"
+              >
                 {count}
               </span>
             </div>
@@ -448,10 +463,6 @@ function Camera({
             <div className="absolute inset-0 bg-white animate-fade-in" />
           ) : null}
         </div>
-
-        <p className="text-base text-white/80 text-center max-w-md">
-          Permaneça na marcação até a contagem terminar.
-        </p>
       </div>
 
       <div className="shrink-0">
@@ -473,26 +484,30 @@ function CameraError({
   const copy = useMemo(() => {
     if (kind === "permission")
       return {
-        title: "Não conseguimos acessar a câmera",
-        body: "Autorize o uso da câmera nas configurações do navegador e tente novamente.",
+        icon: "🔒",
+        title: "Câmera bloqueada",
+        body: "Autorize o uso da câmera nas configurações do navegador.",
         canRetry: true,
       };
     if (kind === "unsupported")
       return {
-        title: "Este navegador não oferece suporte à câmera",
+        icon: "⚠️",
+        title: "Navegador incompatível",
         body: "Abra a experiência em um navegador atualizado.",
         canRetry: false,
       };
     return {
+      icon: "📷",
       title: "Câmera indisponível",
-      body: "Não foi possível iniciar a câmera neste dispositivo.",
+      body: "Não foi possível iniciar a câmera.",
       canRetry: true,
     };
   }, [kind]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 items-center justify-center text-center gap-6 px-4">
-      <h2 className="font-display text-5xl text-white max-w-xl leading-tight">
+    <div className="flex-1 flex flex-col min-h-0 items-center justify-center text-center gap-5 px-4">
+      <span className="text-6xl">{copy.icon}</span>
+      <h2 className="font-display text-3xl sm:text-4xl text-white max-w-xl leading-tight">
         {copy.title}
       </h2>
       <p className="text-white/75 max-w-md text-base">{copy.body}</p>
@@ -506,7 +521,7 @@ function CameraError({
   );
 }
 
-/* ---------- Step 4: Confirm photo ---------- */
+/* ---------- Step 4: Confirm ---------- */
 
 function Confirm({
   photoUrl,
@@ -518,18 +533,16 @@ function Confirm({
   onUse: () => void;
 }) {
   return (
-    <div className="flex-1 flex flex-col min-h-0 gap-4 pt-2">
-      <div className="text-center shrink-0">
-        <h1 className="font-display text-5xl text-white leading-[0.95]">
+    <div className="flex-1 flex flex-col min-h-0 gap-4">
+      <header className="text-center shrink-0">
+        <Badge>✨ Pré-visualização</Badge>
+        <h1 className="font-display text-3xl sm:text-5xl text-white leading-[0.95] mt-2">
           Gostou da sua foto?
         </h1>
-        <p className="mt-3 text-base text-white/70 max-w-xl mx-auto">
-          Essa será a imagem usada para criar sua cena personalizada.
-        </p>
-      </div>
+      </header>
 
       <div className="flex-1 min-h-0 flex items-center justify-center">
-        <div className="tb-card bg-card h-full max-h-full aspect-[4/5] overflow-hidden">
+        <div className="tb-card bg-card w-full max-w-[420px] aspect-[4/5] overflow-hidden mx-auto">
           <div className="relative w-full h-full">
             <img
               src={photoUrl}
@@ -566,18 +579,18 @@ function Processing({ movie, onDone }: { movie: Movie; onDone: () => void }) {
   }, [onDone]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 items-center justify-center text-center gap-8">
-      <div className="w-40 h-40 rounded-full border border-gold/20 grid place-items-center relative">
+    <div className="flex-1 flex flex-col min-h-0 items-center justify-center text-center gap-8 py-10">
+      <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border border-gold/20 grid place-items-center relative">
         <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-gold animate-spin [animation-duration:1.8s]" />
-        <span className="font-display text-3xl text-gold">P&amp;C</span>
+        <span className="font-display text-2xl sm:text-3xl text-gold">P&amp;C</span>
       </div>
 
-      <div className="space-y-4 max-w-xl">
-        <h1 className="font-display text-5xl text-white leading-none">
+      <div className="space-y-3 max-w-xl">
+        <h1 className="font-display text-3xl sm:text-5xl text-white leading-none">
           Luzes, câmera, ação...
         </h1>
-        <p className="text-white/70 text-base">
-          Estamos criando sua cena inspirada no filme escolhido.
+        <p className="text-white/70 text-sm sm:text-base">
+          Criando sua cena inspirada em <span className="text-white">{movie.title}</span>.
         </p>
       </div>
 
@@ -585,7 +598,7 @@ function Processing({ movie, onDone }: { movie: Movie; onDone: () => void }) {
         {LOADING_PHRASES.map((p, i) => (
           <p
             key={p}
-            className={`absolute inset-0 text-base tracking-wide text-gold transition-opacity duration-500 ${
+            className={`absolute inset-0 text-sm sm:text-base tracking-wide text-gold transition-opacity duration-500 ${
               i === phraseIdx ? "opacity-100" : "opacity-0"
             }`}
           >
@@ -593,10 +606,6 @@ function Processing({ movie, onDone }: { movie: Movie; onDone: () => void }) {
           </p>
         ))}
       </div>
-
-      <p className="text-[11px] uppercase tracking-[0.3em] text-white/40">
-        Inspirado em: {movie.title}
-      </p>
     </div>
   );
 }
@@ -613,49 +622,42 @@ function Result({
   onRestart: () => void;
 }) {
   return (
-    <div className="flex-1 flex flex-col min-h-0 gap-4 pt-2">
-      <div className="text-center shrink-0">
-        <span className="text-[12px] uppercase tracking-[0.3em] text-gold">
-          Sua cena
-        </span>
-        <h1 className="font-display text-5xl text-white mt-2 leading-[0.95]">
-          Você entrou em cena
+    <div className="flex-1 flex flex-col min-h-0 gap-4">
+      <header className="text-center shrink-0">
+        <Badge>🎬 Você entrou em cena</Badge>
+        <h1 className="font-display text-3xl sm:text-5xl text-white mt-2 leading-[0.95]">
+          Sua cena está pronta
         </h1>
-        <p className="mt-2 text-sm text-white/65">
-          Inspirado em <span className="text-white">{movie.title}</span>
-        </p>
-      </div>
+      </header>
 
-      <div className="flex-1 min-h-0 grid grid-cols-1 gap-4 items-center">
-        <div className="h-full min-h-0 flex items-center justify-center">
-          <div className="tb-card bg-card h-full max-h-full aspect-[3/4] overflow-hidden">
-            <div className="relative w-full h-full film-grain vignette">
-              <img
-                src={photoUrl ?? movie.posterUrl}
-                alt="Cena gerada"
-                className="absolute inset-0 w-full h-full object-cover"
-                style={photoUrl ? { transform: "scaleX(-1)" } : undefined}
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-4">
-                <span className="text-[10px] uppercase tracking-[0.3em] text-gold">
-                  Inspirado em
-                </span>
-                <h3 className="font-display text-xl text-white mt-1 leading-tight">
-                  {movie.title}
-                </h3>
-              </div>
+      <div className="flex-1 min-h-0 flex items-center justify-center">
+        <div className="tb-card bg-card w-full max-w-[360px] aspect-[3/4] overflow-hidden mx-auto">
+          <div className="relative w-full h-full film-grain vignette">
+            <img
+              src={photoUrl ?? movie.posterUrl}
+              alt="Cena gerada"
+              className="absolute inset-0 w-full h-full object-cover"
+              style={photoUrl ? { transform: "scaleX(-1)" } : undefined}
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-3">
+              <span className="text-[10px] uppercase tracking-[0.3em] text-gold">
+                Inspirado em
+              </span>
+              <h3 className="font-display text-lg sm:text-xl text-white mt-1 leading-tight">
+                {movie.title}
+              </h3>
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="flex items-center justify-center gap-4 shrink-0">
-          <div className="bg-white p-3 rounded-xl shadow-2xl">
-            <img src={QR_URL} alt="QR Code" className="w-32 h-32 object-contain" />
-          </div>
-          <p className="text-sm text-white/80 max-w-[12rem] leading-snug">
-            Escaneie para baixar e compartilhar sua imagem.
-          </p>
+      <div className="flex items-center justify-center gap-3 shrink-0 bg-white/5 border border-white/10 rounded-xl p-3 mx-auto w-full max-w-md">
+        <div className="bg-white p-2 rounded-lg shadow-xl shrink-0">
+          <img src={QR_URL} alt="QR Code" className="w-20 h-20 sm:w-24 sm:h-24 object-contain" />
         </div>
+        <p className="text-sm text-white/85 leading-snug">
+          Escaneie para baixar e compartilhar sua imagem.
+        </p>
       </div>
 
       <div className="shrink-0">
