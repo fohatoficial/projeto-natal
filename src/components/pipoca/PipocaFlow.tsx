@@ -45,7 +45,42 @@ export function PipocaFlow() {
   const [selected, setSelected] = useState<Movie | null>(null);
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
+type Prepared = {
+  sessionId: string;
+  captureId: string;
+  path: string;
+  token: string;
+};
+type UploadStatus = "idle" | "preparing" | "uploading" | "confirming" | "error";
+const UPLOAD_LOG = "[PIPOCA_UPLOAD]";
+
+function getDeviceId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    let id = window.localStorage.getItem("pipoca_device_id");
+    if (!id) {
+      id = `tb-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+      window.localStorage.setItem("pipoca_device_id", id);
+    }
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+export function PipocaFlow() {
+  const [step, setStep] = useState<Step>("choose");
+  const [selected, setSelected] = useState<Movie | null>(null);
+  const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [transitioning, setTransitioning] = useState(false);
+  const [prepared, setPrepared] = useState<Prepared | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const uploadedRef = useRef(false);
   const { films, loading, error } = usePipocaFilms();
+
+  const prepareFn = useServerFn(createPipocaCaptureUpload);
+  const confirmFn = useServerFn(confirmPipocaCaptureUpload);
 
   useEffect(() => {
     return () => {
@@ -65,7 +100,75 @@ export function PipocaFlow() {
       if (photo) URL.revokeObjectURL(photo.url);
       setPhoto(null);
       setSelected(null);
+      setPrepared(null);
+      setUploadStatus("idle");
+      setUploadError(null);
+      uploadedRef.current = false;
       setStep("choose");
+    });
+
+  const runUpload = useCallback(async () => {
+    if (!photo || !selected) return;
+    setUploadError(null);
+    let current = prepared;
+    try {
+      if (!current) {
+        setUploadStatus("preparing");
+        console.log(`${UPLOAD_LOG} preparando`);
+        const res = await prepareFn({
+          data: {
+            filmId: selected.id,
+            deviceId: getDeviceId(),
+            contentType: "image/jpeg",
+          },
+        });
+        current = res as Prepared;
+        setPrepared(current);
+      }
+
+      if (!uploadedRef.current) {
+        setUploadStatus("uploading");
+        console.log(`${UPLOAD_LOG} enviando`);
+        const { error: upErr } = await supabase.storage
+          .from("pipoca-visitor-originals")
+          .uploadToSignedUrl(current.path, current.token, photo.blob, {
+            contentType: "image/jpeg",
+          });
+        if (upErr) throw upErr;
+        uploadedRef.current = true;
+      }
+
+      setUploadStatus("confirming");
+      await confirmFn({
+        data: {
+          sessionId: current.sessionId,
+          captureId: current.captureId,
+          path: current.path,
+        },
+      });
+      console.log(`${UPLOAD_LOG} concluído`);
+      setUploadStatus("idle");
+      transitionTo(() => setStep("processing"));
+    } catch (err) {
+      const stage =
+        !current ? "prepare" : !uploadedRef.current ? "upload" : "confirm";
+      console.warn(`${UPLOAD_LOG} falhou`, { stage });
+      setUploadStatus("error");
+      setUploadError(stage);
+    }
+  }, [photo, selected, prepared, prepareFn, confirmFn]);
+
+  const retakePhoto = () =>
+    transitionTo(() => {
+      console.log(`${UX} foto descartada`);
+      if (photo) URL.revokeObjectURL(photo.url);
+      setPhoto(null);
+      // new attempt = new session for cleanliness
+      setPrepared(null);
+      uploadedRef.current = false;
+      setUploadStatus("idle");
+      setUploadError(null);
+      setStep("camera");
     });
 
   return (
@@ -118,20 +221,11 @@ export function PipocaFlow() {
       {step === "confirm" && photo && (
         <Confirm
           photoUrl={photo.url}
-          onRetake={() =>
-            transitionTo(() => {
-              console.log(`${UX} foto descartada`);
-              URL.revokeObjectURL(photo.url);
-              setPhoto(null);
-              setStep("camera");
-            })
-          }
-          onUse={() =>
-            transitionTo(() => {
-              console.log(`${UX} foto confirmada`);
-              setStep("processing");
-            })
-          }
+          onRetake={retakePhoto}
+          onUse={() => {
+            console.log(`${UX} foto confirmada`);
+            void runUpload();
+          }}
         />
       )}
       {step === "processing" && selected && (
@@ -145,6 +239,20 @@ export function PipocaFlow() {
           movie={selected}
           photoUrl={photo?.url ?? null}
           onRestart={reset}
+        />
+      )}
+
+      {/* Upload progress overlay */}
+      {uploadStatus !== "idle" && uploadStatus !== "error" && (
+        <UploadOverlay status={uploadStatus} />
+      )}
+
+      {/* Upload error overlay */}
+      {uploadStatus === "error" && (
+        <UploadError
+          stage={uploadError}
+          onRetry={() => void runUpload()}
+          onRetake={retakePhoto}
         />
       )}
 
@@ -164,6 +272,64 @@ export function PipocaFlow() {
     </div>
   );
 }
+
+function UploadOverlay({ status }: { status: UploadStatus }) {
+  const label =
+    status === "preparing"
+      ? "Preparando sua foto..."
+      : status === "uploading"
+        ? "Enviando sua foto..."
+        : "Finalizando envio...";
+  return (
+    <div className="fixed inset-0 z-[55] grid place-items-center bg-black/70 backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-5 px-6 text-center">
+        <div className="w-20 h-20 rounded-full border-2 border-transparent border-t-gold border-r-gold/40 animate-spin" />
+        <p className="font-display text-2xl sm:text-3xl text-white">{label}</p>
+        <p className="text-xs uppercase tracking-[0.3em] text-white/60">
+          Não feche esta tela
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function UploadError({
+  stage,
+  onRetry,
+  onRetake,
+}: {
+  stage: string | null;
+  onRetry: () => void;
+  onRetake: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[58] grid place-items-center bg-black/85 backdrop-blur-sm p-6">
+      <div className="max-w-md w-full flex flex-col items-center gap-5 text-center">
+        <div className="w-20 h-20 rounded-full bg-red-500/15 border-2 border-red-500/50 grid place-items-center">
+          <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="#E0463A" strokeWidth="2.2">
+            <path d="M12 9v4M12 17h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h2 className="font-display text-3xl sm:text-4xl text-white leading-tight">
+          NÃO CONSEGUIMOS ENVIAR SUA FOTO
+        </h2>
+        <p className="text-white/75 text-sm sm:text-base">
+          Sua foto continua neste dispositivo. Toque para tentar novamente.
+        </p>
+        {stage ? (
+          <p className="text-[10px] uppercase tracking-[0.3em] text-white/40">
+            etapa: {stage}
+          </p>
+        ) : null}
+        <div className="flex flex-col items-center gap-2 pt-2">
+          <PrimaryCta onClick={onRetry}>Tentar novamente</PrimaryCta>
+          <GhostBtn onClick={onRetake}>Tirar outra foto</GhostBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 /* ---------- Shared layout pieces ---------- */
 
