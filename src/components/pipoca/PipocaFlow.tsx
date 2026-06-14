@@ -20,7 +20,7 @@ const VISITOR_PLACEHOLDER =
   "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=900&q=80";
 
 const QR_URL =
-  "/__l5e/assets-v1/7c617a7d-82ed-49d3-85ec-96e912161a48/qr-code.png";
+  "/__l5e/assets-v1/c736c04b-4813-43bc-80b0-1d6742d491a3/qr-code.png";
 
 const LOADING_PHRASES = [
   "Preparando o cenário...",
