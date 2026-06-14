@@ -1078,13 +1078,27 @@ function Confirm({
   onRetake: () => void;
   onUse: () => void;
 }) {
+  const [remaining, setRemaining] = useState(5);
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    if (firedRef.current) return;
+    if (remaining <= 0) {
+      firedRef.current = true;
+      onUse();
+      return;
+    }
+    const t = window.setTimeout(() => setRemaining((r) => r - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [remaining, onUse]);
+
   return (
     <Screen aurora>
       <Header subtitle="Pré-visualização" />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-3 gap-3 sm:gap-4">
         <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
-          Usar estas <span className="text-gold">fotos</span>?
+          Confira suas <span className="text-gold">fotos</span>
         </h1>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-[520px]">
@@ -1115,11 +1129,32 @@ function Confirm({
             </span>
           </div>
         </div>
+
+        <div className="flex flex-col items-center gap-2 pt-1">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full border-2 border-gold grid place-items-center">
+              <span className="font-display text-2xl text-gold leading-none">
+                {Math.max(remaining, 0)}
+              </span>
+            </div>
+            <p className="text-sm sm:text-base text-white/80 max-w-[18rem] text-left">
+              Se estiver tudo certo, vamos continuar automaticamente.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
-        <PrimaryCta onClick={onUse}>Usar estas fotos</PrimaryCta>
-        <GhostBtn onClick={onRetake}>Tirar novamente</GhostBtn>
+      <div className="relative z-10 shrink-0">
+        <button
+          type="button"
+          onClick={() => {
+            firedRef.current = true;
+            onRetake();
+          }}
+          className="text-xs uppercase tracking-[0.3em] text-white/55 hover:text-white/85 underline underline-offset-4 py-2 px-3"
+        >
+          Tirar fotos novamente
+        </button>
       </div>
     </Screen>
   );
