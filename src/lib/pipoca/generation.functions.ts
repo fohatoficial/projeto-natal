@@ -493,7 +493,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .insert({
         session_id: session.id,
         film_id: session.selected_film_id,
-        scene_pack_id: session.scene_pack_id,
+        scene_pack_id: chosenScenePackId,
         capture_id: capture.id,
         status: "queued",
         provider: "replicate",
