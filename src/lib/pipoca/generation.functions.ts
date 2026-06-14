@@ -27,13 +27,18 @@ async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<FaceCropRes
     const w = img.get_width();
     const h = img.get_height();
 
-    const cropW = Math.round(w * 0.6);
-    const cropH = Math.round(h * 0.55);
-    const x = Math.max(0, Math.round((w - cropW) / 2));
-    // shift up: top of the crop sits at ~12% of the image height instead of centered
-    const y = Math.max(0, Math.round(h * 0.12));
-    const y2 = Math.min(h, y + cropH);
-    const x2 = Math.min(w, x + cropW);
+    // Square crop. Size = 78% of the shorter side — generous enough to keep
+    // forehead, hair, chin, jaw, glasses, beard, neck and a bit of shoulders.
+    // Centered horizontally. Vertically anchored at ~18% from the top, which
+    // shifts the crop DOWN relative to the previous heuristic so the chin is
+    // no longer clipped and there is less empty space above the head.
+    const side = Math.min(w, h);
+    const cropSide = Math.min(w, h, Math.round(side * 0.78));
+    const x = Math.max(0, Math.round((w - cropSide) / 2));
+    const yIdeal = Math.round(h * 0.18);
+    const y = Math.max(0, Math.min(yIdeal, h - cropSide));
+    const x2 = Math.min(w, x + cropSide);
+    const y2 = Math.min(h, y + cropSide);
 
     const cropped = photon.crop(img, x, y, x2, y2);
     try {
@@ -53,6 +58,43 @@ async function buildFaceCropJpeg(originalBytes: Uint8Array): Promise<FaceCropRes
     } finally {
       cropped.free();
     }
+  } finally {
+    img.free();
+  }
+}
+
+/**
+ * Deterministic monochrome post-processing.
+ *
+ * Applied to the model output before it is saved to the generated bucket so
+ * every Pipoca image lands with the same Cinema Novo visual language —
+ * predominantly black & white, mild contrast lift, very subtle earthy tone.
+ *
+ * Pure Photon transforms; no facial detection, no per-image tuning.
+ */
+async function applyMonochromeFinish(inputBytes: Uint8Array): Promise<Uint8Array> {
+  const photon = await import("@cf-wasm/photon");
+  const img = photon.PhotonImage.new_from_byteslice(inputBytes);
+  try {
+    // 1. Strict luminance-based grayscale — removes the colour drift between
+    //    runs of the model.
+    photon.grayscale(img);
+    // 2. Gentle contrast lift for the filmic feel. Photon's contrast range is
+    //    roughly -255..255; a small positive value avoids crushing detail.
+    try {
+      (photon as any).adjust_contrast?.(img, 18.0);
+    } catch {
+      // contrast is optional — skip silently if the build lacks it
+    }
+    // 3. Very subtle earthy toning. sepia() is a fixed warm tint; we apply
+    //    it once at low strength by blending through a single pass. If the
+    //    helper is unavailable we just stay neutral B&W.
+    try {
+      (photon as any).sepia?.(img);
+    } catch {
+      // toning is optional
+    }
+    return img.get_bytes_jpeg(94);
   } finally {
     img.free();
   }
@@ -280,13 +322,48 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       throw new Error("Sessão sem filme/scene pack");
     }
 
-    const { data: scenePack, error: spErr } = await supabaseAdmin
+    // Support multiple active scene packs per film. The schema already carries
+    // the link via session.scene_pack_id (chosen at session creation), so for
+    // backward compatibility we honour that pick first. If for any reason the
+    // session-linked pack is not active/usable, we fall back to a random pick
+    // among the active packs for the film.
+    let scenePack:
+      | { id: string; prompt: unknown; reference_image_url: string | null }
+      | null = null;
+
+    const { data: linkedPack } = await supabaseAdmin
       .from("pipoca_scene_packs")
-      .select("id, prompt, reference_image_url")
+      .select("id, prompt, reference_image_url, active, status, film_id")
       .eq("id", session.scene_pack_id)
       .maybeSingle();
-    if (spErr || !scenePack) throw new Error("Scene pack não encontrado");
+
+    const isUsable = (p: any) =>
+      p && p.reference_image_url && p.active === true && p.status === "active";
+
+    if (isUsable(linkedPack)) {
+      scenePack = linkedPack as any;
+    } else if (session.selected_film_id) {
+      const { data: candidates, error: candErr } = await supabaseAdmin
+        .from("pipoca_scene_packs")
+        .select("id, prompt, reference_image_url, active, status")
+        .eq("film_id", session.selected_film_id)
+        .eq("active", true)
+        .eq("status", "active");
+      if (candErr) throw new Error("Falha ao buscar scene packs");
+      const usable = (candidates ?? []).filter(isUsable);
+      if (usable.length === 0) throw new Error("Nenhum scene pack ativo para o filme");
+      const picked = usable[Math.floor(Math.random() * usable.length)];
+      scenePack = picked as any;
+      console.log(`${LOG} scene pack escolhido entre múltiplos ativos`, {
+        film_id: session.selected_film_id,
+        total_active: usable.length,
+        chosen_scene_pack_id: picked.id,
+      });
+    }
+
+    if (!scenePack) throw new Error("Scene pack não encontrado");
     if (!scenePack.reference_image_url) throw new Error("Cena-base sem reference_image_url");
+    const chosenScenePackId = scenePack.id;
 
     const { data: film } = await supabaseAdmin
       .from("pipoca_films")
@@ -416,7 +493,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .insert({
         session_id: session.id,
         film_id: session.selected_film_id,
-        scene_pack_id: session.scene_pack_id,
+        scene_pack_id: chosenScenePackId,
         capture_id: capture.id,
         status: "queued",
         provider: "replicate",
@@ -481,6 +558,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           face_crop_dimensions:
             faceCropWidth && faceCropHeight ? `${faceCropWidth}x${faceCropHeight}` : null,
           input_image_count: 3,
+          scene_pack_id: chosenScenePackId,
         },
       })
       .eq("id", generation.id);
@@ -515,11 +593,21 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     const { data: gen, error: gErr } = await supabaseAdmin
       .from("pipoca_generations")
       .select(
-        "id, session_id, status, provider_job_id, final_image_path, created_at",
+        "id, session_id, status, provider_job_id, final_image_path, created_at, metadata",
       )
       .eq("id", data.generationId)
       .maybeSingle();
     if (gErr || !gen) throw new Error("Geração não encontrada");
+
+    // Helper: merge into existing metadata so previously-stored fields
+    // (face_crop_*, input_image_count, scene_pack_id, model, attempt…) are
+    // never wiped by a subsequent partial update.
+    const mergeMetadata = (extra: Record<string, unknown>) => ({
+      ...(typeof gen.metadata === "object" && gen.metadata !== null
+        ? (gen.metadata as Record<string, unknown>)
+        : {}),
+      ...extra,
+    });
 
     // Already completed: just re-sign the existing file
     if (gen.status === "completed" && gen.final_image_path) {
@@ -567,7 +655,11 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
       const errMsg = pred.error ?? "Falha na geração";
       await supabaseAdmin
         .from("pipoca_generations")
-        .update({ status: "failed", error_message: errMsg })
+        .update({
+          status: "failed",
+          error_message: errMsg,
+          metadata: mergeMetadata({ replicate_status: pred.status }),
+        })
         .eq("id", gen.id);
       await supabaseAdmin
         .from("pipoca_sessions")
@@ -582,7 +674,11 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     if (!outputUrl || typeof outputUrl !== "string") {
       await supabaseAdmin
         .from("pipoca_generations")
-        .update({ status: "failed", error_message: "Sem output" })
+        .update({
+          status: "failed",
+          error_message: "Sem output",
+          metadata: mergeMetadata({ replicate_status: pred.status }),
+        })
         .eq("id", gen.id);
       return { status: "failed", error: "Saída vazia do modelo" };
     }
@@ -591,14 +687,39 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     if (!imgRes.ok) {
       throw new Error(`Falha ao baixar imagem: ${imgRes.status}`);
     }
-    const buf = new Uint8Array(await imgRes.arrayBuffer());
+    const rawBuf = new Uint8Array(await imgRes.arrayBuffer());
+
+    // Deterministic monochrome post-processing — applied to EVERY generation
+    // before it lands in the bucket. Falls back to the raw bytes if Photon
+    // misbehaves so the user still gets their image.
+    let finalBuf: Uint8Array = rawBuf;
+    let postProcess: "monochrome" | "raw-fallback" = "monochrome";
+    let postProcessError: string | null = null;
+    try {
+      const processed = await applyMonochromeFinish(rawBuf);
+      if (!processed || processed.byteLength < 1024) {
+        throw new Error("pós-processamento devolveu JPEG vazio");
+      }
+      finalBuf = new Uint8Array(processed);
+    } catch (e) {
+      postProcess = "raw-fallback";
+      postProcessError = e instanceof Error ? e.message : "erro desconhecido";
+      finalBuf = rawBuf;
+      console.warn(`${LOG} pós-processamento B&W falhou — usando saída crua`, {
+        reason: postProcessError,
+      });
+    }
+
     const finalPath = `${gen.session_id}/${gen.id}/final.jpg`;
 
     const { error: upErr } = await supabaseAdmin.storage
       .from(GENERATED_BUCKET)
-      .upload(finalPath, buf, { contentType: "image/jpeg", upsert: true });
+      .upload(finalPath, finalBuf, { contentType: "image/jpeg", upsert: true });
     if (upErr) throw new Error(`Upload final falhou: ${upErr.message}`);
-    console.log(`${LOG} imagem final salva`, { generationId: gen.id });
+    console.log(`${LOG} imagem final salva`, {
+      generationId: gen.id,
+      postProcess,
+    });
 
     const processingMs =
       typeof pred.metrics?.predict_time === "number"
@@ -611,6 +732,10 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
         status: "completed",
         final_image_path: finalPath,
         error_message: null,
+        metadata: mergeMetadata({
+          post_process: postProcess,
+          post_process_error: postProcessError,
+        }),
         ...(processingMs !== null ? { processing_time_ms: processingMs } : {}),
       })
       .eq("id", gen.id);
