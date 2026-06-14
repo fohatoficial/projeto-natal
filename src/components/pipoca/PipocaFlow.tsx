@@ -8,6 +8,11 @@ import {
   createPipocaCaptureUpload,
   confirmPipocaCaptureUpload,
 } from "@/lib/pipoca/upload.functions";
+import {
+  createPipocaGeneration,
+  getPipocaGenerationStatus,
+} from "@/lib/pipoca/generation.functions";
+
 
 
 type Step =
@@ -63,6 +68,8 @@ function getDeviceId(): string | null {
   }
 }
 
+const GEN_LOG = "[PIPOCA_GENERATION]";
+
 export function PipocaFlow() {
   const [step, setStep] = useState<Step>("choose");
   const [selected, setSelected] = useState<Movie | null>(null);
@@ -71,11 +78,17 @@ export function PipocaFlow() {
   const [prepared, setPrepared] = useState<Prepared | null>(null);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [generationId, setGenerationId] = useState<string | null>(null);
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
   const uploadedRef = useRef(false);
+  const generationStartedRef = useRef(false);
   const { films, loading, error } = usePipocaFilms();
 
   const prepareFn = useServerFn(createPipocaCaptureUpload);
   const confirmFn = useServerFn(confirmPipocaCaptureUpload);
+  const createGenFn = useServerFn(createPipocaGeneration);
+  const statusGenFn = useServerFn(getPipocaGenerationStatus);
 
   useEffect(() => {
     return () => {
@@ -98,9 +111,31 @@ export function PipocaFlow() {
       setPrepared(null);
       setUploadStatus("idle");
       setUploadError(null);
+      setGenerationId(null);
+      setGeneratedUrl(null);
+      setGenError(null);
       uploadedRef.current = false;
+      generationStartedRef.current = false;
       setStep("choose");
     });
+
+  const startGeneration = useCallback(
+    async (sessionId: string, captureId: string) => {
+      if (generationStartedRef.current) return;
+      generationStartedRef.current = true;
+      console.log(`${GEN_LOG} iniciando`);
+      try {
+        const res = await createGenFn({ data: { sessionId, captureId } });
+        setGenerationId(res.generationId);
+        setGenError(null);
+      } catch (e) {
+        console.warn(`${GEN_LOG} falhou`, e);
+        generationStartedRef.current = false;
+        setGenError("Não conseguimos iniciar sua cena.");
+      }
+    },
+    [createGenFn],
+  );
 
   const runUpload = useCallback(async () => {
     if (!photo || !selected) return;
@@ -144,6 +179,8 @@ export function PipocaFlow() {
       console.log(`${UPLOAD_LOG} concluído`);
       setUploadStatus("idle");
       transitionTo(() => setStep("processing"));
+      // Kick off real generation right after entering the processing step.
+      void startGeneration(current.sessionId, current.captureId);
     } catch (err) {
       const stage =
         !current ? "prepare" : !uploadedRef.current ? "upload" : "confirm";
@@ -151,7 +188,15 @@ export function PipocaFlow() {
       setUploadStatus("error");
       setUploadError(stage);
     }
-  }, [photo, selected, prepared, prepareFn, confirmFn]);
+  }, [photo, selected, prepared, prepareFn, confirmFn, startGeneration]);
+
+  const retryGeneration = useCallback(() => {
+    if (!prepared) return;
+    setGenError(null);
+    setGenerationId(null);
+    generationStartedRef.current = false;
+    void startGeneration(prepared.sessionId, prepared.captureId);
+  }, [prepared, startGeneration]);
 
   const retakePhoto = () =>
     transitionTo(() => {
@@ -161,6 +206,10 @@ export function PipocaFlow() {
       // new attempt = new session for cleanliness
       setPrepared(null);
       uploadedRef.current = false;
+      generationStartedRef.current = false;
+      setGenerationId(null);
+      setGeneratedUrl(null);
+      setGenError(null);
       setUploadStatus("idle");
       setUploadError(null);
       setStep("camera");
@@ -226,13 +275,28 @@ export function PipocaFlow() {
       {step === "processing" && selected && (
         <Processing
           movie={selected}
-          onDone={() => transitionTo(() => setStep("result"))}
+          generationId={generationId}
+          errored={Boolean(genError)}
+          pollFn={statusGenFn}
+          onDone={(imageUrl) => {
+            setGeneratedUrl(imageUrl);
+            transitionTo(() => setStep("result"));
+          }}
+          onError={(msg) => setGenError(msg)}
         />
       )}
       {step === "result" && selected && (
         <Result
           movie={selected}
-          photoUrl={photo?.url ?? null}
+          imageUrl={generatedUrl}
+          onRestart={reset}
+        />
+      )}
+
+      {/* Generation error overlay */}
+      {step === "processing" && genError && (
+        <GenerationError
+          onRetry={retryGeneration}
           onRestart={reset}
         />
       )}
@@ -264,6 +328,36 @@ export function PipocaFlow() {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+function GenerationError({
+  onRetry,
+  onRestart,
+}: {
+  onRetry: () => void;
+  onRestart: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[58] grid place-items-center bg-black/90 backdrop-blur-sm p-6">
+      <div className="max-w-md w-full flex flex-col items-center gap-5 text-center">
+        <div className="w-20 h-20 rounded-full bg-red-500/15 border-2 border-red-500/50 grid place-items-center">
+          <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="#E0463A" strokeWidth="2.2">
+            <path d="M12 9v4M12 17h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h2 className="font-display text-3xl sm:text-4xl text-white leading-tight">
+          NÃO CONSEGUIMOS CRIAR SUA CENA
+        </h2>
+        <p className="text-white/75 text-sm sm:text-base">
+          Tivemos um problema ao gerar sua imagem. Você pode tentar novamente.
+        </p>
+        <div className="flex flex-col items-center gap-2 pt-2">
+          <PrimaryCta onClick={onRetry}>Tentar novamente</PrimaryCta>
+          <GhostBtn onClick={onRestart}>Nova experiência</GhostBtn>
+        </div>
+      </div>
     </div>
   );
 }
@@ -887,19 +981,70 @@ function Confirm({
 
 /* ---------- Step 5: Processing ---------- */
 
-function Processing({ movie, onDone }: { movie: Movie; onDone: () => void }) {
+type StatusFn = (args: { data: { generationId: string } }) => Promise<
+  | { status: "queued" | "processing" }
+  | { status: "failed"; error: string }
+  | { status: "completed"; generationId: string; imageUrl: string }
+>;
+
+function Processing({
+  movie,
+  generationId,
+  errored,
+  pollFn,
+  onDone,
+  onError,
+}: {
+  movie: Movie;
+  generationId: string | null;
+  errored: boolean;
+  pollFn: StatusFn;
+  onDone: (imageUrl: string) => void;
+  onError: (msg: string) => void;
+}) {
   const [phraseIdx, setPhraseIdx] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setPhraseIdx((i) => (i + 1) % LOADING_PHRASES.length);
     }, 1600);
-    const done = setTimeout(onDone, LOADING_PHRASES.length * 1600);
-    return () => {
-      clearInterval(interval);
-      clearTimeout(done);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!generationId || errored) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        console.log(`${GEN_LOG} polling`, { generationId });
+        const res = await pollFn({ data: { generationId } });
+        if (cancelled) return;
+        if (res.status === "completed") {
+          console.log(`${GEN_LOG} concluída`);
+          onDone(res.imageUrl);
+          return;
+        }
+        if (res.status === "failed") {
+          console.warn(`${GEN_LOG} falhou`);
+          onError(res.error || "Falha na geração");
+          return;
+        }
+        timer = setTimeout(tick, 2500);
+      } catch (e) {
+        if (cancelled) return;
+        console.warn(`${GEN_LOG} erro ao consultar`, e);
+        timer = setTimeout(tick, 4000);
+      }
     };
-  }, [onDone]);
+    timer = setTimeout(tick, 1500);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [generationId, errored, pollFn, onDone, onError]);
 
   return (
     <Screen aurora>
@@ -942,15 +1087,16 @@ function Processing({ movie, onDone }: { movie: Movie; onDone: () => void }) {
   );
 }
 
+
 /* ---------- Step 6: Result + QR ---------- */
 
 function Result({
   movie,
-  photoUrl,
+  imageUrl,
   onRestart,
 }: {
   movie: Movie;
-  photoUrl: string | null;
+  imageUrl: string | null;
   onRestart: () => void;
 }) {
   return (
@@ -965,10 +1111,9 @@ function Result({
         <div className="tb-card bg-card w-full max-w-[340px] aspect-[3/4] overflow-hidden mx-auto shadow-2xl animate-pop-in">
           <div className="relative w-full h-full film-grain vignette">
             <img
-              src={photoUrl ?? movie.posterUrl}
+              src={imageUrl ?? movie.posterUrl}
               alt="Cena gerada"
               className="absolute inset-0 w-full h-full object-cover"
-              style={photoUrl ? { transform: "scaleX(-1)" } : undefined}
             />
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 to-transparent p-3">
               <span className="text-[10px] uppercase tracking-[0.3em] text-gold">
@@ -979,6 +1124,7 @@ function Result({
               </h3>
             </div>
           </div>
+
         </div>
 
         <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-2.5 sm:p-3 w-full max-w-sm animate-fade-up">
