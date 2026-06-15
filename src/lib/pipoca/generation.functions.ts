@@ -364,8 +364,15 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
 
     const parsedScenePrompt = parseScenePackPrompt(scenePack.prompt);
     const hatReferenceUrls = extractHatReferenceUrls(parsedScenePrompt);
-    console.log(`${LOG} referências de chapéu detectadas: ${hatReferenceUrls.length}`);
-    const promptText = buildPromptText(scenePack.prompt, film?.title, hatReferenceUrls.length);
+    // Pick exactly one hat reference at random when two are available.
+    const hatRefUsed: string[] =
+      hatReferenceUrls.length > 1
+        ? [hatReferenceUrls[Math.floor(Math.random() * hatReferenceUrls.length)]]
+        : hatReferenceUrls.slice(0, 1);
+    console.log(
+      `${LOG} referência de chapéu escolhida: ${hatRefUsed.length} de ${hatReferenceUrls.length}`,
+    );
+    const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
 
     const { data: generation, error: genErr } = await supabaseAdmin
       .from("pipoca_generations")
@@ -385,16 +392,17 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     console.log(`${GEN_LOG} geração usando referências`, {
       generationId: generation.id,
       attempt: attemptNumber,
-      hatReferenceCount: hatReferenceUrls.length,
+      hatReferenceAvailable: hatReferenceUrls.length,
+      hatReferenceUsed: hatRefUsed.length,
       order: [
         "identity-close",
         "appearance-medium",
         "scene-base",
-        ...hatReferenceUrls.map((_, i) => `hat-${i + 1}`),
+        ...hatRefUsed.map(() => "hat-secondary"),
       ],
     });
-    if (hatReferenceUrls.length > 0) {
-      console.log(`${GEN_LOG} usando referências extras de chapéu`);
+    if (hatRefUsed.length > 0) {
+      console.log(`${GEN_LOG} usando chapéu como referência secundária`);
     }
 
     let prediction: ReplicatePrediction;
@@ -404,7 +412,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         identityUrl: signedIdentity.signedUrl,
         appearanceUrl: signedAppearance.signedUrl,
         sceneImageUrl: scenePack.reference_image_url,
-        hatReferenceUrls,
+        hatReferenceUrls: hatRefUsed,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "erro desconhecido";
@@ -429,10 +437,11 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           attempt: attemptNumber,
           identity_photo_path: identityPath,
           appearance_photo_path: appearancePath,
-          input_image_count: 3 + hatReferenceUrls.length,
+          input_image_count: 3 + hatRefUsed.length,
           scene_pack_id: chosenScenePackId,
-          hat_reference_count: hatReferenceUrls.length,
-          hat_reference_urls_used: hatReferenceUrls,
+          hat_reference_count_available: hatReferenceUrls.length,
+          hat_reference_count_used: hatRefUsed.length,
+          hat_reference_url_used: hatRefUsed[0] ?? null,
           post_process: "neutral-grayscale",
           post_process_contrast: 8,
         },
