@@ -97,39 +97,34 @@ function extractHatUsage(parsedPrompt: unknown): string | null {
 function buildPromptText(
   rawPrompt: unknown,
   filmTitle?: string | null,
-  hatRefCount = 0,
+  hasHatRef = false,
 ): string {
   const parsed = parseScenePackPrompt(rawPrompt);
   const parts: string[] = [];
 
-  // 1. Reference role declaration
+  // 1. Reference role declaration — strict visual priority
   parts.push(
-    "Image 1 is the PRIMARY FACE IDENTITY REFERENCE. It is a close, guided portrait of the visitor and is the absolute source of truth for facial identity.",
+    "Image 1 is the PRIMARY FACE IDENTITY REFERENCE and has the highest priority. It is a close, guided portrait of the visitor and is the absolute source of truth for facial identity.",
   );
   parts.push(
     "Use Image 1 for face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair (beard/stubble), eyebrows, glasses if present, apparent age, and overall recognizable identity.",
   );
   parts.push(
-    "Image 2 is the FULL APPEARANCE AND BODY PROPORTION REFERENCE. It shows the same visitor framed from the waist up.",
+    "Image 2 is the FULL APPEARANCE, CLOTHING AND BODY PROPORTION REFERENCE. It shows the same visitor framed from the waist up.",
   );
   parts.push(
-    "Use Image 2 for posture, body proportions, full hair shape, shoulders, torso, and general appearance — but always defer to Image 1 for the face itself.",
+    "Use Image 2 for posture, body proportions, full hair shape, shoulders, torso, clothing texture, and general appearance — but always defer to Image 1 for the face itself.",
   );
   parts.push(
-    "Image 3 is the ENVIRONMENT AND COMPOSITION REFERENCE. Use it ONLY for the sertão landscape, scenery, composition, the wooden cross, lighting direction and cinematographic atmosphere.",
+    "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it ONLY for the sertão landscape, scenery, composition, the wooden cross, lighting direction and cinematographic atmosphere.",
   );
 
-  if (hatRefCount > 0) {
-    const which =
-      hatRefCount === 1
-        ? "Image 4, when present, is a HAT DESIGN REFERENCE ONLY."
-        : "Image 4 and Image 5, when present, are HAT DESIGN REFERENCES ONLY.";
-    parts.push(which);
+  if (hasHatRef) {
     parts.push(
-      "Use the hat reference image(s) ONLY to guide the hat shape, leather material, wide curved brim, decorative forehead details and authentic cangaceiro visual language.",
+      "Image 4, when present, is a SECONDARY HAT DESIGN CUE ONLY. It is the lowest-priority reference.",
     );
     parts.push(
-      "DO NOT use the hat reference images as face identity references. DO NOT change the visitor's face to resemble any person from the hat references. DO NOT copy facial features, skin tone, age or hair from the hat references.",
+      "Use Image 4 only as a subtle design cue. Preserve only the general crescent-shaped leather construction and restrained frontal decoration. Do NOT copy any person's face, skin tone, hair or clothing from Image 4.",
     );
   }
 
@@ -160,13 +155,18 @@ function buildPromptText(
 
   // 4. Wardrobe
   parts.push(
-    "WARDROBE: rustic, timeless, non-modern, rooted in the northeastern Brazilian sertão. Avoid modern t-shirts, modern jeans, sneakers, streetwear or bright casual clothing.",
+    "WARDROBE: rustic, timeless, non-modern, rooted in the northeastern Brazilian sertão. Avoid modern t-shirts, modern jeans, sneakers, streetwear or bright casual clothing. Clothing must remain complete, coherent and clearly visible.",
   );
 
-  // 5. Hat — cangaceiro
+  // 5. Hat — cangaceiro (strictly subordinate)
   parts.push(
-    "HAT: the visitor must wear a cangaceiro-inspired northeastern Brazilian leather hat — wide upturned brim, weathered leather, with historically evocative decorative forehead details (stars, coins, metal ornaments) typical of cangaço iconography. NOT a cowboy hat. NOT western. NOT theatrical or costume-like.",
+    "HAT: the visitor may wear a cangaceiro-inspired northeastern Brazilian leather hat. It must be an authentic cangaceiro hat, NOT a cowboy hat, NOT western, NOT theatrical or costume-like.",
   );
+  if (hasHatRef) {
+    parts.push(
+      "When Image 4 is used, apply it as a restrained secondary cue: preserve only the general crescent-shaped leather construction and subdued frontal decoration (stars, coins, metal ornaments). The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT replace or distort the environment. The hat must NOT become oversized, ceremonial, fantastical or theatrical.",
+    );
+  }
   const hatUsage = extractHatUsage(parsed);
   if (hatUsage) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
 
@@ -217,16 +217,18 @@ async function createReplicatePrediction(input: {
   hatReferenceUrls: string[];
 }): Promise<ReplicatePrediction> {
   const token = getReplicateToken();
+  // Only one hat reference is ever sent, even if two are available.
+  const hatRefs = input.hatReferenceUrls.slice(0, 1);
   const inputImages = [
     input.identityUrl,
     input.appearanceUrl,
     input.sceneImageUrl,
-    ...input.hatReferenceUrls.slice(0, 2),
+    ...hatRefs,
   ];
   const body = {
     input: {
       prompt: input.prompt,
-      // Order: identity, appearance, scene base, then up to 2 hat refs.
+      // Order: identity, appearance, scene base, then at most 1 hat ref.
       input_images: inputImages,
       aspect_ratio: "4:5",
       output_format: "jpg",
@@ -362,8 +364,15 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
 
     const parsedScenePrompt = parseScenePackPrompt(scenePack.prompt);
     const hatReferenceUrls = extractHatReferenceUrls(parsedScenePrompt);
-    console.log(`${LOG} referências de chapéu detectadas: ${hatReferenceUrls.length}`);
-    const promptText = buildPromptText(scenePack.prompt, film?.title, hatReferenceUrls.length);
+    // Pick exactly one hat reference at random when two are available.
+    const hatRefUsed: string[] =
+      hatReferenceUrls.length > 1
+        ? [hatReferenceUrls[Math.floor(Math.random() * hatReferenceUrls.length)]]
+        : hatReferenceUrls.slice(0, 1);
+    console.log(
+      `${LOG} referência de chapéu escolhida: ${hatRefUsed.length} de ${hatReferenceUrls.length}`,
+    );
+    const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
 
     const { data: generation, error: genErr } = await supabaseAdmin
       .from("pipoca_generations")
@@ -383,16 +392,17 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     console.log(`${GEN_LOG} geração usando referências`, {
       generationId: generation.id,
       attempt: attemptNumber,
-      hatReferenceCount: hatReferenceUrls.length,
+      hatReferenceAvailable: hatReferenceUrls.length,
+      hatReferenceUsed: hatRefUsed.length,
       order: [
         "identity-close",
         "appearance-medium",
         "scene-base",
-        ...hatReferenceUrls.map((_, i) => `hat-${i + 1}`),
+        ...hatRefUsed.map(() => "hat-secondary"),
       ],
     });
-    if (hatReferenceUrls.length > 0) {
-      console.log(`${GEN_LOG} usando referências extras de chapéu`);
+    if (hatRefUsed.length > 0) {
+      console.log(`${GEN_LOG} usando chapéu como referência secundária`);
     }
 
     let prediction: ReplicatePrediction;
@@ -402,7 +412,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         identityUrl: signedIdentity.signedUrl,
         appearanceUrl: signedAppearance.signedUrl,
         sceneImageUrl: scenePack.reference_image_url,
-        hatReferenceUrls,
+        hatReferenceUrls: hatRefUsed,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "erro desconhecido";
@@ -427,10 +437,11 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           attempt: attemptNumber,
           identity_photo_path: identityPath,
           appearance_photo_path: appearancePath,
-          input_image_count: 3 + hatReferenceUrls.length,
+          input_image_count: 3 + hatRefUsed.length,
           scene_pack_id: chosenScenePackId,
-          hat_reference_count: hatReferenceUrls.length,
-          hat_reference_urls_used: hatReferenceUrls,
+          hat_reference_count_available: hatReferenceUrls.length,
+          hat_reference_count_used: hatRefUsed.length,
+          hat_reference_url_used: hatRefUsed[0] ?? null,
           post_process: "neutral-grayscale",
           post_process_contrast: 8,
         },
