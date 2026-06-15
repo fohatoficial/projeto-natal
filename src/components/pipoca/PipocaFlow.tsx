@@ -847,16 +847,28 @@ function Stories({
 
 function StoryFilm({ movie }: { movie: Movie }) {
   return (
-    <div className="flex flex-col items-center gap-4 sm:gap-5 animate-fade-up">
+    <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
         Você escolheu
       </span>
-      <div className="w-44 sm:w-56 aspect-[3/4] rounded-xl overflow-hidden border border-white/15 shadow-2xl">
-        <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
+      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] film-grain vignette">
+        <img
+          src={movie.posterUrl}
+          alt={movie.title}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
+        <div className="absolute top-3 left-3">
+          <span className="inline-block bg-gold text-cinema text-[10px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded">
+            Tela Brasil
+          </span>
+        </div>
+        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+          <h1 className="font-display text-3xl sm:text-4xl text-white leading-[0.95]">
+            {movie.title}
+          </h1>
+        </div>
       </div>
-      <h1 className="font-display text-3xl sm:text-5xl text-white leading-[0.95] max-w-md">
-        {movie.title}
-      </h1>
     </div>
   );
 }
@@ -1100,10 +1112,8 @@ function Camera({
           ) : null}
         </div>
 
-        <p className="text-xs sm:text-sm text-white/70 uppercase tracking-[0.25em]">
-          Captura automática
-        </p>
       </div>
+
 
       <div className="relative z-10 shrink-0">
         <GhostBtn onClick={onBack}>Voltar</GhostBtn>
@@ -1386,36 +1396,47 @@ function Result({
   onRestart: () => void;
 }) {
   const publicUrl = useMemo(() => {
-    if (!publicToken || typeof window === "undefined") return null;
-    return `${window.location.origin}/resultado/${publicToken}`;
+    if (!publicToken) return null;
+    const envBase =
+      (import.meta as unknown as { env?: Record<string, string | undefined> })
+        .env?.VITE_PUBLIC_RESULT_BASE_URL;
+    const base =
+      envBase && envBase.length > 0
+        ? envBase.replace(/\/+$/, "")
+        : typeof window !== "undefined"
+          ? window.location.origin
+          : "";
+    if (!base) return null;
+    return `${base}/resultado/${publicToken}`;
   }, [publicToken]);
 
   return (
     <Screen aurora>
       <Header subtitle="Você entrou em cena" />
 
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-3 sm:gap-4">
-        <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-2 gap-3 sm:gap-4">
+        <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95] animate-fade-up">
           Sua <span className="text-gold">cena</span> está pronta
         </h1>
 
-        <div className="w-full max-w-[340px] aspect-[3/4] overflow-hidden mx-auto shadow-2xl animate-pop-in rounded-xl border border-white/10">
-          <div className="relative w-full h-full film-grain vignette">
+        <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto animate-pop-in flex items-center justify-center">
+          <div className="relative w-full h-full rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] overflow-hidden bg-black film-grain vignette">
             <img
               src={imageUrl ?? movie.posterUrl}
               alt="Cena gerada"
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-contain"
             />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 to-transparent p-3">
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 sm:p-4 pointer-events-none">
               <span className="text-[10px] uppercase tracking-[0.3em] text-gold">
                 Inspirado em
               </span>
-              <h3 className="font-display text-lg sm:text-xl text-white leading-tight">
+              <h3 className="font-display text-base sm:text-lg text-white leading-tight">
                 {movie.title}
               </h3>
             </div>
           </div>
         </div>
+
 
         <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-2.5 sm:p-3 w-full max-w-sm animate-fade-up">
           <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center">
