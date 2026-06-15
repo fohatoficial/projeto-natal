@@ -468,7 +468,7 @@ const StatusInput = z.object({
 type StatusResponse =
   | { status: "queued" | "processing" }
   | { status: "failed"; error: string }
-  | { status: "completed"; generationId: string; imageUrl: string };
+  | { status: "completed"; generationId: string; imageUrl: string; publicToken: string };
 
 export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
   .inputValidator((input) => StatusInput.parse(input))
