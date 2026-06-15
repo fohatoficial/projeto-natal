@@ -262,7 +262,7 @@ export function PipocaFlow() {
       setUploadStatus("error");
       setUploadError(stage);
     }
-  }, [identityPhoto, appearancePhoto, selected, prepared, prepareFn, confirmFn, startGeneration]);
+  }, [identityPhoto, appearancePhoto, selected, prepared, prepareFn, confirmFn, startGeneration, visitorId]);
 
   const retryGeneration = useCallback(() => {
     if (!prepared) return;
@@ -301,13 +301,29 @@ export function PipocaFlow() {
           error={error}
           onPick={(m) => {
             console.log(`${UX} filme selecionado`, { id: m.id, title: m.title });
-            // Pré-aquecer a câmera no mesmo gesto da escolha do filme.
-            void prewarmCamera().catch(() => {});
             transitionTo(() => {
               setSelected(m);
-              setStep("stories");
+              setStep("visitor_registration");
             });
           }}
+        />
+      )}
+      {step === "visitor_registration" && selected && (
+        <VisitorRegistration
+          createVisitorFn={createVisitorFn}
+          onDone={(id, name) => {
+            console.log(`${UX} visitante registrado`);
+            setVisitorId(id);
+            setFirstName(name);
+            void prewarmCamera().catch(() => {});
+            transitionTo(() => setStep("stories"));
+          }}
+          onBack={() =>
+            transitionTo(() => {
+              setSelected(null);
+              setStep("choose");
+            })
+          }
         />
       )}
       {step === "stories" && selected && (
@@ -1524,12 +1540,125 @@ function Result({
       </div>
 
       <div className="relative z-30 shrink-0 pointer-events-auto">
-        {slide === 0 ? (
-          <PrimaryCta onClick={() => setSlide(1)}>Liberar QR Code</PrimaryCta>
-        ) : (
-          <PrimaryCta onClick={onRestart}>Nova experiência</PrimaryCta>
-        )}
+        {slide === 1 ? (
+          <GhostBtn onClick={onRestart}>Nova experiência</GhostBtn>
+        ) : null}
       </div>
+    </Screen>
+  );
+}
+
+/* ---------- Visitor registration ---------- */
+
+function VisitorRegistration({
+  createVisitorFn,
+  onDone,
+  onBack,
+}: {
+  createVisitorFn: (args: { data: { fullName: string; whatsapp: string; experienceConsent: true; privacyNoticeVersion: string } }) => Promise<{ visitorId: string; firstName: string }>;
+  onDone: (id: string, firstName: string) => void;
+  onBack: () => void;
+}) {
+  const [fullName, setFullName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [showNotice, setShowNotice] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const nameOk = fullName.replace(/\s+/g, " ").trim().length >= 2 && !/^\d+$/.test(fullName.trim());
+  const phoneOk = isValidBrWhatsapp(whatsapp);
+  const canSubmit = nameOk && phoneOk && consent && !loading;
+
+  async function submit() {
+    if (!canSubmit) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await createVisitorFn({
+        data: {
+          fullName: fullName.replace(/\s+/g, " ").trim(),
+          whatsapp,
+          experienceConsent: true,
+          privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
+        },
+      });
+      onDone(res.visitorId, res.firstName);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao cadastrar");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Screen aurora>
+      <Header subtitle="Cadastro" />
+      <div className="relative z-10 flex-1 min-h-0 w-full max-w-md mx-auto flex flex-col items-stretch justify-center gap-4 py-3">
+        <h1 className="font-display text-3xl sm:text-4xl text-white text-center leading-[0.95]">
+          Antes de entrar em <span className="text-gold">cena</span>
+        </h1>
+        <label className="flex flex-col gap-1 text-left">
+          <span className="text-xs uppercase tracking-[0.25em] text-white/70">Nome</span>
+          <input
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Nome completo"
+            maxLength={120}
+            className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-left">
+          <span className="text-xs uppercase tracking-[0.25em] text-white/70">WhatsApp</span>
+          <input
+            value={whatsapp}
+            onChange={(e) => setWhatsapp(formatWhatsappMask(e.target.value))}
+            placeholder="(00) 00000-0000"
+            inputMode="numeric"
+            className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base"
+          />
+        </label>
+        <label className="flex items-start gap-2 text-left text-sm text-white/85">
+          <input
+            type="checkbox"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+            className="mt-1 w-4 h-4 accent-gold"
+          />
+          <span>{PRIVACY_CHECKBOX_LABEL}</span>
+        </label>
+        <button
+          type="button"
+          onClick={() => setShowNotice(true)}
+          className="text-[11px] uppercase tracking-[0.3em] text-gold underline underline-offset-4 self-start"
+        >
+          Ler Aviso de Privacidade
+        </button>
+        {error && <p className="text-sm text-red-300 text-center">{error}</p>}
+        <div className="flex flex-col items-center gap-2 pt-2">
+          <PrimaryCta onClick={submit} disabled={!canSubmit}>
+            {loading ? "Enviando…" : "Continuar"}
+          </PrimaryCta>
+          <GhostBtn onClick={onBack}>Voltar</GhostBtn>
+        </div>
+      </div>
+
+      {showNotice && (
+        <div className="fixed inset-0 z-[70] bg-black/85 grid place-items-center px-5">
+          <div className="bg-[#0A1730] border border-white/15 rounded-2xl p-6 max-w-md w-full max-h-[80dvh] overflow-y-auto">
+            <h2 className="font-display text-2xl text-gold">{PRIVACY_NOTICE_TITLE}</h2>
+            <div className="mt-3 space-y-3 text-sm text-white/85">
+              {PRIVACY_NOTICE_PARAGRAPHS.map((p, i) => <p key={i}>{p}</p>)}
+            </div>
+            <button
+              onClick={() => setShowNotice(false)}
+              className="mt-5 w-full bg-gold text-[#000C20] font-semibold uppercase rounded-md py-3"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </Screen>
   );
 }
