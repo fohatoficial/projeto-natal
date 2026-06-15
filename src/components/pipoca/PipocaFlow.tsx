@@ -1441,17 +1441,20 @@ function Processing({
 
 function Result({
   movie,
+  firstName,
   imageUrl,
   publicToken,
   resultPageUrl,
   onRestart,
 }: {
   movie: Movie;
+  firstName?: string;
   imageUrl: string | null;
   publicToken: string | null;
   resultPageUrl: string | null;
   onRestart: () => void;
 }) {
+  const SLIDE_0_MS = 10000;
   const [slide, setSlide] = useState(0);
   const [progress, setProgress] = useState(0);
 
@@ -1461,12 +1464,48 @@ function Result({
     }
   }, [publicToken, resultPageUrl]);
 
+  // Auto-advance slide 0 -> slide 1 over 10s with progress bar
   useEffect(() => {
-    setProgress(slide === 0 ? 0 : 1);
+    if (slide !== 0) {
+      setProgress(1);
+      return;
+    }
+    setProgress(0);
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const pct = Math.min(1, (now - start) / SLIDE_0_MS);
+      setProgress(pct);
+      if (pct < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    const t = window.setTimeout(() => setSlide(1), SLIDE_0_MS);
+    return () => {
+      window.clearTimeout(t);
+      cancelAnimationFrame(raf);
+    };
   }, [slide]);
+
+  const bgUrl = imageUrl ?? movie.posterUrl;
 
   return (
     <Screen aurora>
+      {/* Blurred backdrop of the generated photo */}
+      {bgUrl && (
+        <div
+          aria-hidden
+          className="absolute inset-0 z-0 pointer-events-none"
+          style={{
+            backgroundImage: `url(${bgUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            filter: "blur(40px) brightness(0.45)",
+            transform: "scale(1.15)",
+          }}
+        />
+      )}
+      <div aria-hidden className="absolute inset-0 z-0 bg-black/55 pointer-events-none" />
+
       {/* Progress bars */}
       <div className="relative z-20 w-full max-w-2xl flex gap-1.5 px-1 pt-1">
         {[0, 1].map((i) => {
@@ -1486,29 +1525,19 @@ function Result({
         {slide === 0 && (
           <div className="flex flex-col items-center gap-3 sm:gap-4 w-full h-full animate-fade-up">
             <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95]">
-              Sua <span className="text-gold">cena</span> está pronta
+              {firstName ? `${firstName}, sua ` : "Sua "}<span className="text-gold">cena</span> está pronta
             </h1>
 
             <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto flex items-center justify-center">
-              <div className="relative w-full h-full rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] overflow-hidden bg-black">
-                <img
-                  src={imageUrl ?? movie.posterUrl}
-                  alt="Cena gerada"
-                  className="absolute inset-0 w-full h-full object-contain"
-                />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 sm:p-4 pointer-events-none">
-                  <span className="text-[10px] uppercase tracking-[0.3em] text-gold">
-                    Inspirado em
-                  </span>
-                  <h3 className="font-display text-base sm:text-lg text-white leading-tight">
-                    {movie.title}
-                  </h3>
-                </div>
-              </div>
+              <img
+                src={imageUrl ?? movie.posterUrl}
+                alt="Cena gerada"
+                className="max-w-full max-h-full object-contain rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]"
+              />
             </div>
 
-            <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
-              sua foto está pronta
+            <span className="text-[10px] uppercase tracking-[0.3em] text-white/60">
+              Inspirado em {movie.title}
             </span>
           </div>
         )}
