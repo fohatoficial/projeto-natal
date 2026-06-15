@@ -1620,6 +1620,9 @@ function VisitorRegistration({
           privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
         },
       });
+      if (!res?.visitorId || !res?.firstName) {
+        throw new Error("Resposta inválida do servidor");
+      }
       onDone(res.visitorId, res.firstName);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao cadastrar");
@@ -1642,7 +1645,8 @@ function VisitorRegistration({
             onChange={(e) => setFullName(e.target.value)}
             placeholder="Nome completo"
             maxLength={120}
-            className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base"
+            disabled={loading}
+            className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base disabled:opacity-60"
           />
         </label>
         <label className="flex flex-col gap-1 text-left">
@@ -1652,7 +1656,8 @@ function VisitorRegistration({
             onChange={(e) => setWhatsapp(formatWhatsappMask(e.target.value))}
             placeholder="(00) 00000-0000"
             inputMode="numeric"
-            className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base"
+            disabled={loading}
+            className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base disabled:opacity-60"
           />
         </label>
         <label className="flex items-start gap-2 text-left text-sm text-white/85">
@@ -1660,36 +1665,61 @@ function VisitorRegistration({
             type="checkbox"
             checked={consent}
             onChange={(e) => setConsent(e.target.checked)}
-            className="mt-1 w-4 h-4 accent-gold"
+            disabled={loading}
+            className="mt-1 w-4 h-4 accent-gold flex-shrink-0"
           />
-          <span>{PRIVACY_CHECKBOX_LABEL}</span>
+          <span>
+            Li o{" "}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowNotice(true);
+              }}
+              className="text-gold underline underline-offset-2 hover:text-gold/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-gold rounded-sm"
+            >
+              Aviso de Privacidade
+            </button>{" "}
+            e autorizo o tratamento do meu nome, WhatsApp e imagens para criar e disponibilizar minha cena personalizada e, caso eu solicite, identificar e imprimir minha foto.
+          </span>
         </label>
-        <button
-          type="button"
-          onClick={() => setShowNotice(true)}
-          className="text-[11px] uppercase tracking-[0.3em] text-gold underline underline-offset-4 self-start"
-        >
-          Ler Aviso de Privacidade
-        </button>
-        {error && <p className="text-sm text-red-300 text-center">{error}</p>}
+        {error && (
+          <div className="rounded-md border border-red-400/40 bg-red-950/30 p-3 text-center">
+            <p className="text-sm font-semibold text-red-200 uppercase tracking-wide">
+              Não conseguimos registrar seus dados
+            </p>
+            <p className="text-xs text-red-200/80 mt-1">
+              Confira as informações e tente novamente.
+            </p>
+            <p className="text-[10px] text-red-200/50 mt-2 break-words">{error}</p>
+          </div>
+        )}
         <div className="flex flex-col items-center gap-2 pt-2">
           <PrimaryCta onClick={submit} disabled={!canSubmit}>
-            {loading ? "Enviando…" : "Continuar"}
+            {loading ? "Cadastrando…" : error ? "Tentar novamente" : "Continuar"}
           </PrimaryCta>
-          <GhostBtn onClick={onBack}>Voltar</GhostBtn>
+          <GhostBtn onClick={onBack} disabled={loading}>Voltar</GhostBtn>
         </div>
       </div>
 
       {showNotice && (
-        <div className="fixed inset-0 z-[70] bg-black/85 grid place-items-center px-5">
-          <div className="bg-[#0A1730] border border-white/15 rounded-2xl p-6 max-w-md w-full max-h-[80dvh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-[70] bg-black/85 grid place-items-center px-5"
+          onClick={() => setShowNotice(false)}
+        >
+          <div
+            className="bg-[#0A1730] border border-white/15 rounded-2xl p-6 max-w-md w-full max-h-[80dvh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="font-display text-2xl text-gold">{PRIVACY_NOTICE_TITLE}</h2>
             <div className="mt-3 space-y-3 text-sm text-white/85">
               {PRIVACY_NOTICE_PARAGRAPHS.map((p, i) => <p key={i}>{p}</p>)}
             </div>
             <button
+              type="button"
               onClick={() => setShowNotice(false)}
-              className="mt-5 w-full bg-gold text-[#000C20] font-semibold uppercase rounded-md py-3"
+              className="mt-5 text-xs uppercase tracking-[0.3em] text-white/70 underline underline-offset-4 hover:text-white"
             >
               Fechar
             </button>
