@@ -1,0 +1,356 @@
+// Print queue server functions. All access goes through supabaseAdmin and
+// (for admin operations) a verified session cookie set by the PIN login.
+
+import { createServerFn } from "@tanstack/react-start";
+import {
+  getCookie,
+  setCookie,
+  deleteCookie,
+} from "@tanstack/react-start/server";
+import { z } from "zod";
+
+const LOG = "[PIPOCA_PRINT]";
+const GENERATED_BUCKET = "pipoca-generated-scenes";
+const SIGNED_TTL = 60 * 30;
+
+const TokenInput = z.object({ publicToken: z.string().trim().uuid() });
+
+async function requireAdmin(): Promise<void> {
+  const { PRINT_QUEUE_COOKIE, isValidSessionToken } = await import(
+    "@/lib/pipoca/print-auth.server"
+  );
+  const tok = getCookie(PRINT_QUEUE_COOKIE);
+  if (!isValidSessionToken(tok)) throw new Error("Unauthorized");
+}
+
+// ─── Public: visitor requests print from their phone ────────────────────
+export const requestPipocaPrint = createServerFn({ method: "POST" })
+  .inputValidator((input) => TokenInput.parse(input))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: gen, error } = await supabaseAdmin
+      .from("pipoca_generations")
+      .select("id, status, session_id")
+      .eq("public_token", data.publicToken)
+      .eq("status", "completed")
+      .maybeSingle();
+    if (error || !gen) throw new Error("Geração não encontrada");
+
+    const { data: session, error: sErr } = await supabaseAdmin
+      .from("pipoca_sessions")
+      .select("id, visitor_id")
+      .eq("id", gen.session_id)
+      .maybeSingle();
+    if (sErr || !session || !session.visitor_id) {
+      throw new Error("Visitante não vinculado a esta cena");
+    }
+
+    // Existing active request?
+    const { data: existing } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .select("id, status")
+      .eq("generation_id", gen.id)
+      .in("status", ["pending", "printing"])
+      .maybeSingle();
+    if (existing) {
+      return {
+        success: true as const,
+        alreadyQueued: true as const,
+        queueId: existing.id as string,
+        status: existing.status as string,
+      };
+    }
+
+    const { data: inserted, error: iErr } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .insert({
+        visitor_id: session.visitor_id,
+        generation_id: gen.id,
+        status: "pending",
+      })
+      .select("id, status")
+      .single();
+    if (iErr || !inserted) throw new Error("Falha ao entrar na fila");
+
+    console.log(`${LOG} impressão solicitada`, { queueId: inserted.id });
+    return {
+      success: true as const,
+      alreadyQueued: false as const,
+      queueId: inserted.id as string,
+      status: inserted.status as string,
+    };
+  });
+
+// ─── Admin: PIN login / logout ───────────────────────────────────────────
+const PinInput = z.object({ pin: z.string().min(1).max(64) });
+
+export const loginPrintQueue = createServerFn({ method: "POST" })
+  .inputValidator((input) => PinInput.parse(input))
+  .handler(async ({ data }) => {
+    const { verifyPin, issueSessionToken, PRINT_QUEUE_COOKIE } = await import(
+      "@/lib/pipoca/print-auth.server"
+    );
+    if (!verifyPin(data.pin)) {
+      // small delay would be nice; keep simple
+      throw new Error("PIN inválido");
+    }
+    const { token, maxAge } = issueSessionToken();
+    setCookie(PRINT_QUEUE_COOKIE, token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge,
+    });
+    return { success: true as const };
+  });
+
+export const logoutPrintQueue = createServerFn({ method: "POST" }).handler(async () => {
+  const { PRINT_QUEUE_COOKIE } = await import("@/lib/pipoca/print-auth.server");
+  deleteCookie(PRINT_QUEUE_COOKIE, { path: "/" });
+  return { success: true as const };
+});
+
+export const checkPrintQueueSession = createServerFn({ method: "GET" }).handler(async () => {
+  const { PRINT_QUEUE_COOKIE, isValidSessionToken } = await import(
+    "@/lib/pipoca/print-auth.server"
+  );
+  const tok = getCookie(PRINT_QUEUE_COOKIE);
+  return { authenticated: isValidSessionToken(tok) };
+});
+
+// ─── Admin: list queue ───────────────────────────────────────────────────
+const ListInput = z.object({
+  search: z.string().trim().max(80).optional(),
+  status: z
+    .enum(["pending", "printing", "printed", "failed", "cleared", "cancelled", "active", "all"])
+    .optional(),
+});
+
+export type PrintQueueItem = {
+  id: string;
+  status: string;
+  requestedAt: string;
+  printingStartedAt: string | null;
+  printedAt: string | null;
+  generationId: string;
+  filmTitle: string;
+  visitorFirstName: string;
+  visitorFullName: string;
+  visitorWhatsappLast4: string;
+  thumbnailUrl: string | null;
+};
+
+export const listPrintQueue = createServerFn({ method: "POST" })
+  .inputValidator((input) => ListInput.parse(input ?? {}))
+  .handler(async ({ data }): Promise<{ items: PrintQueueItem[] }> => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let q = supabaseAdmin
+      .from("pipoca_print_queue")
+      .select(
+        "id, status, requested_at, printing_started_at, printed_at, generation_id, visitor_id",
+      )
+      .order("requested_at", { ascending: true })
+      .limit(200);
+
+    const statusFilter = data.status ?? "active";
+    if (statusFilter === "active") {
+      q = q.in("status", ["pending", "printing"]);
+    } else if (statusFilter !== "all") {
+      q = q.eq("status", statusFilter);
+    }
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error("Falha ao listar fila");
+    if (!rows || rows.length === 0) return { items: [] };
+
+    const visitorIds = [...new Set(rows.map((r) => r.visitor_id))];
+    const generationIds = [...new Set(rows.map((r) => r.generation_id))];
+
+    const [{ data: visitors }, { data: gens }] = await Promise.all([
+      supabaseAdmin
+        .from("pipoca_visitors")
+        .select("id, first_name, full_name, whatsapp_last4")
+        .in("id", visitorIds),
+      supabaseAdmin
+        .from("pipoca_generations")
+        .select("id, final_image_path, film_id")
+        .in("id", generationIds),
+    ]);
+
+    const filmIds = [...new Set((gens ?? []).map((g) => g.film_id).filter(Boolean))];
+    const { data: films } = await supabaseAdmin
+      .from("pipoca_films")
+      .select("id, title")
+      .in("id", filmIds);
+
+    const vMap = new Map((visitors ?? []).map((v) => [v.id, v]));
+    const gMap = new Map((gens ?? []).map((g) => [g.id, g]));
+    const fMap = new Map((films ?? []).map((f) => [f.id, f.title as string]));
+
+    // Sign thumbnails in parallel.
+    const items: PrintQueueItem[] = await Promise.all(
+      rows.map(async (r) => {
+        const v = vMap.get(r.visitor_id);
+        const g = gMap.get(r.generation_id);
+        const filmTitle = (g && fMap.get(g.film_id)) || "Tela Brasil";
+        let thumbnailUrl: string | null = null;
+        if (g?.final_image_path) {
+          const { data: signed } = await supabaseAdmin.storage
+            .from(GENERATED_BUCKET)
+            .createSignedUrl(g.final_image_path, SIGNED_TTL);
+          thumbnailUrl = signed?.signedUrl ?? null;
+        }
+        const filtered = data.search?.toLowerCase().trim();
+        if (filtered) {
+          const hay = `${v?.full_name ?? ""} ${v?.first_name ?? ""} ${v?.whatsapp_last4 ?? ""}`.toLowerCase();
+          if (!hay.includes(filtered)) return null as unknown as PrintQueueItem;
+        }
+        return {
+          id: r.id,
+          status: r.status,
+          requestedAt: r.requested_at,
+          printingStartedAt: r.printing_started_at,
+          printedAt: r.printed_at,
+          generationId: r.generation_id,
+          filmTitle,
+          visitorFirstName: v?.first_name ?? "—",
+          visitorFullName: v?.full_name ?? "—",
+          visitorWhatsappLast4: v?.whatsapp_last4 ?? "—",
+          thumbnailUrl,
+        } satisfies PrintQueueItem;
+      }),
+    );
+
+    return { items: items.filter(Boolean) };
+  });
+
+// ─── Admin: actions ──────────────────────────────────────────────────────
+const QueueIdInput = z.object({ queueId: z.string().uuid() });
+
+export const startPrintingItem = createServerFn({ method: "POST" })
+  .inputValidator((input) => QueueIdInput.parse(input))
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: row, error } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .update({
+        status: "printing",
+        printing_started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.queueId)
+      .in("status", ["pending", "printing", "failed"])
+      .select("id, generation_id")
+      .single();
+    if (error || !row) throw new Error("Falha ao iniciar impressão");
+
+    const { data: gen } = await supabaseAdmin
+      .from("pipoca_generations")
+      .select("final_image_path")
+      .eq("id", row.generation_id)
+      .single();
+
+    let imageUrl: string | null = null;
+    if (gen?.final_image_path) {
+      const { data: signed } = await supabaseAdmin.storage
+        .from(GENERATED_BUCKET)
+        .createSignedUrl(gen.final_image_path, SIGNED_TTL);
+      imageUrl = signed?.signedUrl ?? null;
+    }
+    console.log(`${LOG} impressão iniciada`, { queueId: row.id });
+    return { success: true as const, imageUrl };
+  });
+
+export const getPrintItemImage = createServerFn({ method: "POST" })
+  .inputValidator((input) => QueueIdInput.parse(input))
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .select("generation_id")
+      .eq("id", data.queueId)
+      .single();
+    if (!row) throw new Error("Item não encontrado");
+    const { data: gen } = await supabaseAdmin
+      .from("pipoca_generations")
+      .select("final_image_path, film_id")
+      .eq("id", row.generation_id)
+      .single();
+    if (!gen?.final_image_path) throw new Error("Imagem indisponível");
+    const { data: signed } = await supabaseAdmin.storage
+      .from(GENERATED_BUCKET)
+      .createSignedUrl(gen.final_image_path, SIGNED_TTL);
+    const { data: film } = await supabaseAdmin
+      .from("pipoca_films")
+      .select("title")
+      .eq("id", gen.film_id)
+      .maybeSingle();
+    return { imageUrl: signed?.signedUrl ?? null, filmTitle: film?.title ?? "Tela Brasil" };
+  });
+
+export const markPrintedItem = createServerFn({ method: "POST" })
+  .inputValidator((input) => QueueIdInput.parse(input))
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .update({
+        status: "printed",
+        printed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.queueId);
+    if (error) throw new Error("Falha ao marcar como impresso");
+    console.log(`${LOG} impressão concluída`, { queueId: data.queueId });
+    return { success: true as const };
+  });
+
+export const cancelPrintItem = createServerFn({ method: "POST" })
+  .inputValidator((input) => QueueIdInput.parse(input))
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .update({
+        status: "cancelled",
+        cleared_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.queueId);
+    if (error) throw new Error("Falha ao cancelar");
+    return { success: true as const };
+  });
+
+export const clearPrintQueue = createServerFn({ method: "POST" }).handler(async () => {
+  await requireAdmin();
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const now = new Date().toISOString();
+  const { data: rows, error } = await supabaseAdmin
+    .from("pipoca_print_queue")
+    .update({ status: "cleared", cleared_at: now, updated_at: now })
+    .in("status", ["pending", "printing", "failed"])
+    .select("id");
+  if (error) throw new Error("Falha ao zerar fila");
+  console.log(`${LOG} fila zerada`, { count: rows?.length ?? 0 });
+  return { success: true as const, cleared: rows?.length ?? 0 };
+});
+
+export const countActivePrintQueue = createServerFn({ method: "GET" }).handler(async () => {
+  await requireAdmin();
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { count, error } = await supabaseAdmin
+    .from("pipoca_print_queue")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["pending", "printing", "failed"]);
+  if (error) throw new Error("Falha ao contar fila");
+  return { count: count ?? 0 };
+});
