@@ -8,9 +8,50 @@ const ORIGINALS_BUCKET = "pipoca-visitor-originals";
 const GENERATED_BUCKET = "pipoca-generated-scenes";
 const SIGNED_DOWNLOAD_TTL = 60 * 30;
 const SIGNED_REF_TTL = 60 * 30;
+const PUBLIC_RESULT_BASE_URL = "https://pipoca-cena-studio.lovable.app".replace(/\/+$/, "");
 
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
+
+function isUuid(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value.trim(),
+    )
+  );
+}
+
+function buildResultPageUrl(publicToken: string): string {
+  return `${PUBLIC_RESULT_BASE_URL}/resultado/${publicToken}`;
+}
+
+async function ensurePublicResultFields(
+  supabaseAdmin: any,
+  gen: {
+    id: string;
+    status: string;
+    public_token: string | null;
+    result_page_url?: string | null;
+    final_image_path: string | null;
+  },
+): Promise<{ publicToken: string; resultPageUrl: string }> {
+  if (gen.status !== "completed") throw new Error("Geração ainda não concluída");
+  if (!gen.final_image_path) throw new Error("Imagem final indisponível");
+
+  const publicToken = isUuid(gen.public_token) ? gen.public_token.trim() : crypto.randomUUID();
+  const resultPageUrl = buildResultPageUrl(publicToken);
+
+  if (gen.public_token !== publicToken || gen.result_page_url !== resultPageUrl) {
+    const { error } = await supabaseAdmin
+      .from("pipoca_generations")
+      .update({ public_token: publicToken, result_page_url: resultPageUrl })
+      .eq("id", gen.id);
+    if (error) throw new Error("Falha ao salvar URL pública");
+  }
+
+  return { publicToken, resultPageUrl };
+}
 
 type ReplicatePrediction = {
   id: string;
