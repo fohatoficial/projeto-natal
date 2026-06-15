@@ -1373,14 +1373,21 @@ function Processing({
 function Result({
   movie,
   imageUrl,
+  publicToken,
   onRestart,
 }: {
   movie: Movie;
   imageUrl: string | null;
+  publicToken: string | null;
   onRestart: () => void;
 }) {
+  const publicUrl = useMemo(() => {
+    if (!publicToken || typeof window === "undefined") return null;
+    return `${window.location.origin}/resultado/${publicToken}`;
+  }, [publicToken]);
+
   return (
-    <Screen aurora wedgeColor="#92C37A">
+    <Screen aurora>
       <Header subtitle="Você entrou em cena" />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-3 sm:gap-4">
@@ -1388,7 +1395,7 @@ function Result({
           Sua <span className="text-gold">cena</span> está pronta
         </h1>
 
-        <div className="tb-card bg-card w-full max-w-[340px] aspect-[3/4] overflow-hidden mx-auto shadow-2xl animate-pop-in">
+        <div className="w-full max-w-[340px] aspect-[3/4] overflow-hidden mx-auto shadow-2xl animate-pop-in rounded-xl border border-white/10">
           <div className="relative w-full h-full film-grain vignette">
             <img
               src={imageUrl ?? movie.posterUrl}
@@ -1404,12 +1411,22 @@ function Result({
               </h3>
             </div>
           </div>
-
         </div>
 
         <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-2.5 sm:p-3 w-full max-w-sm animate-fade-up">
-          <div className="bg-white p-1.5 sm:p-2 rounded-lg shrink-0">
-            <img src={QR_URL} alt="QR Code" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" />
+          <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center">
+            {publicUrl ? (
+              <QRCodeSVG
+                value={publicUrl}
+                size={96}
+                level="M"
+                marginSize={2}
+                bgColor="#FFFFFF"
+                fgColor="#000000"
+              />
+            ) : (
+              <div className="w-24 h-24 bg-white/40 animate-pulse rounded" />
+            )}
           </div>
           <div className="text-left min-w-0">
             <p className="text-[10px] uppercase tracking-[0.25em] text-gold">
@@ -1428,3 +1445,4 @@ function Result({
     </Screen>
   );
 }
+
