@@ -862,9 +862,9 @@ function Stories({
       />
 
       <div className="relative z-20 flex-1 min-h-0 w-full flex flex-col items-center justify-center max-w-2xl py-3 pointer-events-none">
-        {idx === 0 && <StoryFilm movie={movie} />}
-        {idx === 1 && <StoryTwoPhotos />}
-        {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} />}
+        {idx === 0 && <StoryFilm movie={movie} firstName={firstName} />}
+        {idx === 1 && <StoryTwoPhotos firstName={firstName} />}
+        {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} firstName={firstName} />}
       </div>
 
       <div className="relative z-30 shrink-0">
