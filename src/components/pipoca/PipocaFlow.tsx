@@ -202,6 +202,7 @@ export function PipocaFlow() {
             filmId: selected.id,
             deviceId: getDeviceId(),
             contentType: "image/jpeg",
+            visitorId: visitorId ?? null,
           },
         });
         current = res as Prepared;
