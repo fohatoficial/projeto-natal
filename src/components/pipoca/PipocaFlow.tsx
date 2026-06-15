@@ -1285,7 +1285,13 @@ function Confirm({
 type StatusFn = (args: { data: { generationId: string } }) => Promise<
   | { status: "queued" | "processing" }
   | { status: "failed"; error: string }
-  | { status: "completed"; generationId: string; imageUrl: string; publicToken: string }
+  | {
+      status: "completed";
+      generationId: string;
+      imageUrl: string;
+      publicToken: string;
+      resultPageUrl: string;
+    }
 >;
 
 function Processing({
@@ -1300,7 +1306,7 @@ function Processing({
   generationId: string | null;
   errored: boolean;
   pollFn: StatusFn;
-  onDone: (imageUrl: string, publicToken: string) => void;
+  onDone: (imageUrl: string, publicToken: string, resultPageUrl: string) => void;
   onError: (msg: string) => void;
 }) {
   const [phraseIdx, setPhraseIdx] = useState(0);
@@ -1325,7 +1331,7 @@ function Processing({
         if (cancelled) return;
         if (res.status === "completed") {
           console.log(`${GEN_LOG} concluída`);
-          onDone(res.imageUrl, res.publicToken);
+          onDone(res.imageUrl, res.publicToken, res.resultPageUrl);
           return;
         }
         if (res.status === "failed") {
