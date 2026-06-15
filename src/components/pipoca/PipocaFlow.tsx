@@ -999,20 +999,12 @@ function Camera({
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
   const title =
-    variant === "identity" ? "Enquadre seu rosto" : "Enquadre-se da cintura para cima";
+    variant === "identity" ? "Posicione seu rosto na marcação" : "Encaixe o rosto e o corpo na marcação";
   const hint =
     variant === "identity"
-      ? "Posicione o rosto dentro da marcação e olhe diretamente para a câmera."
-      : "Mantenha cabeça, ombros e tronco visíveis, centralizados na marcação.";
+      ? "Cabelo, testa e queixo dentro da área."
+      : "Mantenha a cabeça no topo e o corpo dentro do contorno.";
   const subtitle = variant === "identity" ? "Foto de rosto" : "Foto de corpo";
-
-  // Guide mask geometry — pure visual overlay, no crop applied to the captured file.
-  // Identity: tighter oval covering head + shoulders.
-  // Appearance: taller, wider rounded frame covering bust + waist.
-  const maskClass =
-    variant === "identity"
-      ? "w-3/5 h-[62%] rounded-[48%]"
-      : "w-[78%] h-[88%] rounded-[36%]";
 
   return (
     <Screen>
@@ -1040,20 +1032,54 @@ function Camera({
             </div>
           ) : null}
 
-          <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className={`${maskClass} border-2 border-gold/80 animate-pulse-soft`} />
-          </div>
+          {/* Adaptive SVG mask — pure overlay, never crops the captured file. */}
+          <svg
+            viewBox="0 0 100 125"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-0 w-full h-full animate-pulse-soft"
+            aria-hidden
+          >
+            {variant === "identity" ? (
+              <>
+                {/* Head + shoulders oval, centered at ~36% of height */}
+                <ellipse
+                  cx="50"
+                  cy="45"
+                  rx="22"
+                  ry="30"
+                  fill="none"
+                  stroke="#F8BA32"
+                  strokeWidth="0.6"
+                  strokeDasharray="1.5 1.2"
+                />
+              </>
+            ) : (
+              <>
+                {/* Face oval at ~28% height */}
+                <ellipse
+                  cx="50"
+                  cy="35"
+                  rx="11"
+                  ry="14"
+                  fill="none"
+                  stroke="#F8BA32"
+                  strokeWidth="0.6"
+                  strokeDasharray="1.5 1.2"
+                />
+                {/* Shoulders + torso silhouette down to waist (~82% height) */}
+                <path
+                  d="M22 102 C 24 78, 32 60, 50 60 C 68 60, 76 78, 78 102"
+                  fill="none"
+                  stroke="#F8BA32"
+                  strokeWidth="0.6"
+                  strokeDasharray="1.5 1.2"
+                  strokeLinecap="round"
+                />
+              </>
+            )}
+          </svg>
 
-          {(["tl", "tr", "bl", "br"] as const).map((p) => (
-            <span
-              key={p}
-              className={`pointer-events-none absolute w-7 h-7 border-gold/90 ${
-                p === "tl" ? "top-3 left-3 border-l-2 border-t-2" : ""
-              } ${p === "tr" ? "top-3 right-3 border-r-2 border-t-2" : ""} ${
-                p === "bl" ? "bottom-3 left-3 border-l-2 border-b-2" : ""
-              } ${p === "br" ? "bottom-3 right-3 border-r-2 border-b-2" : ""}`}
-            />
-          ))}
+
 
           {count !== null && count > 0 ? (
             <div className="absolute inset-0 grid place-items-center bg-black/40 backdrop-blur-[1px]">
