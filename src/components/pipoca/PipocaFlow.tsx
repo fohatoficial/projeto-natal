@@ -605,14 +605,17 @@ function PrimaryCta({
 function GhostBtn({
   children,
   onClick,
+  disabled,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="text-white/70 hover:text-white text-xs sm:text-sm uppercase tracking-[0.3em] py-2 px-3 transition-colors"
+      disabled={disabled}
+      className="text-white/70 hover:text-white text-xs sm:text-sm uppercase tracking-[0.3em] py-2 px-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {children}
     </button>
