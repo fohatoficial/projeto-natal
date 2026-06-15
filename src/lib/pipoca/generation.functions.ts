@@ -509,7 +509,13 @@ const StatusInput = z.object({
 type StatusResponse =
   | { status: "queued" | "processing" }
   | { status: "failed"; error: string }
-  | { status: "completed"; generationId: string; imageUrl: string; publicToken: string };
+  | {
+      status: "completed";
+      generationId: string;
+      imageUrl: string;
+      publicToken: string;
+      resultPageUrl: string;
+    };
 
 export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
   .inputValidator((input) => StatusInput.parse(input))
@@ -519,7 +525,7 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     const { data: gen, error: gErr } = await supabaseAdmin
       .from("pipoca_generations")
       .select(
-        "id, session_id, status, provider_job_id, final_image_path, created_at, metadata, public_token",
+        "id, public_token, result_page_url, final_image_path, status, film_id, session_id, provider_job_id, created_at, metadata",
       )
       .eq("id", data.generationId)
       .maybeSingle();
@@ -534,6 +540,7 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     });
 
     if (gen.status === "completed" && gen.final_image_path) {
+      const { publicToken, resultPageUrl } = await ensurePublicResultFields(supabaseAdmin, gen);
       const { data: signed, error: sErr } = await supabaseAdmin.storage
         .from(GENERATED_BUCKET)
         .createSignedUrl(gen.final_image_path, SIGNED_DOWNLOAD_TTL);
@@ -542,7 +549,8 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
         status: "completed",
         generationId: gen.id,
         imageUrl: signed.signedUrl,
-        publicToken: gen.public_token as string,
+        publicToken,
+        resultPageUrl,
       };
     }
 
