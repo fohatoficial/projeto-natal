@@ -217,16 +217,18 @@ async function createReplicatePrediction(input: {
   hatReferenceUrls: string[];
 }): Promise<ReplicatePrediction> {
   const token = getReplicateToken();
+  // Only one hat reference is ever sent, even if two are available.
+  const hatRefs = input.hatReferenceUrls.slice(0, 1);
   const inputImages = [
     input.identityUrl,
     input.appearanceUrl,
     input.sceneImageUrl,
-    ...input.hatReferenceUrls.slice(0, 2),
+    ...hatRefs,
   ];
   const body = {
     input: {
       prompt: input.prompt,
-      // Order: identity, appearance, scene base, then up to 2 hat refs.
+      // Order: identity, appearance, scene base, then at most 1 hat ref.
       input_images: inputImages,
       aspect_ratio: "4:5",
       output_format: "jpg",
