@@ -782,10 +782,12 @@ const STORY_DURATIONS_MS = [3000, 4500, 2000];
 
 function Stories({
   movie,
+  firstName,
   onDone,
   onChangeFilm,
 }: {
   movie: Movie;
+  firstName?: string;
   onDone: () => void;
   onChangeFilm: () => void;
 }) {
