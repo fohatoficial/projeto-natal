@@ -24,7 +24,7 @@ import {
 
 type Step =
   | "choose"
-  | "orient"
+  | "stories"
   | "camera_identity"
   | "orient_appearance"
   | "camera_appearance"
@@ -36,8 +36,6 @@ type CameraVariant = "identity" | "appearance";
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
-const QR_URL =
-  "/__l5e/assets-v1/c736c04b-4813-43bc-80b0-1d6742d491a3/qr-code.png";
 
 const LOADING_PHRASES = [
   "Preparando o cenário...",
