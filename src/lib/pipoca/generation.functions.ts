@@ -380,11 +380,20 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .single();
     if (genErr || !generation) throw new Error("Falha ao criar registro de geração");
 
-    console.log(`${GEN_LOG} geração usando três referências`, {
+    console.log(`${GEN_LOG} geração usando referências`, {
       generationId: generation.id,
       attempt: attemptNumber,
-      order: ["identity-close", "appearance-medium", "scene-base"],
+      hatReferenceCount: hatReferenceUrls.length,
+      order: [
+        "identity-close",
+        "appearance-medium",
+        "scene-base",
+        ...hatReferenceUrls.map((_, i) => `hat-${i + 1}`),
+      ],
     });
+    if (hatReferenceUrls.length > 0) {
+      console.log(`${GEN_LOG} usando referências extras de chapéu`);
+    }
 
     let prediction: ReplicatePrediction;
     try {
@@ -393,6 +402,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         identityUrl: signedIdentity.signedUrl,
         appearanceUrl: signedAppearance.signedUrl,
         sceneImageUrl: scenePack.reference_image_url,
+        hatReferenceUrls,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "erro desconhecido";
@@ -417,8 +427,10 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           attempt: attemptNumber,
           identity_photo_path: identityPath,
           appearance_photo_path: appearancePath,
-          input_image_count: 3,
+          input_image_count: 3 + hatReferenceUrls.length,
           scene_pack_id: chosenScenePackId,
+          hat_reference_count: hatReferenceUrls.length,
+          hat_reference_urls_used: hatReferenceUrls,
           post_process: "neutral-grayscale",
           post_process_contrast: 8,
         },
