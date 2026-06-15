@@ -52,24 +52,57 @@ async function applyNeutralGrayscale(inputBytes: Uint8Array): Promise<Uint8Array
 
 /* ---------- Prompt builder ---------- */
 
-function buildPromptText(rawPrompt: unknown, filmTitle?: string | null): string {
-  let parsed: unknown = rawPrompt;
+function parseScenePackPrompt(rawPrompt: unknown): unknown {
   if (typeof rawPrompt === "string") {
     const trimmed = rawPrompt.trim();
     if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
       try {
-        parsed = JSON.parse(trimmed);
+        return JSON.parse(trimmed);
       } catch {
-        parsed = rawPrompt;
+        return rawPrompt;
       }
-    } else {
-      parsed = rawPrompt;
     }
+    return rawPrompt;
   }
+  return rawPrompt;
+}
 
+function extractHatReferenceUrls(parsedPrompt: unknown): string[] {
+  if (!parsedPrompt || typeof parsedPrompt !== "object") return [];
+  const obj = parsedPrompt as Record<string, unknown>;
+  const props = obj["prop_references"];
+  if (!props || typeof props !== "object") return [];
+  const raw = (props as Record<string, unknown>)["hat_reference_images"];
+  if (!Array.isArray(raw)) return [];
+  const urls: string[] = [];
+  for (const v of raw) {
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t && /^https?:\/\//i.test(t)) urls.push(t);
+    }
+    if (urls.length >= 2) break;
+  }
+  return urls;
+}
+
+function extractHatUsage(parsedPrompt: unknown): string | null {
+  if (!parsedPrompt || typeof parsedPrompt !== "object") return null;
+  const obj = parsedPrompt as Record<string, unknown>;
+  const props = obj["prop_references"];
+  if (!props || typeof props !== "object") return null;
+  const usage = (props as Record<string, unknown>)["hat_usage"];
+  return typeof usage === "string" && usage.trim() ? usage.trim() : null;
+}
+
+function buildPromptText(
+  rawPrompt: unknown,
+  filmTitle?: string | null,
+  hatRefCount = 0,
+): string {
+  const parsed = parseScenePackPrompt(rawPrompt);
   const parts: string[] = [];
 
-  // 1. Three references — explicit role declaration
+  // 1. Reference role declaration
   parts.push(
     "Image 1 is the PRIMARY FACE IDENTITY REFERENCE. It is a close, guided portrait of the visitor and is the absolute source of truth for facial identity.",
   );
@@ -86,9 +119,23 @@ function buildPromptText(rawPrompt: unknown, filmTitle?: string | null): string 
     "Image 3 is the ENVIRONMENT AND COMPOSITION REFERENCE. Use it ONLY for the sertão landscape, scenery, composition, the wooden cross, lighting direction and cinematographic atmosphere.",
   );
 
+  if (hatRefCount > 0) {
+    const which =
+      hatRefCount === 1
+        ? "Image 4, when present, is a HAT DESIGN REFERENCE ONLY."
+        : "Image 4 and Image 5, when present, are HAT DESIGN REFERENCES ONLY.";
+    parts.push(which);
+    parts.push(
+      "Use the hat reference image(s) ONLY to guide the hat shape, leather material, wide curved brim, decorative forehead details and authentic cangaceiro visual language.",
+    );
+    parts.push(
+      "DO NOT use the hat reference images as face identity references. DO NOT change the visitor's face to resemble any person from the hat references. DO NOT copy facial features, skin tone, age or hair from the hat references.",
+    );
+  }
+
   // 2. Hard identity rules
   parts.push(
-    "HARD RULES (highest priority): facial identity has absolute priority. Do NOT redraw the face. Do NOT blend the face with another person. Do NOT stylize the face to match the scene.",
+    "HARD RULES (highest priority): facial identity has absolute priority. The visitor's facial identity from Image 1 must remain the highest priority and must not be altered by any other reference. Do NOT redraw the face. Do NOT blend the face with another person. Do NOT stylize the face to match the scene.",
   );
   parts.push(
     "Exactly one person in the final image, and that person must be clearly recognizable as the visitor from Image 1 — not a similar person.",
@@ -100,7 +147,7 @@ function buildPromptText(rawPrompt: unknown, filmTitle?: string | null): string 
     "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
   );
 
-  // 3. Style — neutral B&W, no sepia
+  // 3. Style
   parts.push(
     "STYLE: strictly black and white, neutral grayscale. No sepia. No brown, yellow, beige or golden tint. No earthy toning.",
   );
@@ -116,10 +163,12 @@ function buildPromptText(rawPrompt: unknown, filmTitle?: string | null): string 
     "WARDROBE: rustic, timeless, non-modern, rooted in the northeastern Brazilian sertão. Avoid modern t-shirts, modern jeans, sneakers, streetwear or bright casual clothing.",
   );
 
-  // 5. Hat
+  // 5. Hat — cangaceiro
   parts.push(
-    "HAT: a subtle northeastern leather hat inspired by cangaço — wide-brim, weathered, earthy, native to the sertão. NOT a cowboy hat. NOT western. NOT theatrical or costume-like. Understated, never overpowering the face.",
+    "HAT: the visitor must wear a cangaceiro-inspired northeastern Brazilian leather hat — wide upturned brim, weathered leather, with historically evocative decorative forehead details (stars, coins, metal ornaments) typical of cangaço iconography. NOT a cowboy hat. NOT western. NOT theatrical or costume-like.",
   );
+  const hatUsage = extractHatUsage(parsed);
+  if (hatUsage) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
 
   // 6. Cross
   parts.push(
