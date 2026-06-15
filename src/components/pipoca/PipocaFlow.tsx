@@ -329,6 +329,7 @@ export function PipocaFlow() {
       {step === "stories" && selected && (
         <Stories
           movie={selected}
+          firstName={firstName}
           onDone={() => {
             console.log(`${UX} stories concluídos, abrindo câmera`);
             transitionTo(() => setStep("camera_identity"));
