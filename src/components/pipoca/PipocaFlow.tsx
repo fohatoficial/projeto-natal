@@ -253,6 +253,9 @@ export function PipocaFlow() {
     if (!prepared) return;
     setGenError(null);
     setGenerationId(null);
+    setGeneratedUrl(null);
+    setPublicToken(null);
+    setResultPageUrl(null);
     generationStartedRef.current = false;
     void startGeneration(prepared.sessionId, prepared.captureId);
   }, [prepared, startGeneration]);
@@ -1403,31 +1406,24 @@ function Result({
   movie,
   imageUrl,
   publicToken,
+  resultPageUrl,
   onRestart,
 }: {
   movie: Movie;
   imageUrl: string | null;
   publicToken: string | null;
+  resultPageUrl: string | null;
   onRestart: () => void;
 }) {
   const [slide, setSlide] = useState(0);
   const [progress, setProgress] = useState(0);
   const advanceLockRef = useRef(false);
 
-  const publicUrl = useMemo(() => {
-    if (!publicToken) return null;
-    const envBase =
-      (import.meta as unknown as { env?: Record<string, string | undefined> })
-        .env?.VITE_PUBLIC_RESULT_BASE_URL;
-    const base =
-      envBase && envBase.length > 0
-        ? envBase.replace(/\/+$/, "")
-        : typeof window !== "undefined"
-          ? window.location.origin
-          : "";
-    if (!base) return null;
-    return `${base}/resultado/${publicToken}`;
-  }, [publicToken]);
+  useEffect(() => {
+    if (publicToken && resultPageUrl) {
+      console.log("[PIPOCA_QR] result page URL pronta", resultPageUrl);
+    }
+  }, [publicToken, resultPageUrl]);
 
   function advance() {
     if (advanceLockRef.current) return;
@@ -1437,22 +1433,7 @@ function Result({
 
   useEffect(() => {
     advanceLockRef.current = false;
-    setProgress(0);
-    if (slide !== 0) return;
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const pct = Math.min(1, (now - start) / RESULT_SLIDE_DURATION_MS);
-      setProgress(pct);
-      if (pct < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    const t = window.setTimeout(() => advance(), RESULT_SLIDE_DURATION_MS);
-    return () => {
-      window.clearTimeout(t);
-      cancelAnimationFrame(raf);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setProgress(slide === 0 ? 0 : 1);
   }, [slide]);
 
   return (
@@ -1519,9 +1500,9 @@ function Result({
 
             <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-3 sm:p-4 w-full max-w-sm">
               <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center">
-                {publicUrl ? (
+                {resultPageUrl ? (
                   <QRCodeSVG
-                    value={publicUrl}
+                    value={resultPageUrl}
                     size={110}
                     level="M"
                     marginSize={2}
