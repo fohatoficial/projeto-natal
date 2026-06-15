@@ -494,7 +494,6 @@ function UploadError({
 function Screen({
   children,
   aurora = false,
-  wedgeColor = "#2E5BE5",
   className = "",
 }: {
   children: React.ReactNode;
@@ -509,17 +508,6 @@ function Screen({
       } ${className}`}
     >
       <div className="absolute inset-0 brand-pattern opacity-[0.05] pointer-events-none" aria-hidden />
-      {/* Decorative corner wedges */}
-      <div
-        className="absolute top-0 left-0 w-10 h-10 sm:w-14 sm:h-14 lg:w-20 lg:h-20 pointer-events-none z-20"
-        style={{ background: "#F8BA32", clipPath: "polygon(0 0, 100% 0, 0 100%)" }}
-        aria-hidden
-      />
-      <div
-        className="absolute bottom-0 right-0 w-10 h-10 sm:w-14 sm:h-14 lg:w-20 lg:h-20 pointer-events-none z-20"
-        style={{ background: wedgeColor, clipPath: "polygon(100% 0, 100% 100%, 0 100%)" }}
-        aria-hidden
-      />
       {children}
     </div>
   );
