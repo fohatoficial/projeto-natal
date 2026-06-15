@@ -387,16 +387,10 @@ export function PipocaFlow() {
       )}
 
       {transitioning && (
-        <div className="fixed inset-0 z-[60] pointer-events-none overflow-hidden" aria-hidden>
-          <div
-            className="wedge-tl absolute inset-0"
-            style={{ background: "#F8BA32", clipPath: "polygon(0 0, 100% 0, 0 100%)" }}
-          />
-          <div
-            className="wedge-br absolute inset-0"
-            style={{ background: "#2E5BE5", clipPath: "polygon(100% 0, 100% 100%, 0 100%)" }}
-          />
-        </div>
+        <div
+          className="fixed inset-0 z-[60] pointer-events-none overflow-hidden bg-black/30"
+          aria-hidden
+        />
       )}
     </div>
   );
