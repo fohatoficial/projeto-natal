@@ -158,6 +158,8 @@ export function PipocaFlow() {
       clearPhotos();
       releaseSharedCamera();
       setSelected(null);
+      setVisitorId(null);
+      setFirstName("");
       setPrepared(null);
       setUploadStatus("idle");
       setUploadError(null);
