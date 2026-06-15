@@ -228,6 +228,7 @@ export function PipocaFlow() {
         },
       });
       setUploadStatus("idle");
+      releaseSharedCamera();
       transitionTo(() => setStep("processing"));
       void startGeneration(current.sessionId, current.captureId);
     } catch (err) {
