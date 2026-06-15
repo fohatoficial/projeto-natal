@@ -132,10 +132,16 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
       setItems(r.items);
       const c = await countFn({});
       setActiveCount(c.count);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.toLowerCase().includes("unauthorized")) {
+        onSignOut();
+        return;
+      }
     } finally {
       setLoading(false);
     }
-  }, [list, countFn, search, statusFilter]);
+  }, [list, countFn, search, statusFilter, onSignOut]);
 
   useEffect(() => {
     void refresh();
