@@ -851,7 +851,7 @@ function StoryFilm({ movie }: { movie: Movie }) {
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
         Você escolheu
       </span>
-      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] film-grain vignette">
+      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
         <img
           src={movie.posterUrl}
           alt={movie.title}
