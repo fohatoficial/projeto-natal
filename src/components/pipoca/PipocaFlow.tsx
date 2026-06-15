@@ -118,6 +118,8 @@ export function PipocaFlow() {
     return () => {
       if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
       if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
+      // Encerra a câmera ao desmontar o fluxo principal.
+      releaseSharedCamera();
     };
   }, []);
 
