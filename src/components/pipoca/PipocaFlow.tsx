@@ -847,16 +847,28 @@ function Stories({
 
 function StoryFilm({ movie }: { movie: Movie }) {
   return (
-    <div className="flex flex-col items-center gap-4 sm:gap-5 animate-fade-up">
+    <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
         Você escolheu
       </span>
-      <div className="w-44 sm:w-56 aspect-[3/4] rounded-xl overflow-hidden border border-white/15 shadow-2xl">
-        <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
+      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] film-grain vignette">
+        <img
+          src={movie.posterUrl}
+          alt={movie.title}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
+        <div className="absolute top-3 left-3">
+          <span className="inline-block bg-gold text-cinema text-[10px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded">
+            Tela Brasil
+          </span>
+        </div>
+        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+          <h1 className="font-display text-3xl sm:text-4xl text-white leading-[0.95]">
+            {movie.title}
+          </h1>
+        </div>
       </div>
-      <h1 className="font-display text-3xl sm:text-5xl text-white leading-[0.95] max-w-md">
-        {movie.title}
-      </h1>
     </div>
   );
 }
