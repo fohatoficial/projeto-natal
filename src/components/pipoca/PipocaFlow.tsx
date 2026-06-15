@@ -1336,6 +1336,7 @@ type StatusFn = (args: { data: { generationId: string } }) => Promise<
 
 function Processing({
   movie,
+  firstName,
   generationId,
   errored,
   pollFn,
@@ -1343,6 +1344,7 @@ function Processing({
   onError,
 }: {
   movie: Movie;
+  firstName?: string;
   generationId: string | null;
   errored: boolean;
   pollFn: StatusFn;
