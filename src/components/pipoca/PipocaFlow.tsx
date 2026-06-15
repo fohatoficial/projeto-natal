@@ -889,11 +889,12 @@ function Stories({
   );
 }
 
-function StoryFilm({ movie }: { movie: Movie }) {
+function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
+  const prefix = firstName ? `${firstName.toUpperCase()}, você escolheu` : "Você escolheu";
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
-        Você escolheu
+        {prefix}
       </span>
       <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
         <img
