@@ -53,7 +53,9 @@ function PublicResultPage() {
         else if (msg.includes("Imagem") || msg.includes("URL")) {
           setStatus({ kind: "imageUnavailable" });
         }
-        else if (msg.includes("não encontrado")) setStatus({ kind: "missing" });
+        else if (msg.includes("não encontrado") || msg.includes("Token") || msg.includes("uuid")) {
+          setStatus({ kind: "missing" });
+        }
         else setStatus({ kind: "error", message: msg });
       }
     })();
