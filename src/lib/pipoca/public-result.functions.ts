@@ -10,11 +10,11 @@ const Input = z.object({
     .string()
     .trim()
     .min(1)
+    .uuid()
     .refine(
       (v) => v !== "undefined" && v !== "null" && v !== "[object Object]",
       "Token inválido",
-    )
-    .uuid(),
+    ),
 });
 
 export type PublicResult = {
