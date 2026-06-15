@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResultadoRouteImport } from './routes/resultado'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ResultadoPublicTokenRouteImport } from './routes/resultado.$publicToken'
 
 const ResultadoRoute = ResultadoRouteImport.update({
   id: '/resultado',
@@ -22,31 +23,39 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResultadoPublicTokenRoute = ResultadoPublicTokenRouteImport.update({
+  id: '/$publicToken',
+  path: '/$publicToken',
+  getParentRoute: () => ResultadoRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/resultado': typeof ResultadoRoute
+  '/resultado': typeof ResultadoRouteWithChildren
+  '/resultado/$publicToken': typeof ResultadoPublicTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/resultado': typeof ResultadoRoute
+  '/resultado': typeof ResultadoRouteWithChildren
+  '/resultado/$publicToken': typeof ResultadoPublicTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/resultado': typeof ResultadoRoute
+  '/resultado': typeof ResultadoRouteWithChildren
+  '/resultado/$publicToken': typeof ResultadoPublicTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/resultado'
+  fullPaths: '/' | '/resultado' | '/resultado/$publicToken'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/resultado'
-  id: '__root__' | '/' | '/resultado'
+  to: '/' | '/resultado' | '/resultado/$publicToken'
+  id: '__root__' | '/' | '/resultado' | '/resultado/$publicToken'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ResultadoRoute: typeof ResultadoRoute
+  ResultadoRoute: typeof ResultadoRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +74,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/resultado/$publicToken': {
+      id: '/resultado/$publicToken'
+      path: '/$publicToken'
+      fullPath: '/resultado/$publicToken'
+      preLoaderRoute: typeof ResultadoPublicTokenRouteImport
+      parentRoute: typeof ResultadoRoute
+    }
   }
 }
 
+interface ResultadoRouteChildren {
+  ResultadoPublicTokenRoute: typeof ResultadoPublicTokenRoute
+}
+
+const ResultadoRouteChildren: ResultadoRouteChildren = {
+  ResultadoPublicTokenRoute: ResultadoPublicTokenRoute,
+}
+
+const ResultadoRouteWithChildren = ResultadoRoute._addFileChildren(
+  ResultadoRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ResultadoRoute: ResultadoRoute,
+  ResultadoRoute: ResultadoRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
