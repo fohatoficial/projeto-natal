@@ -12,6 +12,7 @@ const PrepareInput = z.object({
   filmId: z.string().uuid(),
   deviceId: z.string().max(120).nullish(),
   contentType: z.literal("image/jpeg"),
+  visitorId: z.string().uuid().nullish(),
 });
 
 export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
