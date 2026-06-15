@@ -273,21 +273,24 @@ export function PipocaFlow() {
           error={error}
           onPick={(m) => {
             console.log(`${UX} filme selecionado`, { id: m.id, title: m.title });
+            // Pré-aquecer a câmera no mesmo gesto da escolha do filme.
+            void prewarmCamera().catch(() => {});
             transitionTo(() => {
               setSelected(m);
-              setStep("orient");
+              setStep("stories");
             });
           }}
         />
       )}
-      {step === "orient" && selected && (
-        <Orient
+      {step === "stories" && selected && (
+        <Stories
           movie={selected}
-          onNext={() => {
-            console.log(`${UX} pronto para câmera de identidade`);
+          onDone={() => {
+            console.log(`${UX} stories concluídos, abrindo câmera`);
             transitionTo(() => setStep("camera_identity"));
           }}
-          onBack={() => {
+          onChangeFilm={() => {
+            releaseSharedCamera();
             transitionTo(() => {
               setSelected(null);
               setStep("choose");
@@ -305,7 +308,7 @@ export function PipocaFlow() {
           }}
           onBack={() =>
             transitionTo(() => {
-              setStep("orient");
+              setStep("stories");
             })
           }
         />
