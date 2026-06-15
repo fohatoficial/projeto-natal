@@ -638,11 +638,15 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
       typeof pred.metrics?.predict_time === "number"
         ? Math.round(pred.metrics.predict_time * 1000)
         : null;
+    const publicToken = isUuid(gen.public_token) ? gen.public_token.trim() : crypto.randomUUID();
+    const resultPageUrl = buildResultPageUrl(publicToken);
 
     await supabaseAdmin
       .from("pipoca_generations")
       .update({
         status: "completed",
+        public_token: publicToken,
+        result_page_url: resultPageUrl,
         final_image_path: finalPath,
         error_message: null,
         metadata: mergeMetadata({
@@ -668,6 +672,7 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
       status: "completed",
       generationId: gen.id,
       imageUrl: signed.signedUrl,
-      publicToken: gen.public_token as string,
+      publicToken,
+      resultPageUrl,
     };
   });
