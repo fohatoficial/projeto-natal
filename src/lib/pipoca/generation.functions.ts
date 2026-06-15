@@ -619,5 +619,6 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
       status: "completed",
       generationId: gen.id,
       imageUrl: signed.signedUrl,
+      publicToken: gen.public_token as string,
     };
   });
