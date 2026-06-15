@@ -357,8 +357,9 @@ export function PipocaFlow() {
           generationId={generationId}
           errored={Boolean(genError)}
           pollFn={statusGenFn}
-          onDone={(imageUrl) => {
+          onDone={(imageUrl, token) => {
             setGeneratedUrl(imageUrl);
+            setPublicToken(token);
             transitionTo(() => setStep("result"));
           }}
           onError={(msg) => setGenError(msg)}
@@ -368,6 +369,7 @@ export function PipocaFlow() {
         <Result
           movie={selected}
           imageUrl={generatedUrl}
+          publicToken={publicToken}
           onRestart={reset}
         />
       )}
