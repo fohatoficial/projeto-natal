@@ -1112,10 +1112,8 @@ function Camera({
           ) : null}
         </div>
 
-        <p className="text-xs sm:text-sm text-white/70 uppercase tracking-[0.25em]">
-          Captura automática
-        </p>
       </div>
+
 
       <div className="relative z-10 shrink-0">
         <GhostBtn onClick={onBack}>Voltar</GhostBtn>
