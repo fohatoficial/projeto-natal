@@ -93,6 +93,7 @@ export function PipocaFlow() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  const [publicToken, setPublicToken] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
   const identityUploadedRef = useRef(false);
   const appearanceUploadedRef = useRef(false);
