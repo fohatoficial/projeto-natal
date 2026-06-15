@@ -1398,9 +1398,7 @@ function Processing({
 }
 
 
-/* ---------- Step 6: Result (Stories-style) ---------- */
-
-const RESULT_SLIDE_DURATION_MS = 5000;
+/* ---------- Step 6: Result (photo first, QR on demand) ---------- */
 
 function Result({
   movie,
@@ -1417,7 +1415,6 @@ function Result({
 }) {
   const [slide, setSlide] = useState(0);
   const [progress, setProgress] = useState(0);
-  const advanceLockRef = useRef(false);
 
   useEffect(() => {
     if (publicToken && resultPageUrl) {
@@ -1425,14 +1422,7 @@ function Result({
     }
   }, [publicToken, resultPageUrl]);
 
-  function advance() {
-    if (advanceLockRef.current) return;
-    advanceLockRef.current = true;
-    setSlide((s) => (s < 1 ? s + 1 : s));
-  }
-
   useEffect(() => {
-    advanceLockRef.current = false;
     setProgress(slide === 0 ? 0 : 1);
   }, [slide]);
 
@@ -1452,14 +1442,6 @@ function Result({
           );
         })}
       </div>
-
-      {/* Tap-to-advance */}
-      <button
-        type="button"
-        onClick={advance}
-        aria-label="Próximo"
-        className="absolute inset-0 z-10 cursor-pointer"
-      />
 
       <div className="relative z-20 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-2 gap-3 sm:gap-4 pointer-events-none">
         {slide === 0 && (
@@ -1487,7 +1469,7 @@ function Result({
             </div>
 
             <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
-              toque para avançar
+              sua foto está pronta
             </span>
           </div>
         )}
@@ -1527,7 +1509,11 @@ function Result({
       </div>
 
       <div className="relative z-30 shrink-0 pointer-events-auto">
-        <PrimaryCta onClick={onRestart}>Nova experiência</PrimaryCta>
+        {slide === 0 ? (
+          <PrimaryCta onClick={() => setSlide(1)}>Liberar QR Code</PrimaryCta>
+        ) : (
+          <PrimaryCta onClick={onRestart}>Nova experiência</PrimaryCta>
+        )}
       </div>
     </Screen>
   );
