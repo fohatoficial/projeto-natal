@@ -360,7 +360,10 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       throw new Error("Falha ao gerar URL da foto de aparência");
     }
 
-    const promptText = buildPromptText(scenePack.prompt, film?.title);
+    const parsedScenePrompt = parseScenePackPrompt(scenePack.prompt);
+    const hatReferenceUrls = extractHatReferenceUrls(parsedScenePrompt);
+    console.log(`${LOG} referências de chapéu detectadas: ${hatReferenceUrls.length}`);
+    const promptText = buildPromptText(scenePack.prompt, film?.title, hatReferenceUrls.length);
 
     const { data: generation, error: genErr } = await supabaseAdmin
       .from("pipoca_generations")
