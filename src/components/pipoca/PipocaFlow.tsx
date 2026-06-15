@@ -394,6 +394,7 @@ export function PipocaFlow() {
       {step === "processing" && selected && (
         <Processing
           movie={selected}
+          firstName={firstName}
           generationId={generationId}
           errored={Boolean(genError)}
           pollFn={statusGenFn}
@@ -409,6 +410,7 @@ export function PipocaFlow() {
       {step === "result" && selected && (
         <Result
           movie={selected}
+          firstName={firstName}
           imageUrl={generatedUrl}
           publicToken={publicToken}
           resultPageUrl={resultPageUrl}
