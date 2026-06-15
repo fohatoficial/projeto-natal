@@ -1267,7 +1267,7 @@ function Confirm({
 type StatusFn = (args: { data: { generationId: string } }) => Promise<
   | { status: "queued" | "processing" }
   | { status: "failed"; error: string }
-  | { status: "completed"; generationId: string; imageUrl: string }
+  | { status: "completed"; generationId: string; imageUrl: string; publicToken: string }
 >;
 
 function Processing({
