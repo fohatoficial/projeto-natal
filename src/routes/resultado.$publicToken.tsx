@@ -2,6 +2,7 @@ import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { getPublicPipocaResult, type PublicResult } from "@/lib/pipoca/public-result.functions";
+import { requestPipocaPrint } from "@/lib/pipoca/print-queue.functions";
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
@@ -28,14 +29,45 @@ type Status =
   | { kind: "imageUnavailable" }
   | { kind: "error"; message: string };
 
+type PrintState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "ok"; alreadyQueued: boolean }
+  | { kind: "error"; message: string };
+
 function PublicResultPage() {
   const { publicToken } = useParams({ from: "/resultado/$publicToken" });
   const normalizedPublicToken = publicToken.trim();
   const fetchPublic = useServerFn(getPublicPipocaResult);
+  const requestPrint = useServerFn(requestPipocaPrint);
   const [status, setStatus] = useState<Status>({ kind: "loading" });
+  const [print, setPrint] = useState<PrintState>({ kind: "idle" });
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
   const fetchedTokenRef = useRef<string | null>(null);
+
+  // Release any kiosk scroll-lock that may be inherited and ensure mobile
+  // scroll works on this public page. Restore prior styles on unmount.
+  useEffect(() => {
+    const prev = {
+      htmlOverflow: document.documentElement.style.overflow,
+      bodyOverflow: document.body.style.overflow,
+      bodyHeight: document.body.style.height,
+      bodyPosition: document.body.style.position,
+    };
+    document.documentElement.style.overflow = "auto";
+    document.body.style.overflow = "auto";
+    document.body.style.height = "auto";
+    document.body.style.position = "static";
+    document.body.classList.add("pipoca-public-result-page");
+    return () => {
+      document.documentElement.style.overflow = prev.htmlOverflow;
+      document.body.style.overflow = prev.bodyOverflow;
+      document.body.style.height = prev.bodyHeight;
+      document.body.style.position = prev.bodyPosition;
+      document.body.classList.remove("pipoca-public-result-page");
+    };
+  }, []);
 
   useEffect(() => {
     if (fetchedTokenRef.current === normalizedPublicToken) return;
@@ -43,9 +75,6 @@ function PublicResultPage() {
     setStatus({ kind: "loading" });
     (async () => {
       try {
-        console.log(
-          `[PIPOCA_PUBLIC_RESULT] token recebido: ${normalizedPublicToken.slice(0, 8)}`,
-        );
         const data = await fetchPublic({ data: { publicToken: normalizedPublicToken } });
         setStatus({ kind: "ready", data });
       } catch (e) {
@@ -53,11 +82,9 @@ function PublicResultPage() {
         if (msg.includes("processando")) setStatus({ kind: "pending" });
         else if (msg.includes("Imagem") || msg.includes("URL")) {
           setStatus({ kind: "imageUnavailable" });
-        }
-        else if (msg.includes("não encontrado") || msg.includes("Token") || msg.includes("uuid")) {
+        } else if (msg.includes("não encontrado") || msg.includes("Token") || msg.includes("uuid")) {
           setStatus({ kind: "missing" });
-        }
-        else setStatus({ kind: "error", message: msg });
+        } else setStatus({ kind: "error", message: msg });
       }
     })();
   }, [fetchPublic, normalizedPublicToken]);
@@ -86,28 +113,44 @@ function PublicResultPage() {
   async function handleShare() {
     if (status.kind !== "ready") return;
     const shareUrl = window.location.href;
-    const title = `Minha cena — ${status.data.filmTitle}`;
-    const text = `Inspirado em ${status.data.filmTitle} · Pipoca & Cena`;
+    const title = "Minha cena — Pipoca & Cena";
+    const text = "Inspirado em cinema brasileiro · Pipoca & Cena";
     if (navigator.share) {
       try {
         await navigator.share({ title, text, url: shareUrl });
         return;
-      } catch {
-        /* user cancelled, fall through to copy */
-      }
+      } catch {/* user cancelled */}
     }
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    } catch {
-      /* noop */
+    } catch {/* noop */}
+  }
+
+  async function handleRequestPrint() {
+    if (print.kind === "loading" || print.kind === "ok") return;
+    setPrint({ kind: "loading" });
+    try {
+      const res = await requestPrint({ data: { publicToken: normalizedPublicToken } });
+      setPrint({ kind: "ok", alreadyQueued: res.alreadyQueued });
+    } catch (e) {
+      setPrint({
+        kind: "error",
+        message: e instanceof Error ? e.message : "Não foi possível solicitar a impressão",
+      });
     }
   }
 
   return (
-    <div className="min-h-[100svh] w-full bg-[#000C20] text-white film-grain vignette">
-      <div className="mx-auto w-full max-w-md px-5 pt-6 pb-10 flex flex-col items-center">
+    <div
+      className="min-h-[100dvh] w-full bg-[#000C20] text-white"
+      style={{
+        paddingBottom: "max(env(safe-area-inset-bottom), 1.25rem)",
+        paddingTop: "max(env(safe-area-inset-top), 1.25rem)",
+      }}
+    >
+      <div className="mx-auto w-full max-w-md px-5 flex flex-col items-center">
         <img src={LOGO_URL} alt="Tela Brasil" className="h-9 w-auto" />
         <span className="mt-2 text-[10px] uppercase tracking-[0.3em] text-gold">
           Pipoca &amp; Cena
@@ -126,21 +169,18 @@ function PublicResultPage() {
             body="Este link não corresponde a nenhuma cena. Verifique o QR Code e tente novamente."
           />
         )}
-
         {status.kind === "pending" && (
           <ErrorBlock
             title="SUA CENA AINDA ESTÁ SENDO PREPARADA"
             body="Aguarde alguns instantes e atualize a página."
           />
         )}
-
         {status.kind === "imageUnavailable" && (
           <ErrorBlock
             title="NÃO FOI POSSÍVEL CARREGAR SUA CENA"
             body="A imagem desta cena não está disponível no momento."
           />
         )}
-
         {status.kind === "error" && (
           <ErrorBlock title="Algo deu errado" body={status.message} />
         )}
@@ -151,8 +191,7 @@ function PublicResultPage() {
               SUA CENA ESTÁ <span className="text-gold">PRONTA</span>
             </h1>
             <p className="mt-2 text-center text-sm text-white/70">
-              Inspirado em{" "}
-              <span className="text-white">{status.data.filmTitle}</span>
+              Inspirado em <span className="text-white">{status.data.filmTitle}</span>
             </p>
 
             <div className="mt-5 w-full rounded-xl overflow-hidden border border-white/15 bg-black shadow-2xl">
@@ -179,6 +218,30 @@ function PublicResultPage() {
               >
                 {copied ? "Link copiado!" : "Compartilhar"}
               </button>
+
+              <button
+                type="button"
+                onClick={handleRequestPrint}
+                disabled={print.kind === "loading" || print.kind === "ok"}
+                className="w-full border border-gold/60 text-gold font-semibold tracking-wider uppercase rounded-md py-3.5 text-sm hover:bg-gold/10 active:scale-[0.99] transition disabled:opacity-70"
+              >
+                {print.kind === "loading"
+                  ? "Solicitando…"
+                  : print.kind === "ok"
+                    ? print.alreadyQueued
+                      ? "Sua impressão já está na fila"
+                      : "Impressão solicitada"
+                    : "Solicitar impressão"}
+              </button>
+
+              {print.kind === "ok" && (
+                <p className="text-xs text-white/70 text-center">
+                  Informe seu nome à recepcionista para retirar sua foto.
+                </p>
+              )}
+              {print.kind === "error" && (
+                <p className="text-xs text-red-300 text-center">{print.message}</p>
+              )}
             </div>
 
             <p className="mt-6 text-[10px] uppercase tracking-[0.3em] text-white/40 text-center">

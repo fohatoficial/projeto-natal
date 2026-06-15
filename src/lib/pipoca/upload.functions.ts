@@ -12,6 +12,7 @@ const PrepareInput = z.object({
   filmId: z.string().uuid(),
   deviceId: z.string().max(120).nullish(),
   contentType: z.literal("image/jpeg"),
+  visitorId: z.string().uuid().nullish(),
 });
 
 export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
@@ -39,6 +40,20 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
     if (spError) throw new Error("Falha ao localizar scene pack");
     if (!scenePack) throw new Error("Scene pack indisponível para este filme");
 
+    // If a visitorId was provided, ensure the visitor exists and granted
+    // experience consent before linking it to the session.
+    let linkedVisitorId: string | null = null;
+    if (data.visitorId) {
+      const { data: visitor } = await supabaseAdmin
+        .from("pipoca_visitors")
+        .select("id, experience_consent")
+        .eq("id", data.visitorId)
+        .maybeSingle();
+      if (visitor && visitor.experience_consent) {
+        linkedVisitorId = visitor.id;
+      }
+    }
+
     const { data: session, error: sessionError } = await supabaseAdmin
       .from("pipoca_sessions")
       .insert({
@@ -46,6 +61,7 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
         selected_film_id: data.filmId,
         scene_pack_id: scenePack.id,
         status: "photo_step",
+        visitor_id: linkedVisitorId,
       })
       .select("id")
       .single();
