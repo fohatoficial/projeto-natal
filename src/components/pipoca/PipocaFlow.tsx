@@ -94,6 +94,7 @@ export function PipocaFlow() {
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [publicToken, setPublicToken] = useState<string | null>(null);
+  const [resultPageUrl, setResultPageUrl] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
   const identityUploadedRef = useRef(false);
   const appearanceUploadedRef = useRef(false);
@@ -150,6 +151,8 @@ export function PipocaFlow() {
       setUploadError(null);
       setGenerationId(null);
       setGeneratedUrl(null);
+      setPublicToken(null);
+      setResultPageUrl(null);
       setGenError(null);
       generationStartedRef.current = false;
       setStep("choose");
@@ -263,6 +266,8 @@ export function PipocaFlow() {
       generationStartedRef.current = false;
       setGenerationId(null);
       setGeneratedUrl(null);
+      setPublicToken(null);
+      setResultPageUrl(null);
       setGenError(null);
       setUploadStatus("idle");
       setUploadError(null);
@@ -357,9 +362,10 @@ export function PipocaFlow() {
           generationId={generationId}
           errored={Boolean(genError)}
           pollFn={statusGenFn}
-          onDone={(imageUrl, token) => {
+          onDone={(imageUrl, token, url) => {
             setGeneratedUrl(imageUrl);
             setPublicToken(token);
+            setResultPageUrl(url);
             transitionTo(() => setStep("result"));
           }}
           onError={(msg) => setGenError(msg)}
@@ -370,6 +376,7 @@ export function PipocaFlow() {
           movie={selected}
           imageUrl={generatedUrl}
           publicToken={publicToken}
+          resultPageUrl={resultPageUrl}
           onRestart={reset}
         />
       )}
