@@ -35,11 +35,12 @@ function PublicResultPage() {
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const didFetch = useRef(false);
+  const fetchedTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (didFetch.current) return;
-    didFetch.current = true;
+    if (fetchedTokenRef.current === normalizedPublicToken) return;
+    fetchedTokenRef.current = normalizedPublicToken;
+    setStatus({ kind: "loading" });
     (async () => {
       try {
         console.log(
