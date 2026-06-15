@@ -55,7 +55,7 @@ export const getPublicPipocaResult = createServerFn({ method: "POST" })
       .eq("status", "completed")
       .single();
     if (error || !gen) {
-      console.warn(`${LOG} erro ao buscar`, error.message);
+      console.warn(`${LOG} erro ao buscar`, error?.message ?? "sem linha");
       const { data: existing } = await supabaseAdmin
         .from("pipoca_generations")
         .select("id, status")
