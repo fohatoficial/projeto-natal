@@ -918,11 +918,11 @@ function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
   );
 }
 
-function StoryTwoPhotos() {
+function StoryTwoPhotos({ firstName }: { firstName?: string }) {
   return (
     <div className="flex flex-col items-center gap-6 sm:gap-7 animate-fade-up max-w-md">
       <h1 className="font-display text-3xl sm:text-5xl text-white leading-[0.95]">
-        Vamos tirar <span className="text-gold">duas fotos</span>
+        {firstName ? `${firstName}, vamos` : "Vamos"} tirar <span className="text-gold">duas fotos</span>
       </h1>
       <div className="grid grid-cols-2 gap-4 w-full">
         <div className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-4">
