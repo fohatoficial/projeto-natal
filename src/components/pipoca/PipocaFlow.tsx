@@ -948,7 +948,7 @@ function StoryTwoPhotos({ firstName }: { firstName?: string }) {
   );
 }
 
-function StoryPrepare({ cameraStatus }: { cameraStatus: ReturnType<typeof getSharedStatus> }) {
+function StoryPrepare({ cameraStatus, firstName }: { cameraStatus: ReturnType<typeof getSharedStatus>; firstName?: string }) {
   const camHint =
     cameraStatus === "ready"
       ? "Câmera pronta"
@@ -964,7 +964,7 @@ function StoryPrepare({ cameraStatus }: { cameraStatus: ReturnType<typeof getSha
         </svg>
       </div>
       <h1 className="font-display text-4xl sm:text-6xl text-white leading-[0.95]">
-        <span className="text-gold">Prepare-se</span>
+        {firstName ? `${firstName}, ` : ""}<span className="text-gold">prepare-se</span>
       </h1>
       <p className="text-sm sm:text-base text-white/75 max-w-sm">
         A câmera será aberta agora.
