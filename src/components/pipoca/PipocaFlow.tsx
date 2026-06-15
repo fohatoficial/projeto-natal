@@ -712,7 +712,7 @@ function PosterCard({
   return (
     <button
       onClick={() => onPick(movie)}
-      className="tb-card bg-card relative overflow-hidden text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl w-full h-full group film-grain vignette"
+      className="bg-card relative overflow-hidden text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl w-full h-full group rounded-2xl border border-white/10"
     >
       <img
         src={movie.posterUrl}
