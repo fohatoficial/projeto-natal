@@ -130,15 +130,15 @@ function PublicResultPage() {
 
   async function handleRequestPrint() {
     if (print.kind === "loading" || print.kind === "ok") return;
+    console.log("[PIPOCA_PRINT] solicitação enviada");
     setPrint({ kind: "loading" });
     try {
       const res = await requestPrint({ data: { publicToken: normalizedPublicToken } });
       setPrint({ kind: "ok", alreadyQueued: res.alreadyQueued });
     } catch (e) {
-      setPrint({
-        kind: "error",
-        message: e instanceof Error ? e.message : "Não foi possível solicitar a impressão",
-      });
+      const message = e instanceof Error ? e.message : "Não foi possível solicitar a impressão";
+      console.warn("[PIPOCA_PRINT] solicitação falhou");
+      setPrint({ kind: "error", message });
     }
   }
 
@@ -240,7 +240,15 @@ function PublicResultPage() {
                 </p>
               )}
               {print.kind === "error" && (
-                <p className="text-xs text-red-300 text-center">{print.message}</p>
+                <div className="rounded-md border border-red-400/40 bg-red-500/10 p-3 text-center">
+                  <p className="font-display text-sm uppercase tracking-wider text-red-200">
+                    Não conseguimos solicitar a impressão
+                  </p>
+                  <p className="mt-1 text-[11px] text-red-100/80">
+                    Tente novamente ou procure a recepção.
+                  </p>
+                  <p className="mt-1 text-[10px] text-red-100/60">{print.message}</p>
+                </div>
               )}
             </div>
 
