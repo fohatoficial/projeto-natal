@@ -94,6 +94,8 @@ const GEN_LOG = "[PIPOCA_GENERATION]";
 export function PipocaFlow() {
   const [step, setStep] = useState<Step>("choose");
   const [selected, setSelected] = useState<Movie | null>(null);
+  const [visitorId, setVisitorId] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState<string>("");
   const [identityPhoto, setIdentityPhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [appearancePhoto, setAppearancePhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
@@ -114,6 +116,7 @@ export function PipocaFlow() {
   const confirmFn = useServerFn(confirmPipocaCaptureUpload);
   const createGenFn = useServerFn(createPipocaGeneration);
   const statusGenFn = useServerFn(getPipocaGenerationStatus);
+  const createVisitorFn = useServerFn(createPipocaVisitor);
 
   // Keep refs in sync so the unmount cleanup can revoke without re-running
   // the effect (and prematurely revoking) whenever a photo state changes.
