@@ -712,7 +712,7 @@ function PosterCard({
   return (
     <button
       onClick={() => onPick(movie)}
-      className="tb-card bg-card relative overflow-hidden text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl w-full h-full group film-grain vignette"
+      className="bg-card relative overflow-hidden text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl w-full h-full group rounded-2xl border border-white/10"
     >
       <img
         src={movie.posterUrl}
@@ -851,7 +851,7 @@ function StoryFilm({ movie }: { movie: Movie }) {
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
         Você escolheu
       </span>
-      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] film-grain vignette">
+      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
         <img
           src={movie.posterUrl}
           alt={movie.title}
@@ -1215,7 +1215,7 @@ function Confirm({
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-[520px]">
           <div className="flex flex-col items-center gap-1.5 animate-pop-in">
-            <div className="tb-card bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl">
+            <div className="bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10">
               <img
                 src={identityUrl}
                 alt="Foto de rosto"
@@ -1228,7 +1228,7 @@ function Confirm({
             </span>
           </div>
           <div className="flex flex-col items-center gap-1.5 animate-pop-in">
-            <div className="tb-card bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl">
+            <div className="bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10">
               <img
                 src={appearanceUrl}
                 alt="Foto de corpo"
@@ -1382,7 +1382,9 @@ function Processing({
 }
 
 
-/* ---------- Step 6: Result + QR ---------- */
+/* ---------- Step 6: Result (Stories-style) ---------- */
+
+const RESULT_SLIDE_DURATION_MS = 5000;
 
 function Result({
   movie,
@@ -1395,6 +1397,10 @@ function Result({
   publicToken: string | null;
   onRestart: () => void;
 }) {
+  const [slide, setSlide] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const advanceLockRef = useRef(false);
+
   const publicUrl = useMemo(() => {
     if (!publicToken) return null;
     const envBase =
@@ -1410,61 +1416,123 @@ function Result({
     return `${base}/resultado/${publicToken}`;
   }, [publicToken]);
 
+  function advance() {
+    if (advanceLockRef.current) return;
+    advanceLockRef.current = true;
+    setSlide((s) => (s < 1 ? s + 1 : s));
+  }
+
+  useEffect(() => {
+    advanceLockRef.current = false;
+    setProgress(0);
+    if (slide !== 0) return;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const pct = Math.min(1, (now - start) / RESULT_SLIDE_DURATION_MS);
+      setProgress(pct);
+      if (pct < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    const t = window.setTimeout(() => advance(), RESULT_SLIDE_DURATION_MS);
+    return () => {
+      window.clearTimeout(t);
+      cancelAnimationFrame(raf);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slide]);
+
   return (
     <Screen aurora>
-      <Header subtitle="Você entrou em cena" />
-
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-2 gap-3 sm:gap-4">
-        <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95] animate-fade-up">
-          Sua <span className="text-gold">cena</span> está pronta
-        </h1>
-
-        <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto animate-pop-in flex items-center justify-center">
-          <div className="relative w-full h-full rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] overflow-hidden bg-black film-grain vignette">
-            <img
-              src={imageUrl ?? movie.posterUrl}
-              alt="Cena gerada"
-              className="absolute inset-0 w-full h-full object-contain"
-            />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 sm:p-4 pointer-events-none">
-              <span className="text-[10px] uppercase tracking-[0.3em] text-gold">
-                Inspirado em
-              </span>
-              <h3 className="font-display text-base sm:text-lg text-white leading-tight">
-                {movie.title}
-              </h3>
-            </div>
-          </div>
-        </div>
-
-
-        <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-2.5 sm:p-3 w-full max-w-sm animate-fade-up">
-          <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center">
-            {publicUrl ? (
-              <QRCodeSVG
-                value={publicUrl}
-                size={96}
-                level="M"
-                marginSize={2}
-                bgColor="#FFFFFF"
-                fgColor="#000000"
+      {/* Progress bars */}
+      <div className="relative z-20 w-full max-w-2xl flex gap-1.5 px-1 pt-1">
+        {[0, 1].map((i) => {
+          const pct = i < slide ? 1 : i === slide ? progress : 0;
+          return (
+            <div key={i} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
+              <div
+                className="h-full bg-gold transition-[width] duration-75 ease-linear"
+                style={{ width: `${pct * 100}%` }}
               />
-            ) : (
-              <div className="w-24 h-24 bg-white/40 animate-pulse rounded" />
-            )}
-          </div>
-          <div className="text-left min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-gold">
-              Leve sua cena
-            </p>
-            <p className="text-sm text-white/85 leading-snug">
-              Escaneie para baixar e compartilhar.
-            </p>
-          </div>
-        </div>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="relative z-10 shrink-0">
+      {/* Tap-to-advance */}
+      <button
+        type="button"
+        onClick={advance}
+        aria-label="Próximo"
+        className="absolute inset-0 z-10 cursor-pointer"
+      />
+
+      <div className="relative z-20 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-2 gap-3 sm:gap-4 pointer-events-none">
+        {slide === 0 && (
+          <div className="flex flex-col items-center gap-3 sm:gap-4 w-full h-full animate-fade-up">
+            <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95]">
+              Sua <span className="text-gold">cena</span> está pronta
+            </h1>
+
+            <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto flex items-center justify-center">
+              <div className="relative w-full h-full rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] overflow-hidden bg-black">
+                <img
+                  src={imageUrl ?? movie.posterUrl}
+                  alt="Cena gerada"
+                  className="absolute inset-0 w-full h-full object-contain"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-3 sm:p-4 pointer-events-none">
+                  <span className="text-[10px] uppercase tracking-[0.3em] text-gold">
+                    Inspirado em
+                  </span>
+                  <h3 className="font-display text-base sm:text-lg text-white leading-tight">
+                    {movie.title}
+                  </h3>
+                </div>
+              </div>
+            </div>
+
+            <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
+              toque para avançar
+            </span>
+          </div>
+        )}
+
+        {slide === 1 && (
+          <div className="flex flex-col items-center gap-4 sm:gap-5 w-full animate-fade-up">
+            <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95]">
+              Leve sua <span className="text-gold">cena</span>
+            </h1>
+
+            <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-3 sm:p-4 w-full max-w-sm">
+              <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center">
+                {publicUrl ? (
+                  <QRCodeSVG
+                    value={publicUrl}
+                    size={110}
+                    level="M"
+                    marginSize={2}
+                    bgColor="#FFFFFF"
+                    fgColor="#000000"
+                  />
+                ) : (
+                  <div className="w-28 h-28 bg-white/40 animate-pulse rounded" />
+                )}
+              </div>
+              <div className="text-left min-w-0">
+                <p className="text-[10px] uppercase tracking-[0.25em] text-gold">
+                  Escaneie para baixar
+                </p>
+                <p className="text-sm text-white/85 leading-snug">
+                  Salve e compartilhe sua imagem cinematográfica.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="relative z-30 shrink-0 pointer-events-auto">
         <PrimaryCta onClick={onRestart}>Nova experiência</PrimaryCta>
       </div>
     </Screen>
