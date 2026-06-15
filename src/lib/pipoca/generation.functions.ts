@@ -478,7 +478,7 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     const { data: gen, error: gErr } = await supabaseAdmin
       .from("pipoca_generations")
       .select(
-        "id, session_id, status, provider_job_id, final_image_path, created_at, metadata",
+        "id, session_id, status, provider_job_id, final_image_path, created_at, metadata, public_token",
       )
       .eq("id", data.generationId)
       .maybeSingle();
