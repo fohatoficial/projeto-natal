@@ -54,8 +54,17 @@ export const createPipocaVisitor = createServerFn({ method: "POST" })
       .select("id, first_name")
       .single();
     if (error || !row) {
-      console.warn(`${LOG} falha ao criar visitante`, error?.message);
-      throw new Error("Falha ao registrar visitante");
+      // Surface the real PostgREST/Supabase error so the frontend & logs can act on it,
+      // without leaking visitor name or WhatsApp.
+      console.warn(`${LOG} falha no cadastro`, {
+        code: error?.code,
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+      });
+      const code = error?.code ? ` [${error.code}]` : "";
+      const msg = error?.message ?? "erro desconhecido";
+      throw new Error(`Falha ao registrar visitante${code}: ${msg}`);
     }
 
     console.log(`${LOG} visitante criado`, { id: row.id, len: fullName.length });
