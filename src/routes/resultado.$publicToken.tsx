@@ -25,10 +25,12 @@ type Status =
   | { kind: "ready"; data: PublicResult }
   | { kind: "missing" }
   | { kind: "pending" }
+  | { kind: "imageUnavailable" }
   | { kind: "error"; message: string };
 
 function PublicResultPage() {
   const { publicToken } = useParams({ from: "/resultado/$publicToken" });
+  const normalizedPublicToken = publicToken.trim();
   const fetchPublic = useServerFn(getPublicPipocaResult);
   const [status, setStatus] = useState<Status>({ kind: "loading" });
   const [downloading, setDownloading] = useState(false);
@@ -40,16 +42,22 @@ function PublicResultPage() {
     didFetch.current = true;
     (async () => {
       try {
-        const data = await fetchPublic({ data: { publicToken } });
+        console.log(
+          `[PIPOCA_PUBLIC_RESULT] token recebido: ${normalizedPublicToken.slice(0, 8)}`,
+        );
+        const data = await fetchPublic({ data: { publicToken: normalizedPublicToken } });
         setStatus({ kind: "ready", data });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Erro";
-        if (msg.includes("indisponível")) setStatus({ kind: "pending" });
+        if (msg.includes("processando")) setStatus({ kind: "pending" });
+        else if (msg.includes("Imagem") || msg.includes("URL")) {
+          setStatus({ kind: "imageUnavailable" });
+        }
         else if (msg.includes("não encontrado")) setStatus({ kind: "missing" });
         else setStatus({ kind: "error", message: msg });
       }
     })();
-  }, [fetchPublic, publicToken]);
+  }, [fetchPublic, normalizedPublicToken]);
 
   async function handleDownload() {
     if (status.kind !== "ready" || downloading) return;
@@ -111,15 +119,22 @@ function PublicResultPage() {
 
         {status.kind === "missing" && (
           <ErrorBlock
-            title="Cena não encontrada"
+            title="RESULTADO NÃO ENCONTRADO"
             body="Este link não corresponde a nenhuma cena. Verifique o QR Code e tente novamente."
           />
         )}
 
         {status.kind === "pending" && (
           <ErrorBlock
-            title="Sua cena ainda está sendo criada"
+            title="SUA CENA AINDA ESTÁ SENDO PREPARADA"
             body="Aguarde alguns instantes e atualize a página."
+          />
+        )}
+
+        {status.kind === "imageUnavailable" && (
+          <ErrorBlock
+            title="NÃO FOI POSSÍVEL CARREGAR SUA CENA"
+            body="A imagem desta cena não está disponível no momento."
           />
         )}
 
