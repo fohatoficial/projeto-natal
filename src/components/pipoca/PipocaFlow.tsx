@@ -94,6 +94,7 @@ export function PipocaFlow() {
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [publicToken, setPublicToken] = useState<string | null>(null);
+  const [resultPageUrl, setResultPageUrl] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
   const identityUploadedRef = useRef(false);
   const appearanceUploadedRef = useRef(false);
@@ -150,6 +151,8 @@ export function PipocaFlow() {
       setUploadError(null);
       setGenerationId(null);
       setGeneratedUrl(null);
+      setPublicToken(null);
+      setResultPageUrl(null);
       setGenError(null);
       generationStartedRef.current = false;
       setStep("choose");
@@ -250,6 +253,9 @@ export function PipocaFlow() {
     if (!prepared) return;
     setGenError(null);
     setGenerationId(null);
+    setGeneratedUrl(null);
+    setPublicToken(null);
+    setResultPageUrl(null);
     generationStartedRef.current = false;
     void startGeneration(prepared.sessionId, prepared.captureId);
   }, [prepared, startGeneration]);
@@ -263,6 +269,8 @@ export function PipocaFlow() {
       generationStartedRef.current = false;
       setGenerationId(null);
       setGeneratedUrl(null);
+      setPublicToken(null);
+      setResultPageUrl(null);
       setGenError(null);
       setUploadStatus("idle");
       setUploadError(null);
@@ -357,9 +365,10 @@ export function PipocaFlow() {
           generationId={generationId}
           errored={Boolean(genError)}
           pollFn={statusGenFn}
-          onDone={(imageUrl, token) => {
+          onDone={(imageUrl, token, url) => {
             setGeneratedUrl(imageUrl);
             setPublicToken(token);
+            setResultPageUrl(url);
             transitionTo(() => setStep("result"));
           }}
           onError={(msg) => setGenError(msg)}
@@ -370,6 +379,7 @@ export function PipocaFlow() {
           movie={selected}
           imageUrl={generatedUrl}
           publicToken={publicToken}
+          resultPageUrl={resultPageUrl}
           onRestart={reset}
         />
       )}
@@ -1278,7 +1288,13 @@ function Confirm({
 type StatusFn = (args: { data: { generationId: string } }) => Promise<
   | { status: "queued" | "processing" }
   | { status: "failed"; error: string }
-  | { status: "completed"; generationId: string; imageUrl: string; publicToken: string }
+  | {
+      status: "completed";
+      generationId: string;
+      imageUrl: string;
+      publicToken: string;
+      resultPageUrl: string;
+    }
 >;
 
 function Processing({
@@ -1293,7 +1309,7 @@ function Processing({
   generationId: string | null;
   errored: boolean;
   pollFn: StatusFn;
-  onDone: (imageUrl: string, publicToken: string) => void;
+  onDone: (imageUrl: string, publicToken: string, resultPageUrl: string) => void;
   onError: (msg: string) => void;
 }) {
   const [phraseIdx, setPhraseIdx] = useState(0);
@@ -1318,7 +1334,7 @@ function Processing({
         if (cancelled) return;
         if (res.status === "completed") {
           console.log(`${GEN_LOG} concluída`);
-          onDone(res.imageUrl, res.publicToken);
+          onDone(res.imageUrl, res.publicToken, res.resultPageUrl);
           return;
         }
         if (res.status === "failed") {
@@ -1382,64 +1398,32 @@ function Processing({
 }
 
 
-/* ---------- Step 6: Result (Stories-style) ---------- */
-
-const RESULT_SLIDE_DURATION_MS = 5000;
+/* ---------- Step 6: Result (photo first, QR on demand) ---------- */
 
 function Result({
   movie,
   imageUrl,
   publicToken,
+  resultPageUrl,
   onRestart,
 }: {
   movie: Movie;
   imageUrl: string | null;
   publicToken: string | null;
+  resultPageUrl: string | null;
   onRestart: () => void;
 }) {
   const [slide, setSlide] = useState(0);
   const [progress, setProgress] = useState(0);
-  const advanceLockRef = useRef(false);
-
-  const publicUrl = useMemo(() => {
-    if (!publicToken) return null;
-    const envBase =
-      (import.meta as unknown as { env?: Record<string, string | undefined> })
-        .env?.VITE_PUBLIC_RESULT_BASE_URL;
-    const base =
-      envBase && envBase.length > 0
-        ? envBase.replace(/\/+$/, "")
-        : typeof window !== "undefined"
-          ? window.location.origin
-          : "";
-    if (!base) return null;
-    return `${base}/resultado/${publicToken}`;
-  }, [publicToken]);
-
-  function advance() {
-    if (advanceLockRef.current) return;
-    advanceLockRef.current = true;
-    setSlide((s) => (s < 1 ? s + 1 : s));
-  }
 
   useEffect(() => {
-    advanceLockRef.current = false;
-    setProgress(0);
-    if (slide !== 0) return;
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const pct = Math.min(1, (now - start) / RESULT_SLIDE_DURATION_MS);
-      setProgress(pct);
-      if (pct < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    const t = window.setTimeout(() => advance(), RESULT_SLIDE_DURATION_MS);
-    return () => {
-      window.clearTimeout(t);
-      cancelAnimationFrame(raf);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (publicToken && resultPageUrl) {
+      console.log("[PIPOCA_QR] result page URL pronta", resultPageUrl);
+    }
+  }, [publicToken, resultPageUrl]);
+
+  useEffect(() => {
+    setProgress(slide === 0 ? 0 : 1);
   }, [slide]);
 
   return (
@@ -1458,14 +1442,6 @@ function Result({
           );
         })}
       </div>
-
-      {/* Tap-to-advance */}
-      <button
-        type="button"
-        onClick={advance}
-        aria-label="Próximo"
-        className="absolute inset-0 z-10 cursor-pointer"
-      />
 
       <div className="relative z-20 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-2 gap-3 sm:gap-4 pointer-events-none">
         {slide === 0 && (
@@ -1493,7 +1469,7 @@ function Result({
             </div>
 
             <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
-              toque para avançar
+              sua foto está pronta
             </span>
           </div>
         )}
@@ -1506,9 +1482,9 @@ function Result({
 
             <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-3 sm:p-4 w-full max-w-sm">
               <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center">
-                {publicUrl ? (
+                {resultPageUrl ? (
                   <QRCodeSVG
-                    value={publicUrl}
+                    value={resultPageUrl}
                     size={110}
                     level="M"
                     marginSize={2}
@@ -1533,7 +1509,11 @@ function Result({
       </div>
 
       <div className="relative z-30 shrink-0 pointer-events-auto">
-        <PrimaryCta onClick={onRestart}>Nova experiência</PrimaryCta>
+        {slide === 0 ? (
+          <PrimaryCta onClick={() => setSlide(1)}>Liberar QR Code</PrimaryCta>
+        ) : (
+          <PrimaryCta onClick={onRestart}>Nova experiência</PrimaryCta>
+        )}
       </div>
     </Screen>
   );
