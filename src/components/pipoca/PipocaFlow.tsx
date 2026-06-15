@@ -19,11 +19,20 @@ import {
   createPipocaGeneration,
   getPipocaGenerationStatus,
 } from "@/lib/pipoca/generation.functions";
+import { createPipocaVisitor } from "@/lib/pipoca/visitors.functions";
+import {
+  PRIVACY_NOTICE_PARAGRAPHS,
+  PRIVACY_NOTICE_TITLE,
+  PRIVACY_NOTICE_VERSION,
+  PRIVACY_CHECKBOX_LABEL,
+} from "@/lib/pipoca/privacy-notice";
+import { formatWhatsappMask, isValidBrWhatsapp } from "@/lib/pipoca/whatsapp";
 
 
 
 type Step =
   | "choose"
+  | "visitor_registration"
   | "stories"
   | "camera_identity"
   | "orient_appearance"

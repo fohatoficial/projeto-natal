@@ -10,12 +10,19 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResultadoRouteImport } from './routes/resultado'
+import { Route as FilaDeImpressaoRouteImport } from './routes/fila-de-impressao'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ResultadoPublicTokenRouteImport } from './routes/resultado.$publicToken'
+import { Route as ImprimirQueueIdRouteImport } from './routes/imprimir.$queueId'
 
 const ResultadoRoute = ResultadoRouteImport.update({
   id: '/resultado',
   path: '/resultado',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilaDeImpressaoRoute = FilaDeImpressaoRouteImport.update({
+  id: '/fila-de-impressao',
+  path: '/fila-de-impressao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -28,34 +35,63 @@ const ResultadoPublicTokenRoute = ResultadoPublicTokenRouteImport.update({
   path: '/$publicToken',
   getParentRoute: () => ResultadoRoute,
 } as any)
+const ImprimirQueueIdRoute = ImprimirQueueIdRouteImport.update({
+  id: '/imprimir/$queueId',
+  path: '/imprimir/$queueId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/fila-de-impressao': typeof FilaDeImpressaoRoute
   '/resultado': typeof ResultadoRouteWithChildren
+  '/imprimir/$queueId': typeof ImprimirQueueIdRoute
   '/resultado/$publicToken': typeof ResultadoPublicTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/fila-de-impressao': typeof FilaDeImpressaoRoute
   '/resultado': typeof ResultadoRouteWithChildren
+  '/imprimir/$queueId': typeof ImprimirQueueIdRoute
   '/resultado/$publicToken': typeof ResultadoPublicTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/fila-de-impressao': typeof FilaDeImpressaoRoute
   '/resultado': typeof ResultadoRouteWithChildren
+  '/imprimir/$queueId': typeof ImprimirQueueIdRoute
   '/resultado/$publicToken': typeof ResultadoPublicTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/resultado' | '/resultado/$publicToken'
+  fullPaths:
+    | '/'
+    | '/fila-de-impressao'
+    | '/resultado'
+    | '/imprimir/$queueId'
+    | '/resultado/$publicToken'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/resultado' | '/resultado/$publicToken'
-  id: '__root__' | '/' | '/resultado' | '/resultado/$publicToken'
+  to:
+    | '/'
+    | '/fila-de-impressao'
+    | '/resultado'
+    | '/imprimir/$queueId'
+    | '/resultado/$publicToken'
+  id:
+    | '__root__'
+    | '/'
+    | '/fila-de-impressao'
+    | '/resultado'
+    | '/imprimir/$queueId'
+    | '/resultado/$publicToken'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FilaDeImpressaoRoute: typeof FilaDeImpressaoRoute
   ResultadoRoute: typeof ResultadoRouteWithChildren
+  ImprimirQueueIdRoute: typeof ImprimirQueueIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,6 +101,13 @@ declare module '@tanstack/react-router' {
       path: '/resultado'
       fullPath: '/resultado'
       preLoaderRoute: typeof ResultadoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fila-de-impressao': {
+      id: '/fila-de-impressao'
+      path: '/fila-de-impressao'
+      fullPath: '/fila-de-impressao'
+      preLoaderRoute: typeof FilaDeImpressaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -80,6 +123,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/resultado/$publicToken'
       preLoaderRoute: typeof ResultadoPublicTokenRouteImport
       parentRoute: typeof ResultadoRoute
+    }
+    '/imprimir/$queueId': {
+      id: '/imprimir/$queueId'
+      path: '/imprimir/$queueId'
+      fullPath: '/imprimir/$queueId'
+      preLoaderRoute: typeof ImprimirQueueIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -98,7 +148,9 @@ const ResultadoRouteWithChildren = ResultadoRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FilaDeImpressaoRoute: FilaDeImpressaoRoute,
   ResultadoRoute: ResultadoRouteWithChildren,
+  ImprimirQueueIdRoute: ImprimirQueueIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
