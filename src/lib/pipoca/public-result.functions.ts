@@ -5,7 +5,17 @@ const GENERATED_BUCKET = "pipoca-generated-scenes";
 const SIGNED_DOWNLOAD_TTL = 60 * 30;
 const LOG = "[PIPOCA_PUBLIC_RESULT]";
 
-const Input = z.object({ publicToken: z.string().uuid() });
+const Input = z.object({
+  publicToken: z
+    .string()
+    .trim()
+    .min(1)
+    .refine(
+      (v) => v !== "undefined" && v !== "null" && v !== "[object Object]",
+      "Token inválido",
+    )
+    .uuid(),
+});
 
 export type PublicResult = {
   generationId: string;
@@ -35,20 +45,26 @@ export const getPublicPipocaResult = createServerFn({ method: "POST" })
   .inputValidator((input) => Input.parse(input))
   .handler(async ({ data }): Promise<PublicResult> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const publicToken = data.publicToken.trim();
+    console.log(`${LOG} token recebido: ${publicToken.slice(0, 8)}`);
 
     const { data: gen, error } = await supabaseAdmin
       .from("pipoca_generations")
       .select("id, status, final_image_path, film_id, created_at, public_token")
-      .eq("public_token", data.publicToken)
-      .maybeSingle();
-    if (error) {
+      .eq("public_token", publicToken)
+      .eq("status", "completed")
+      .single();
+    if (error || !gen) {
       console.warn(`${LOG} erro ao buscar`, error.message);
+      const { data: existing } = await supabaseAdmin
+        .from("pipoca_generations")
+        .select("id, status")
+        .eq("public_token", publicToken)
+        .maybeSingle();
+      if (existing) throw new Error("Resultado ainda processando");
       throw new Error("Resultado não encontrado");
     }
-    if (!gen) throw new Error("Resultado não encontrado");
-    if (gen.status !== "completed" || !gen.final_image_path) {
-      throw new Error("Resultado indisponível");
-    }
+    if (!gen.final_image_path) throw new Error("Imagem indisponível");
 
     const { data: film } = await supabaseAdmin
       .from("pipoca_films")
