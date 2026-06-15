@@ -142,6 +142,7 @@ export function PipocaFlow() {
     transitionTo(() => {
       console.log(`${UX} fluxo reiniciado`);
       clearPhotos();
+      releaseSharedCamera();
       setSelected(null);
       setPrepared(null);
       setUploadStatus("idle");
