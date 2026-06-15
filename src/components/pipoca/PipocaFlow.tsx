@@ -1408,7 +1408,7 @@ function Processing({
 
         <div className="space-y-2">
           <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-none">
-            Luzes, câmera, <span className="text-gold">ação</span>...
+            {firstName ? `${firstName}, aguarde...` : <>Luzes, câmera, <span className="text-gold">ação</span>...</>}
           </h1>
           <p className="text-white/70 text-sm sm:text-base">
             Inspirado em <span className="text-white">{movie.title}</span>
