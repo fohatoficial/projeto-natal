@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { QRCodeSVG } from "qrcode.react";
 import type { Movie } from "@/lib/pipoca/movies";
 import { usePipocaFilms } from "@/lib/pipoca/usePipocaFilms";
 import { useCamera, type CameraErrorKind } from "@/lib/pipoca/useCamera";
+import {
+  prewarmCamera,
+  releaseSharedCamera,
+  getSharedStatus,
+  subscribeSharedCamera,
+} from "@/lib/pipoca/sharedCamera";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createPipocaCaptureUpload,
@@ -17,7 +24,7 @@ import {
 
 type Step =
   | "choose"
-  | "orient"
+  | "stories"
   | "camera_identity"
   | "orient_appearance"
   | "camera_appearance"
@@ -29,8 +36,6 @@ type CameraVariant = "identity" | "appearance";
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
-const QR_URL =
-  "/__l5e/assets-v1/c736c04b-4813-43bc-80b0-1d6742d491a3/qr-code.png";
 
 const LOADING_PHRASES = [
   "Preparando o cenário...",
@@ -88,6 +93,7 @@ export function PipocaFlow() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  const [publicToken, setPublicToken] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
   const identityUploadedRef = useRef(false);
   const appearanceUploadedRef = useRef(false);
@@ -113,6 +119,8 @@ export function PipocaFlow() {
     return () => {
       if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
       if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
+      // Encerra a câmera ao desmontar o fluxo principal.
+      releaseSharedCamera();
     };
   }, []);
 
@@ -135,6 +143,7 @@ export function PipocaFlow() {
     transitionTo(() => {
       console.log(`${UX} fluxo reiniciado`);
       clearPhotos();
+      releaseSharedCamera();
       setSelected(null);
       setPrepared(null);
       setUploadStatus("idle");
@@ -220,6 +229,7 @@ export function PipocaFlow() {
         },
       });
       setUploadStatus("idle");
+      releaseSharedCamera();
       transitionTo(() => setStep("processing"));
       void startGeneration(current.sessionId, current.captureId);
     } catch (err) {
@@ -268,21 +278,24 @@ export function PipocaFlow() {
           error={error}
           onPick={(m) => {
             console.log(`${UX} filme selecionado`, { id: m.id, title: m.title });
+            // Pré-aquecer a câmera no mesmo gesto da escolha do filme.
+            void prewarmCamera().catch(() => {});
             transitionTo(() => {
               setSelected(m);
-              setStep("orient");
+              setStep("stories");
             });
           }}
         />
       )}
-      {step === "orient" && selected && (
-        <Orient
+      {step === "stories" && selected && (
+        <Stories
           movie={selected}
-          onNext={() => {
-            console.log(`${UX} pronto para câmera de identidade`);
+          onDone={() => {
+            console.log(`${UX} stories concluídos, abrindo câmera`);
             transitionTo(() => setStep("camera_identity"));
           }}
-          onBack={() => {
+          onChangeFilm={() => {
+            releaseSharedCamera();
             transitionTo(() => {
               setSelected(null);
               setStep("choose");
@@ -300,7 +313,7 @@ export function PipocaFlow() {
           }}
           onBack={() =>
             transitionTo(() => {
-              setStep("orient");
+              setStep("stories");
             })
           }
         />
@@ -344,8 +357,9 @@ export function PipocaFlow() {
           generationId={generationId}
           errored={Boolean(genError)}
           pollFn={statusGenFn}
-          onDone={(imageUrl) => {
+          onDone={(imageUrl, token) => {
             setGeneratedUrl(imageUrl);
+            setPublicToken(token);
             transitionTo(() => setStep("result"));
           }}
           onError={(msg) => setGenError(msg)}
@@ -355,6 +369,7 @@ export function PipocaFlow() {
         <Result
           movie={selected}
           imageUrl={generatedUrl}
+          publicToken={publicToken}
           onRestart={reset}
         />
       )}
@@ -379,16 +394,10 @@ export function PipocaFlow() {
       )}
 
       {transitioning && (
-        <div className="fixed inset-0 z-[60] pointer-events-none overflow-hidden" aria-hidden>
-          <div
-            className="wedge-tl absolute inset-0"
-            style={{ background: "#F8BA32", clipPath: "polygon(0 0, 100% 0, 0 100%)" }}
-          />
-          <div
-            className="wedge-br absolute inset-0"
-            style={{ background: "#2E5BE5", clipPath: "polygon(100% 0, 100% 100%, 0 100%)" }}
-          />
-        </div>
+        <div
+          className="fixed inset-0 z-[60] pointer-events-none overflow-hidden bg-black/30"
+          aria-hidden
+        />
       )}
     </div>
   );
@@ -488,7 +497,6 @@ function UploadError({
 function Screen({
   children,
   aurora = false,
-  wedgeColor = "#2E5BE5",
   className = "",
 }: {
   children: React.ReactNode;
@@ -503,17 +511,6 @@ function Screen({
       } ${className}`}
     >
       <div className="absolute inset-0 brand-pattern opacity-[0.05] pointer-events-none" aria-hidden />
-      {/* Decorative corner wedges */}
-      <div
-        className="absolute top-0 left-0 w-10 h-10 sm:w-14 sm:h-14 lg:w-20 lg:h-20 pointer-events-none z-20"
-        style={{ background: "#F8BA32", clipPath: "polygon(0 0, 100% 0, 0 100%)" }}
-        aria-hidden
-      />
-      <div
-        className="absolute bottom-0 right-0 w-10 h-10 sm:w-14 sm:h-14 lg:w-20 lg:h-20 pointer-events-none z-20"
-        style={{ background: wedgeColor, clipPath: "polygon(100% 0, 100% 100%, 0 100%)" }}
-        aria-hidden
-      />
       {children}
     </div>
   );
@@ -737,113 +734,191 @@ function PosterCard({
   );
 }
 
-/* ---------- Step 2: Orient ---------- */
+/* ---------- Step 2: Stories (after film pick, prewarms camera) ---------- */
 
-function Orient({
+const STORY_DURATIONS_MS = [3000, 4500, 2000];
+
+function Stories({
   movie,
-  onNext,
-  onBack,
+  onDone,
+  onChangeFilm,
 }: {
   movie: Movie;
-  onNext: () => void;
-  onBack: () => void;
+  onDone: () => void;
+  onChangeFilm: () => void;
 }) {
+  const [idx, setIdx] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [cameraStatus, setCameraStatus] = useState(getSharedStatus());
+  const advanceLockRef = useRef(false);
+
   useEffect(() => {
-    console.log(`${UX} tela de instruções aberta`);
+    const unsub = subscribeSharedCamera(() => setCameraStatus(getSharedStatus()));
+    return unsub;
   }, []);
 
-  const tips = [
-    {
-      svg: (
-        <svg viewBox="0 0 24 24" className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10" fill="none" stroke="#F8BA32" strokeWidth="2">
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 21c0-4 4-7 8-7s8 3 8 7" strokeLinecap="round" />
-        </svg>
-      ),
-      label: "Rosto visível",
-    },
-    {
-      svg: (
-        <svg viewBox="0 0 24 24" className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10" fill="none" stroke="#F8BA32" strokeWidth="2">
-          <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12c1 1 1 2 1 3h6c0-1 0-2 1-3a7 7 0 0 0-4-12z" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ),
-      label: "Boa iluminação",
-    },
-    {
-      svg: (
-        <svg viewBox="0 0 24 24" className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10" fill="none" stroke="#92C37A" strokeWidth="2">
-          <circle cx="12" cy="12" r="10" />
-          <circle cx="12" cy="12" r="6" />
-          <circle cx="12" cy="12" r="2" fill="#92C37A" />
-        </svg>
-      ),
-      label: "Olhe para a câmera",
-    },
-    {
-      svg: (
-        <svg viewBox="0 0 24 24" className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10" fill="none" stroke="#E0463A" strokeWidth="2">
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 21c0-4 4-7 8-7s8 3 8 7" strokeLinecap="round" />
-          <line x1="2" y1="2" x2="22" y2="22" strokeLinecap="round" stroke="#E0463A" />
-        </svg>
-      ),
-      label: "Apenas 1 pessoa",
-    },
-  ];
+  // Reset advance lock + progress whenever the story index changes.
+  useEffect(() => {
+    advanceLockRef.current = false;
+    setProgress(0);
+    const duration = STORY_DURATIONS_MS[idx];
+    if (duration === undefined) return;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const pct = Math.min(1, (now - start) / duration);
+      setProgress(pct);
+      if (pct < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    const t = window.setTimeout(() => advance(), duration);
+    return () => {
+      window.clearTimeout(t);
+      cancelAnimationFrame(raf);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx]);
+
+  function advance() {
+    if (advanceLockRef.current) return;
+    advanceLockRef.current = true;
+    if (idx >= STORY_DURATIONS_MS.length - 1) {
+      onDone();
+    } else {
+      setIdx((i) => i + 1);
+    }
+  }
 
   return (
     <Screen aurora>
-      <Header subtitle="Prepare-se" />
-
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-3 gap-4 sm:gap-5">
-        {/* Film chip */}
-        <div className="flex items-center gap-3 sm:gap-4 bg-white/5 border border-white/15 rounded-xl p-2.5 sm:p-3 animate-fade-up max-w-md w-full">
-          <div className="w-14 h-18 sm:w-16 sm:h-20 rounded overflow-hidden shrink-0">
-            <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
-          </div>
-          <div className="min-w-0 text-left flex-1">
-            <p className="text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-gold">
-              Sua cena será inspirada em
-            </p>
-            <p className="font-display text-xl sm:text-2xl text-white truncate leading-tight mt-0.5">
-              {movie.title}
-            </p>
-          </div>
-        </div>
-
-        <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
-          Vamos tirar <span className="text-gold">duas fotos</span>
-        </h1>
-        <p className="text-sm sm:text-base text-white/70 max-w-md animate-fade-up">
-          Primeiro, uma foto de perto para reconhecer seu rosto. Depois, uma foto mais distante para registrar sua postura.
-        </p>
-
-
-        {/* Tips grid */}
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 w-full max-w-md">
-          {tips.map((t, i) => (
+      {/* Progress bars */}
+      <div className="relative z-20 w-full max-w-2xl flex gap-1.5 px-1">
+        {STORY_DURATIONS_MS.map((_, i) => {
+          const pct = i < idx ? 1 : i === idx ? progress : 0;
+          return (
             <div
-              key={t.label}
-              className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-3 sm:p-4 text-center animate-slide-in"
-              style={{ animationDelay: `${i * 80}ms` }}
+              key={i}
+              className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden"
             >
-              {t.svg}
-              <span className="text-[10px] sm:text-xs uppercase tracking-[0.18em] text-white/85">
-                {t.label}
-              </span>
+              <div
+                className="h-full bg-gold transition-[width] duration-75 ease-linear"
+                style={{ width: `${pct * 100}%` }}
+              />
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
-      <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
-        <PrimaryCta onClick={onNext}>Estou pronto</PrimaryCta>
-        <GhostBtn onClick={onBack}>Escolher outro filme</GhostBtn>
+      {/* Tap-to-advance area */}
+      <button
+        type="button"
+        onClick={advance}
+        aria-label="Próximo"
+        className="absolute inset-0 z-10 cursor-pointer"
+      />
+
+      <div className="relative z-20 flex-1 min-h-0 w-full flex flex-col items-center justify-center max-w-2xl py-3 pointer-events-none">
+        {idx === 0 && <StoryFilm movie={movie} />}
+        {idx === 1 && <StoryTwoPhotos />}
+        {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} />}
+      </div>
+
+      <div className="relative z-30 shrink-0">
+        {idx === 0 ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChangeFilm();
+            }}
+            className="text-xs uppercase tracking-[0.3em] text-white/65 hover:text-white underline underline-offset-4 py-2 px-3"
+          >
+            Trocar filme
+          </button>
+        ) : (
+          <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
+            toque para avançar
+          </span>
+        )}
       </div>
     </Screen>
   );
 }
+
+function StoryFilm({ movie }: { movie: Movie }) {
+  return (
+    <div className="flex flex-col items-center gap-4 sm:gap-5 animate-fade-up">
+      <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
+        Você escolheu
+      </span>
+      <div className="w-44 sm:w-56 aspect-[3/4] rounded-xl overflow-hidden border border-white/15 shadow-2xl">
+        <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
+      </div>
+      <h1 className="font-display text-3xl sm:text-5xl text-white leading-[0.95] max-w-md">
+        {movie.title}
+      </h1>
+    </div>
+  );
+}
+
+function StoryTwoPhotos() {
+  return (
+    <div className="flex flex-col items-center gap-6 sm:gap-7 animate-fade-up max-w-md">
+      <h1 className="font-display text-3xl sm:text-5xl text-white leading-[0.95]">
+        Vamos tirar <span className="text-gold">duas fotos</span>
+      </h1>
+      <div className="grid grid-cols-2 gap-4 w-full">
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-4">
+          <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="#F8BA32" strokeWidth="1.8">
+            <circle cx="12" cy="9" r="3.5" />
+            <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" strokeLinecap="round" />
+          </svg>
+          <p className="text-xs sm:text-sm text-white/85 leading-snug">
+            Uma foto <span className="text-gold">de perto</span> para reconhecer seu rosto
+          </p>
+        </div>
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-4">
+          <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="#2E5BE5" strokeWidth="1.8">
+            <circle cx="12" cy="6" r="2.5" />
+            <path d="M8 22v-7l-2-4h12l-2 4v7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="text-xs sm:text-sm text-white/85 leading-snug">
+            Uma foto <span className="text-gold">mais distante</span> para registrar sua postura
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StoryPrepare({ cameraStatus }: { cameraStatus: ReturnType<typeof getSharedStatus> }) {
+  const camHint =
+    cameraStatus === "ready"
+      ? "Câmera pronta"
+      : cameraStatus === "denied"
+        ? "Autorize a câmera no navegador"
+        : "Ativando câmera...";
+  return (
+    <div className="flex flex-col items-center gap-5 animate-fade-up">
+      <div className="w-24 h-24 rounded-full border-2 border-gold/60 grid place-items-center animate-badge-in">
+        <svg viewBox="0 0 24 24" className="w-12 h-12" fill="none" stroke="#F8BA32" strokeWidth="1.8">
+          <rect x="3" y="7" width="14" height="11" rx="2" />
+          <path d="M21 9l-4 3 4 3V9z" />
+        </svg>
+      </div>
+      <h1 className="font-display text-4xl sm:text-6xl text-white leading-[0.95]">
+        <span className="text-gold">Prepare-se</span>
+      </h1>
+      <p className="text-sm sm:text-base text-white/75 max-w-sm">
+        A câmera será aberta agora.
+      </p>
+      <span className="text-[10px] uppercase tracking-[0.3em] text-white/50">
+        {camHint}
+      </span>
+    </div>
+  );
+}
+
 
 /* ---------- Step 2b: Orient appearance (between identity and appearance captures) ---------- */
 
@@ -927,20 +1002,12 @@ function Camera({
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
   const title =
-    variant === "identity" ? "Enquadre seu rosto" : "Enquadre-se da cintura para cima";
+    variant === "identity" ? "Posicione seu rosto na marcação" : "Encaixe o rosto e o corpo na marcação";
   const hint =
     variant === "identity"
-      ? "Posicione o rosto dentro da marcação e olhe diretamente para a câmera."
-      : "Mantenha cabeça, ombros e tronco visíveis, centralizados na marcação.";
+      ? "Cabelo, testa e queixo dentro da área."
+      : "Mantenha a cabeça no topo e o corpo dentro do contorno.";
   const subtitle = variant === "identity" ? "Foto de rosto" : "Foto de corpo";
-
-  // Guide mask geometry — pure visual overlay, no crop applied to the captured file.
-  // Identity: tighter oval covering head + shoulders.
-  // Appearance: taller, wider rounded frame covering bust + waist.
-  const maskClass =
-    variant === "identity"
-      ? "w-3/5 h-[62%] rounded-[48%]"
-      : "w-[78%] h-[88%] rounded-[36%]";
 
   return (
     <Screen>
@@ -968,20 +1035,54 @@ function Camera({
             </div>
           ) : null}
 
-          <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className={`${maskClass} border-2 border-gold/80 animate-pulse-soft`} />
-          </div>
+          {/* Adaptive SVG mask — pure overlay, never crops the captured file. */}
+          <svg
+            viewBox="0 0 100 125"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-0 w-full h-full animate-pulse-soft"
+            aria-hidden
+          >
+            {variant === "identity" ? (
+              <>
+                {/* Head + shoulders oval, centered at ~36% of height */}
+                <ellipse
+                  cx="50"
+                  cy="45"
+                  rx="22"
+                  ry="30"
+                  fill="none"
+                  stroke="#F8BA32"
+                  strokeWidth="0.6"
+                  strokeDasharray="1.5 1.2"
+                />
+              </>
+            ) : (
+              <>
+                {/* Face oval at ~28% height */}
+                <ellipse
+                  cx="50"
+                  cy="35"
+                  rx="11"
+                  ry="14"
+                  fill="none"
+                  stroke="#F8BA32"
+                  strokeWidth="0.6"
+                  strokeDasharray="1.5 1.2"
+                />
+                {/* Shoulders + torso silhouette down to waist (~82% height) */}
+                <path
+                  d="M22 102 C 24 78, 32 60, 50 60 C 68 60, 76 78, 78 102"
+                  fill="none"
+                  stroke="#F8BA32"
+                  strokeWidth="0.6"
+                  strokeDasharray="1.5 1.2"
+                  strokeLinecap="round"
+                />
+              </>
+            )}
+          </svg>
 
-          {(["tl", "tr", "bl", "br"] as const).map((p) => (
-            <span
-              key={p}
-              className={`pointer-events-none absolute w-7 h-7 border-gold/90 ${
-                p === "tl" ? "top-3 left-3 border-l-2 border-t-2" : ""
-              } ${p === "tr" ? "top-3 right-3 border-r-2 border-t-2" : ""} ${
-                p === "bl" ? "bottom-3 left-3 border-l-2 border-b-2" : ""
-              } ${p === "br" ? "bottom-3 right-3 border-r-2 border-b-2" : ""}`}
-            />
-          ))}
+
 
           {count !== null && count > 0 ? (
             <div className="absolute inset-0 grid place-items-center bg-black/40 backdrop-blur-[1px]">
@@ -1042,7 +1143,8 @@ function CameraError({
   }, [kind]);
 
   return (
-    <Screen aurora wedgeColor="#E0463A">
+    <Screen aurora>
+{/* error variant */}
       <Header />
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center text-center gap-5 max-w-xl">
         <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-red-500/15 border-2 border-red-500/40 grid place-items-center animate-badge-in">
@@ -1166,7 +1268,7 @@ function Confirm({
 type StatusFn = (args: { data: { generationId: string } }) => Promise<
   | { status: "queued" | "processing" }
   | { status: "failed"; error: string }
-  | { status: "completed"; generationId: string; imageUrl: string }
+  | { status: "completed"; generationId: string; imageUrl: string; publicToken: string }
 >;
 
 function Processing({
@@ -1181,7 +1283,7 @@ function Processing({
   generationId: string | null;
   errored: boolean;
   pollFn: StatusFn;
-  onDone: (imageUrl: string) => void;
+  onDone: (imageUrl: string, publicToken: string) => void;
   onError: (msg: string) => void;
 }) {
   const [phraseIdx, setPhraseIdx] = useState(0);
@@ -1206,7 +1308,7 @@ function Processing({
         if (cancelled) return;
         if (res.status === "completed") {
           console.log(`${GEN_LOG} concluída`);
-          onDone(res.imageUrl);
+          onDone(res.imageUrl, res.publicToken);
           return;
         }
         if (res.status === "failed") {
@@ -1275,14 +1377,21 @@ function Processing({
 function Result({
   movie,
   imageUrl,
+  publicToken,
   onRestart,
 }: {
   movie: Movie;
   imageUrl: string | null;
+  publicToken: string | null;
   onRestart: () => void;
 }) {
+  const publicUrl = useMemo(() => {
+    if (!publicToken || typeof window === "undefined") return null;
+    return `${window.location.origin}/resultado/${publicToken}`;
+  }, [publicToken]);
+
   return (
-    <Screen aurora wedgeColor="#92C37A">
+    <Screen aurora>
       <Header subtitle="Você entrou em cena" />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-3 sm:gap-4">
@@ -1290,7 +1399,7 @@ function Result({
           Sua <span className="text-gold">cena</span> está pronta
         </h1>
 
-        <div className="tb-card bg-card w-full max-w-[340px] aspect-[3/4] overflow-hidden mx-auto shadow-2xl animate-pop-in">
+        <div className="w-full max-w-[340px] aspect-[3/4] overflow-hidden mx-auto shadow-2xl animate-pop-in rounded-xl border border-white/10">
           <div className="relative w-full h-full film-grain vignette">
             <img
               src={imageUrl ?? movie.posterUrl}
@@ -1306,12 +1415,22 @@ function Result({
               </h3>
             </div>
           </div>
-
         </div>
 
         <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-2.5 sm:p-3 w-full max-w-sm animate-fade-up">
-          <div className="bg-white p-1.5 sm:p-2 rounded-lg shrink-0">
-            <img src={QR_URL} alt="QR Code" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" />
+          <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center">
+            {publicUrl ? (
+              <QRCodeSVG
+                value={publicUrl}
+                size={96}
+                level="M"
+                marginSize={2}
+                bgColor="#FFFFFF"
+                fgColor="#000000"
+              />
+            ) : (
+              <div className="w-24 h-24 bg-white/40 animate-pulse rounded" />
+            )}
           </div>
           <div className="text-left min-w-0">
             <p className="text-[10px] uppercase tracking-[0.25em] text-gold">
@@ -1330,3 +1449,4 @@ function Result({
     </Screen>
   );
 }
+

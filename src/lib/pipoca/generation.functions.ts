@@ -468,7 +468,7 @@ const StatusInput = z.object({
 type StatusResponse =
   | { status: "queued" | "processing" }
   | { status: "failed"; error: string }
-  | { status: "completed"; generationId: string; imageUrl: string };
+  | { status: "completed"; generationId: string; imageUrl: string; publicToken: string };
 
 export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
   .inputValidator((input) => StatusInput.parse(input))
@@ -478,7 +478,7 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     const { data: gen, error: gErr } = await supabaseAdmin
       .from("pipoca_generations")
       .select(
-        "id, session_id, status, provider_job_id, final_image_path, created_at, metadata",
+        "id, session_id, status, provider_job_id, final_image_path, created_at, metadata, public_token",
       )
       .eq("id", data.generationId)
       .maybeSingle();
@@ -501,6 +501,7 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
         status: "completed",
         generationId: gen.id,
         imageUrl: signed.signedUrl,
+        publicToken: gen.public_token as string,
       };
     }
 
@@ -618,5 +619,6 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
       status: "completed",
       generationId: gen.id,
       imageUrl: signed.signedUrl,
+      publicToken: gen.public_token as string,
     };
   });
