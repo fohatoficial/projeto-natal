@@ -29,22 +29,52 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: gen, error } = await supabaseAdmin
+    const { data: gen, error: gErr } = await supabaseAdmin
       .from("pipoca_generations")
-      .select("id, status, session_id")
+      .select("id, session_id, final_image_path, public_token, status")
       .eq("public_token", data.publicToken)
       .eq("status", "completed")
       .maybeSingle();
-    if (error || !gen) throw new Error("Geração não encontrada");
+    if (gErr) {
+      console.warn(`${LOG} falha: geração`, {
+        code: gErr.code, message: gErr.message, details: gErr.details, hint: gErr.hint,
+      });
+      throw new Error("Falha ao localizar geração");
+    }
+    if (!gen) throw new Error("Geração não encontrada");
+    if (!gen.session_id) throw new Error("Geração sem sessão vinculada");
+    console.log(`${LOG} geração localizada`, { generationId: gen.id });
 
     const { data: session, error: sErr } = await supabaseAdmin
       .from("pipoca_sessions")
       .select("id, visitor_id")
       .eq("id", gen.session_id)
       .maybeSingle();
-    if (sErr || !session || !session.visitor_id) {
+    if (sErr) {
+      console.warn(`${LOG} falha: sessão`, {
+        code: sErr.code, message: sErr.message, details: sErr.details, hint: sErr.hint,
+      });
+      throw new Error("Falha ao localizar sessão");
+    }
+    if (!session) throw new Error("Sessão não encontrada");
+    if (!session.visitor_id) {
+      console.warn(`${LOG} sessão sem visitor_id`, { sessionId: session.id });
       throw new Error("Visitante não vinculado a esta cena");
     }
+    console.log(`${LOG} sessão localizada`, { sessionId: session.id });
+
+    const { data: visitor, error: vErr } = await supabaseAdmin
+      .from("pipoca_visitors")
+      .select("id")
+      .eq("id", session.visitor_id)
+      .maybeSingle();
+    if (vErr || !visitor) {
+      console.warn(`${LOG} falha: visitante`, {
+        code: vErr?.code, message: vErr?.message, details: vErr?.details, hint: vErr?.hint,
+      });
+      throw new Error("Visitante não encontrado");
+    }
+    console.log(`${LOG} visitante localizado`);
 
     // Existing active request?
     const { data: existing } = await supabaseAdmin
@@ -56,6 +86,7 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
     if (existing) {
       return {
         success: true as const,
+        alreadyRequested: true as const,
         alreadyQueued: true as const,
         queueId: existing.id as string,
         status: existing.status as string,
@@ -65,17 +96,41 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
     const { data: inserted, error: iErr } = await supabaseAdmin
       .from("pipoca_print_queue")
       .insert({
-        visitor_id: session.visitor_id,
+        visitor_id: visitor.id,
         generation_id: gen.id,
         status: "pending",
       })
       .select("id, status")
       .single();
-    if (iErr || !inserted) throw new Error("Falha ao entrar na fila");
+    if (iErr || !inserted) {
+      // Unique partial index conflict → another active request was just inserted; re-read.
+      if (iErr?.code === "23505") {
+        const { data: again } = await supabaseAdmin
+          .from("pipoca_print_queue")
+          .select("id, status")
+          .eq("generation_id", gen.id)
+          .in("status", ["pending", "printing"])
+          .maybeSingle();
+        if (again) {
+          return {
+            success: true as const,
+            alreadyRequested: true as const,
+            alreadyQueued: true as const,
+            queueId: again.id as string,
+            status: again.status as string,
+          };
+        }
+      }
+      console.warn(`${LOG} falha: insert`, {
+        code: iErr?.code, message: iErr?.message, details: iErr?.details, hint: iErr?.hint,
+      });
+      throw new Error("Falha ao entrar na fila");
+    }
 
-    console.log(`${LOG} impressão solicitada`, { queueId: inserted.id });
+    console.log(`${LOG} item criado na fila`, { queueId: inserted.id });
     return {
       success: true as const,
+      alreadyRequested: false as const,
       alreadyQueued: false as const,
       queueId: inserted.id as string,
       status: inserted.status as string,
