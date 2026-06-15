@@ -1143,7 +1143,8 @@ function CameraError({
   }, [kind]);
 
   return (
-    <Screen aurora wedgeColor="#E0463A">
+    <Screen aurora>
+{/* error variant */}
       <Header />
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center text-center gap-5 max-w-xl">
         <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-red-500/15 border-2 border-red-500/40 grid place-items-center animate-badge-in">
@@ -1282,7 +1283,7 @@ function Processing({
   generationId: string | null;
   errored: boolean;
   pollFn: StatusFn;
-  onDone: (imageUrl: string) => void;
+  onDone: (imageUrl: string, publicToken: string) => void;
   onError: (msg: string) => void;
 }) {
   const [phraseIdx, setPhraseIdx] = useState(0);
@@ -1307,7 +1308,7 @@ function Processing({
         if (cancelled) return;
         if (res.status === "completed") {
           console.log(`${GEN_LOG} concluída`);
-          onDone(res.imageUrl);
+          onDone(res.imageUrl, res.publicToken);
           return;
         }
         if (res.status === "failed") {
