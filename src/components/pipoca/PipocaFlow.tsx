@@ -1845,63 +1845,38 @@ function GuidedCamera({
       ? "PREPARANDO O ENQUADRAMENTO"
       : getGuideHint(guide.status, mode);
 
-  const frameMaxW = mode === "identity" ? "max-w-[460px]" : "max-w-[520px]";
+  const frameMaxW = mode === "identity" ? "max-w-[680px]" : "max-w-[760px]";
 
   return (
-    <Screen>
-      {/* NO BrandHeader / movie title / fixed instructions on capture screens.
-          Single source of guidance = dynamic hint at the top. */}
-      <div
-        className="relative z-10 shrink-0 w-full flex items-center justify-center px-4"
-        style={{ minHeight: "clamp(72px, 10dvh, 140px)" }}
-      >
+    <div
+      className="pipoca-camera-grid bg-cinema relative"
+      data-pipoca-camera={mode}
+    >
+      {/* Row 1 — dynamic hint only (no logo, no fixed text). */}
+      <div className="pipoca-camera-hint-slot">
         <p
           key={hint}
-          className={`font-display text-center leading-tight transition-opacity duration-200 ${
-            guide.status === "ok" ? "text-emerald-300" : "text-white"
-          }`}
-          style={{
-            fontSize: "clamp(1.25rem, 2.6dvh, 2.25rem)",
-            maxWidth: "22ch",
-          }}
+          className={`pipoca-camera-hint ${guide.status === "ok" ? "pipoca-camera-hint--ok" : ""}`}
         >
           {hint}
         </p>
       </div>
 
-      <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center w-full max-w-2xl py-2">
+      {/* Row 2 — preview fills available vertical space, never cropped. */}
+      <div className="w-full min-h-0 h-full flex items-center justify-center">
         <div
-          className={`relative w-full ${frameMaxW} aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl`}
+          className={`relative w-full ${frameMaxW} h-full max-h-full aspect-[4/5] mx-auto rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl`}
+          style={{ maxHeight: "100%" }}
         >
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: "scaleX(-1)" }}
-          />
-
-          {!ready ? (
-            <div className="absolute inset-0 grid place-items-center text-white/75 text-sm tracking-wide animate-pulse-soft">
-              Iniciando câmera…
-            </div>
-          ) : null}
-
+          <CameraPreviewSurface videoRef={videoRef} ready={ready} />
           <FaceScanOverlay guide={guide} discreet={mode === "appearance"} />
         </div>
       </div>
 
-      <div
-        className="relative z-10 shrink-0 w-full flex flex-col items-center gap-2"
-        style={{ minHeight: "clamp(120px, 16dvh, 200px)" }}
-      >
+      {/* Row 3 — countdown / fallback / back. Reserved height prevents jumps. */}
+      <div className="pipoca-camera-countdown-slot">
         {countdown !== null && countdown > 0 ? (
-          <span
-            key={countdown}
-            className="font-display text-gold leading-none animate-pop-in"
-            style={{ fontSize: "clamp(3rem, 8dvh, 5rem)" }}
-          >
+          <span key={countdown} className="pipoca-camera-countdown">
             {countdown}
           </span>
         ) : null}
@@ -1912,9 +1887,40 @@ function GuidedCamera({
         ) : null}
         <GhostBtn onClick={onBack}>Voltar</GhostBtn>
       </div>
-    </Screen>
+    </div>
   );
 }
+
+/**
+ * Isolated, memoized <video> surface so countdown/hint/box state updates in
+ * the parent never remount the video element (which would flash and drop
+ * frames). Re-renders only when `ready` flips.
+ */
+const CameraPreviewSurface = React.memo(function CameraPreviewSurface({
+  videoRef,
+  ready,
+}: {
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  ready: boolean;
+}) {
+  return (
+    <>
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ transform: "scaleX(-1)" }}
+      />
+      {!ready ? (
+        <div className="absolute inset-0 grid place-items-center text-white/75 text-sm tracking-wide animate-pulse-soft">
+          Iniciando câmera…
+        </div>
+      ) : null}
+    </>
+  );
+});
 
 function FaceScanOverlay({ guide, discreet = false }: { guide: GuideState; discreet?: boolean }) {
   const box = guide.box;
