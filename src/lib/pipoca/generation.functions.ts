@@ -227,7 +227,7 @@ function buildPromptText(
   );
   if (hasHatRef) {
     parts.push(
-      "When Image 4 is used, apply it only as a restrained secondary cue for the hat's authentic shape, scale and natural fit. The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT change the pose. The hat must NOT replace or distort the environment. The hat must NOT become oversized, theatrical, ceremonial, fantastical, a cowboy hat, a western wide-brim hat or the main subject.",
+      "When Images 4 and 5 are used, apply them only as restrained secondary cues for the hat's authentic shape, scale, side profile and natural fit. The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT change the pose. The hat must NOT replace or distort the environment. The hat must NOT become oversized, theatrical, ceremonial, fantastical, a cowboy hat, a western wide-brim hat or the main subject.",
     );
   }
 
