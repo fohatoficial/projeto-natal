@@ -276,9 +276,9 @@
   }
   .pipoca-camera-frame {
     position: relative;
-    aspect-ratio: 16 / 9;
-    width: min(92vw, 680px);
-    max-height: 46dvh;
+    aspect-ratio: 4 / 5;
+    width: min(78vw, 520px);
+    max-height: 56dvh;
     border-radius: 18px;
     overflow: hidden;
     border: 1px solid rgba(255,255,255,0.15);
