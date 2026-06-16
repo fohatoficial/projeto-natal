@@ -8,10 +8,7 @@ const ORIGINALS_BUCKET = "pipoca-visitor-originals";
 const GENERATED_BUCKET = "pipoca-generated-scenes";
 const SIGNED_DOWNLOAD_TTL = 60 * 30;
 const SIGNED_REF_TTL = 60 * 30;
-// Canonical public domain for the visitor-facing result page. Must match the
-// production host so QR codes generated on the totem resolve correctly when
-// scanned on a real phone. Do NOT use Preview, localhost or storage hosts.
-const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/, "");
+const PUBLIC_RESULT_BASE_URL = "https://pipoca-cena-studio.lovable.app".replace(/\/+$/, "");
 
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
