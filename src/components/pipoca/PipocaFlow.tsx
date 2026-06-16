@@ -1217,8 +1217,11 @@ function Camera({
           >
             {variant === "identity" ? (
               <>
-                {/* Head + shoulders oval, centered at ~36% of height */}
+                {/* Head + shoulders oval. cy lowered on tall portrait totems
+                    via the .pipoca-identity-mask-ellipse CSS override so the
+                    user's face doesn't end up under the totem's top camera. */}
                 <ellipse
+                  className="pipoca-identity-mask-ellipse"
                   cx="50"
                   cy="45"
                   rx="22"
