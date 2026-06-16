@@ -1015,6 +1015,7 @@ function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
           src={movie.posterUrl}
           alt={movie.title}
           fit="cover"
+          eager
           logTag={`story-poster:${movie.id}`}
         />
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
