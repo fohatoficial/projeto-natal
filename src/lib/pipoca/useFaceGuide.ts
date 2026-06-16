@@ -145,10 +145,8 @@ export function useFaceGuide(opts: {
     stableMs: 0,
   });
   const detectorRef = useRef<DetectorAny | null>(null);
-  const rafRef = useRef<number | null>(null);
   const lastOkSinceRef = useRef<number | null>(null);
-  const lastStatusRef = useRef<GuideStatus>("no_face");
-  const lastTickRef = useRef<number>(0);
+  const lastStateRef = useRef<GuideState>({ status: "no_face", box: null, stableMs: 0 });
 
   useEffect(() => {
     if (!enabled) return;
@@ -181,7 +179,6 @@ export function useFaceGuide(opts: {
 
     return () => {
       cancelled = true;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       try {
         detectorRef.current?.close?.();
       } catch {
@@ -192,21 +189,13 @@ export function useFaceGuide(opts: {
     };
   }, [enabled]);
 
-  const evalFrame = useCallback(
-    (now: number) => {
+  const evalOnce = useCallback(
+    (now: number): { dur: number } | null => {
       const v = videoRef.current;
       const det = detectorRef.current;
-      if (!enabled || !v || !det || v.videoWidth === 0 || v.videoHeight === 0) {
-        rafRef.current = requestAnimationFrame(evalFrame);
-        return;
-      }
-      // Throttle to ~5 fps.
-      if (now - lastTickRef.current < 180) {
-        rafRef.current = requestAnimationFrame(evalFrame);
-        return;
-      }
-      lastTickRef.current = now;
+      if (!v || !det || v.videoWidth === 0 || v.videoHeight === 0) return null;
 
+      const t0 = performance.now();
       let nextStatus: GuideStatus = "no_face";
       let nextBox: FaceBox | null = null;
       try {
@@ -224,18 +213,15 @@ export function useFaceGuide(opts: {
             const y = bb.originY / vh;
             const w = bb.width / vw;
             const h = bb.height / vh;
-            // Mirror X for the user-facing camera that we render with scaleX(-1).
             const mx = 1 - (x + w);
             nextBox = { x: mx, y, w, h };
             const cx = mx + w / 2;
             const cy = y + h / 2;
 
-            // Head pose via keypoint asymmetry: eyes-to-nose horizontal balance.
-            // Keypoints: 0,1 = eyes, 2 = nose tip (per blaze_face short range).
             const kp = d.keypoints ?? [];
             let turned = false;
             if (kp.length >= 3) {
-              const lex = 1 - kp[0].x; // mirror to match preview
+              const lex = 1 - kp[0].x;
               const rex = 1 - kp[1].x;
               const nx = 1 - kp[2].x;
               const eyeCx = (lex + rex) / 2;
@@ -256,6 +242,7 @@ export function useFaceGuide(opts: {
         console.warn(`${LOG} detect erro`, err);
       }
 
+      const dur = performance.now() - t0;
       const t = performance.now();
       if (nextStatus === "ok") {
         if (lastOkSinceRef.current === null) lastOkSinceRef.current = t;
@@ -267,30 +254,134 @@ export function useFaceGuide(opts: {
           ? Math.round(t - lastOkSinceRef.current)
           : 0;
 
-      // Hysteresis: only update text if status actually changed, or to refresh stableMs / box.
-      const changed = nextStatus !== lastStatusRef.current;
-      lastStatusRef.current = nextStatus;
-      const s: GuideState = { status: nextStatus, box: nextBox, stableMs };
-      setGuide(s);
-      onTick?.(s);
-      void changed; // (kept for future debouncing)
+      // Skip React update when nothing material changed. Quantize the box
+      // to ~1% steps so micro-jitter doesn't re-render the overlay.
+      const prev = lastStateRef.current;
+      const qBox =
+        nextBox === null
+          ? null
+          : {
+              x: Math.round(nextBox.x * 100) / 100,
+              y: Math.round(nextBox.y * 100) / 100,
+              w: Math.round(nextBox.w * 100) / 100,
+              h: Math.round(nextBox.h * 100) / 100,
+            };
+      const boxChanged =
+        (prev.box === null) !== (qBox === null) ||
+        (qBox !== null &&
+          prev.box !== null &&
+          (qBox.x !== prev.box.x ||
+            qBox.y !== prev.box.y ||
+            qBox.w !== prev.box.w ||
+            qBox.h !== prev.box.h));
+      const statusChanged = prev.status !== nextStatus;
+      // Update on status change, box change, or every ~400ms while OK
+      // so stableMs progresses for the countdown trigger.
+      const stableTick = nextStatus === "ok" && stableMs - prev.stableMs >= 200;
+      if (statusChanged || boxChanged || stableTick) {
+        const s: GuideState = { status: nextStatus, box: qBox, stableMs };
+        lastStateRef.current = s;
+        setGuide(s);
+        onTick?.(s);
+      } else {
+        // Still surface stableMs internally to the caller via onTick lightly.
+        onTick?.({ ...prev, stableMs });
+      }
 
-      rafRef.current = requestAnimationFrame(evalFrame);
+      return { dur };
     },
-    [enabled, videoRef, onTick, th],
+    [videoRef, onTick, th],
   );
 
+  // ---- Adaptive cadence loop with inference lock + visibility pause. ----
   useEffect(() => {
     if (!enabled || !detectorReady) return;
-    rafRef.current = requestAnimationFrame(evalFrame);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let inflight = false;
+    const times: number[] = [];
+    let interval = 280;
+    let slowMode = false;
+    let logCounter = 0;
+    let dropped = 0;
+
+    const schedule = (ms: number) => {
+      if (cancelled) return;
+      timer = setTimeout(run, ms);
+    };
+
+    const run = async () => {
+      if (cancelled) return;
+      if (document.visibilityState !== "visible") {
+        schedule(interval);
+        return;
+      }
+      const v = videoRef.current;
+      if (!v || v.paused || v.ended || v.videoWidth === 0) {
+        schedule(interval);
+        return;
+      }
+      if (inflight) {
+        dropped++;
+        if (dropped === 1) console.log(`${LOG} [PIPOCA_FACE_PERF] dropped-frame`);
+        schedule(interval);
+        return;
+      }
+      inflight = true;
+      try {
+        const r = evalOnce(performance.now());
+        if (r) {
+          times.push(r.dur);
+          if (times.length > 12) times.shift();
+          const avg = times.reduce((a, b) => a + b, 0) / times.length;
+          const prevInterval = interval;
+          const prevSlow = slowMode;
+          if (avg > 220) {
+            interval = 550;
+            slowMode = true;
+          } else if (avg > 120) {
+            interval = 400;
+            slowMode = true;
+          } else {
+            interval = 280;
+            slowMode = false;
+          }
+          // Log sparingly to avoid console churn.
+          if (++logCounter % 10 === 0) {
+            console.log(
+              `${LOG} [PIPOCA_FACE_PERF] mode=${mode} inference-ms=${Math.round(
+                avg,
+              )} interval-ms=${interval}${slowMode ? " slow-mode" : ""}`,
+            );
+          }
+          if (prevInterval !== interval || prevSlow !== slowMode) {
+            (window as unknown as { __pipocaSlowMode?: boolean }).__pipocaSlowMode = slowMode;
+          }
+        }
+      } finally {
+        inflight = false;
+      }
+      schedule(interval);
+    };
+
+    const onVis = () => {
+      if (document.visibilityState === "visible" && !timer && !cancelled) {
+        schedule(0);
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    schedule(0);
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      timer = null;
+      document.removeEventListener("visibilitychange", onVis);
       lastOkSinceRef.current = null;
-      lastStatusRef.current = "no_face";
+      lastStateRef.current = { status: "no_face", box: null, stableMs: 0 };
       setGuide({ status: "no_face", box: null, stableMs: 0 });
     };
-  }, [enabled, detectorReady, evalFrame]);
+  }, [enabled, detectorReady, evalOnce, mode, videoRef]);
 
   return { detectorReady, detectorError, guide };
 }

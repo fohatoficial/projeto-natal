@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { QRCodeSVG } from "qrcode.react";
 import type { Movie } from "@/lib/pipoca/movies";
@@ -1845,63 +1845,38 @@ function GuidedCamera({
       ? "PREPARANDO O ENQUADRAMENTO"
       : getGuideHint(guide.status, mode);
 
-  const frameMaxW = mode === "identity" ? "max-w-[460px]" : "max-w-[520px]";
+  const frameMaxW = mode === "identity" ? "max-w-[680px]" : "max-w-[760px]";
 
   return (
-    <Screen>
-      {/* NO BrandHeader / movie title / fixed instructions on capture screens.
-          Single source of guidance = dynamic hint at the top. */}
-      <div
-        className="relative z-10 shrink-0 w-full flex items-center justify-center px-4"
-        style={{ minHeight: "clamp(72px, 10dvh, 140px)" }}
-      >
+    <div
+      className="pipoca-camera-grid bg-cinema relative"
+      data-pipoca-camera={mode}
+    >
+      {/* Row 1 — dynamic hint only (no logo, no fixed text). */}
+      <div className="pipoca-camera-hint-slot">
         <p
           key={hint}
-          className={`font-display text-center leading-tight transition-opacity duration-200 ${
-            guide.status === "ok" ? "text-emerald-300" : "text-white"
-          }`}
-          style={{
-            fontSize: "clamp(1.25rem, 2.6dvh, 2.25rem)",
-            maxWidth: "22ch",
-          }}
+          className={`pipoca-camera-hint ${guide.status === "ok" ? "pipoca-camera-hint--ok" : ""}`}
         >
           {hint}
         </p>
       </div>
 
-      <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center w-full max-w-2xl py-2">
+      {/* Row 2 — preview fills available vertical space, never cropped. */}
+      <div className="w-full min-h-0 h-full flex items-center justify-center">
         <div
-          className={`relative w-full ${frameMaxW} aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl`}
+          className={`relative w-full ${frameMaxW} h-full max-h-full aspect-[4/5] mx-auto rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl`}
+          style={{ maxHeight: "100%" }}
         >
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: "scaleX(-1)" }}
-          />
-
-          {!ready ? (
-            <div className="absolute inset-0 grid place-items-center text-white/75 text-sm tracking-wide animate-pulse-soft">
-              Iniciando câmera…
-            </div>
-          ) : null}
-
+          <CameraPreviewSurface videoRef={videoRef} ready={ready} />
           <FaceScanOverlay guide={guide} discreet={mode === "appearance"} />
         </div>
       </div>
 
-      <div
-        className="relative z-10 shrink-0 w-full flex flex-col items-center gap-2"
-        style={{ minHeight: "clamp(120px, 16dvh, 200px)" }}
-      >
+      {/* Row 3 — countdown / fallback / back. Reserved height prevents jumps. */}
+      <div className="pipoca-camera-countdown-slot">
         {countdown !== null && countdown > 0 ? (
-          <span
-            key={countdown}
-            className="font-display text-gold leading-none animate-pop-in"
-            style={{ fontSize: "clamp(3rem, 8dvh, 5rem)" }}
-          >
+          <span key={countdown} className="pipoca-camera-countdown">
             {countdown}
           </span>
         ) : null}
@@ -1912,31 +1887,76 @@ function GuidedCamera({
         ) : null}
         <GhostBtn onClick={onBack}>Voltar</GhostBtn>
       </div>
-    </Screen>
+    </div>
   );
 }
 
-function FaceScanOverlay({ guide, discreet = false }: { guide: GuideState; discreet?: boolean }) {
+/**
+ * Isolated, memoized <video> surface so countdown/hint/box state updates in
+ * the parent never remount the video element (which would flash and drop
+ * frames). Re-renders only when `ready` flips.
+ */
+const CameraPreviewSurface = React.memo(function CameraPreviewSurface({
+  videoRef,
+  ready,
+}: {
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  ready: boolean;
+}) {
+  return (
+    <>
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ transform: "scaleX(-1)" }}
+      />
+      {!ready ? (
+        <div className="absolute inset-0 grid place-items-center text-white/75 text-sm tracking-wide animate-pulse-soft">
+          Iniciando câmera…
+        </div>
+      ) : null}
+    </>
+  );
+});
+
+const FaceScanOverlay = React.memo(function FaceScanOverlay({
+  guide,
+  discreet = false,
+}: {
+  guide: GuideState;
+  discreet?: boolean;
+}) {
   const box = guide.box;
   if (!box) return null;
   const ok = guide.status === "ok";
   const color = ok ? "#7CFC9B" : "#F8BA32";
-  // Convert normalized box to % so the corners follow the face within the
-  // preview, regardless of preview pixel size on the totem.
-  const left = `${Math.max(0, box.x) * 100}%`;
-  const top = `${Math.max(0, box.y) * 100}%`;
-  const width = `${Math.max(0.05, box.w) * 100}%`;
-  const height = `${Math.max(0.05, box.h) * 100}%`;
+  // translate3d on a single element + scale for the box — only transform/opacity
+  // are animated, never layout (top/left/width/height).
+  const tx = `${Math.max(0, box.x) * 100}%`;
+  const ty = `${Math.max(0, box.y) * 100}%`;
+  const w = `${Math.max(0.05, box.w) * 100}%`;
+  const h = `${Math.max(0.05, box.h) * 100}%`;
+  const slowMode =
+    typeof window !== "undefined" &&
+    (window as unknown as { __pipocaSlowMode?: boolean }).__pipocaSlowMode === true;
+  const size = discreet ? 14 : 22;
+  const bw = discreet ? 2 : 3;
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute"
-      style={{ left, top, width, height, transition: "all 120ms ease-out" }}
+      className="pointer-events-none absolute top-0 left-0"
+      style={{
+        width: w,
+        height: h,
+        transform: `translate3d(${tx}, ${ty}, 0)`,
+        transition: "transform 140ms linear, width 140ms linear, height 140ms linear",
+        willChange: "transform",
+      }}
     >
-      {/* Four corner brackets — never cover eyes/mouth/face. Smaller in appearance mode. */}
       {(["tl", "tr", "bl", "br"] as const).map((pos) => {
-        const size = discreet ? 14 : 22;
-        const bw = discreet ? "2px" : "3px";
         const base: React.CSSProperties = {
           position: "absolute",
           width: size,
@@ -1946,27 +1966,28 @@ function FaceScanOverlay({ guide, discreet = false }: { guide: GuideState; discr
           opacity: discreet ? 0.85 : 1,
         };
         const styles: Record<typeof pos, React.CSSProperties> = {
-          tl: { ...base, top: -2, left: -2, borderWidth: `${bw} 0 0 ${bw}` },
-          tr: { ...base, top: -2, right: -2, borderWidth: `${bw} ${bw} 0 0` },
-          bl: { ...base, bottom: -2, left: -2, borderWidth: `0 0 ${bw} ${bw}` },
-          br: { ...base, bottom: -2, right: -2, borderWidth: `0 ${bw} ${bw} 0` },
+          tl: { ...base, top: -2, left: -2, borderWidth: `${bw}px 0 0 ${bw}px` },
+          tr: { ...base, top: -2, right: -2, borderWidth: `${bw}px ${bw}px 0 0` },
+          bl: { ...base, bottom: -2, left: -2, borderWidth: `0 0 ${bw}px ${bw}px` },
+          br: { ...base, bottom: -2, right: -2, borderWidth: `0 ${bw}px ${bw}px 0` },
         };
         return <span key={pos} style={styles[pos]} />;
       })}
-      {/* Scanning line — only when actively coaching, not on success. */}
-      {!ok ? (
+      {!ok && !slowMode ? (
         <span
+          className="pipoca-scan-line"
           style={{
             position: "absolute",
             left: 0,
             right: 0,
+            top: 0,
             height: 2,
             background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
-            animation: "pipoca-scan-line 1.6s ease-in-out infinite",
-            top: "50%",
+            animation: "pipoca-scan-line 2.2s ease-in-out infinite",
+            willChange: "transform, opacity",
           }}
         />
       ) : null}
     </div>
   );
-}
+});

@@ -210,10 +210,90 @@
     body > .fixed .max-w-md { max-width: min(86vw, 820px) !important; }
   }
 
-  /* Scanning line animation for the dynamic face frame (identity camera). */
+  /* Scanning line animation for the dynamic face frame (identity camera).
+     Pure transform/opacity — no layout property animated. */
   @keyframes pipoca-scan-line {
-    0%, 100% { top: 18%; opacity: 0.2; }
-    50% { top: 82%; opacity: 0.9; }
+    0%   { transform: translateY(-90%); opacity: 0.15; }
+    50%  { transform: translateY(90%);  opacity: 0.9;  }
+    100% { transform: translateY(-90%); opacity: 0.15; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pipoca-scan-line { animation: none !important; }
+  }
+
+  /* =======================================================================
+     Camera capture screens (identity + appearance) — large legible UX
+     for tablet (>=768px portrait) and totem (>=1400px portrait).
+     ======================================================================= */
+  .pipoca-camera-grid {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: 100vw;
+    height: var(--pipoca-app-height, 100dvh);
+    overflow: hidden;
+    align-items: stretch;
+    justify-items: center;
+    row-gap: clamp(8px, 1.2dvh, 24px);
+    padding: clamp(8px, 1.4dvh, 24px) clamp(8px, 2vw, 32px);
+    box-sizing: border-box;
+  }
+  .pipoca-camera-hint-slot {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: clamp(110px, 13dvh, 220px);
+  }
+  .pipoca-camera-hint {
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: 0.02em;
+    text-align: center;
+    color: #ffffff;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.55);
+    max-width: 90vw;
+    /* Allow up to 2 lines without squeezing. */
+    overflow-wrap: balance;
+    transition: opacity 180ms ease, color 180ms ease;
+    font-size: clamp(2rem, 3.4dvh, 3.5rem);
+  }
+  .pipoca-camera-hint--ok { color: #7CFC9B; }
+  .pipoca-camera-countdown-slot {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(8px, 1dvh, 18px);
+    min-height: clamp(110px, 14dvh, 230px);
+  }
+  .pipoca-camera-countdown {
+    font-family: var(--font-display);
+    font-weight: 800;
+    line-height: 1;
+    color: var(--gold);
+    text-shadow: 0 4px 24px rgba(248,186,50,0.45);
+    font-size: clamp(5rem, 9dvh, 8rem);
+    transform-origin: center;
+    will-change: transform, opacity;
+    animation: pipoca-count-pop 320ms cubic-bezier(.34,1.56,.64,1) both;
+  }
+  @keyframes pipoca-count-pop {
+    0%   { transform: scale(0.6); opacity: 0; }
+    60%  { transform: scale(1.12); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pipoca-camera-countdown { animation: none !important; }
+  }
+
+  /* Totem portrait — bump instruction and counter further. */
+  @media (orientation: portrait) and (min-height: 1400px) {
+    .pipoca-camera-hint     { font-size: clamp(2.75rem, 4dvh, 4.75rem); }
+    .pipoca-camera-countdown{ font-size: clamp(7rem, 10dvh, 12rem); }
+    .pipoca-camera-hint-slot      { min-height: clamp(140px, 13dvh, 240px); }
+    .pipoca-camera-countdown-slot { min-height: clamp(160px, 14dvh, 240px); }
   }
 
   .brand-pattern {
