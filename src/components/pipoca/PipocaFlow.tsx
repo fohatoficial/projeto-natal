@@ -1840,29 +1840,36 @@ function GuidedCamera({
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
   const hint: string = !ready
-    ? "ABRINDO A CÂMERA..."
+    ? "ABRINDO A CÂMERA"
     : !detectorReady && !detectorError
-      ? "PREPARANDO O ENQUADRAMENTO..."
+      ? "PREPARANDO O ENQUADRAMENTO"
       : getGuideHint(guide.status, mode);
 
-  const subtitle = mode === "identity" ? "Foto de rosto" : "Foto de corpo";
-  const topInstruction =
-    mode === "identity"
-      ? "OLHE DIRETAMENTE PARA A CÂMERA NO TOPO DA TELA. Se os óculos refletirem a luz, incline levemente o rosto."
-      : "POSICIONE-SE PARA MOSTRAR O ROSTO E A CINTURA.";
-  const supportText =
-    mode === "identity"
-      ? "Captura automática quando estiver perfeito"
-      : "MANTENHA O ROSTO E A CINTURA VISÍVEIS";
   const frameMaxW = mode === "identity" ? "max-w-[460px]" : "max-w-[520px]";
 
   return (
     <Screen>
-      <Header subtitle={subtitle} />
+      {/* NO BrandHeader / movie title / fixed instructions on capture screens.
+          Single source of guidance = dynamic hint at the top. */}
+      <div
+        className="relative z-10 shrink-0 w-full flex items-center justify-center px-4"
+        style={{ minHeight: "clamp(72px, 10dvh, 140px)" }}
+      >
+        <p
+          key={hint}
+          className={`font-display text-center leading-tight transition-opacity duration-200 ${
+            guide.status === "ok" ? "text-emerald-300" : "text-white"
+          }`}
+          style={{
+            fontSize: "clamp(1.25rem, 2.6dvh, 2.25rem)",
+            maxWidth: "22ch",
+          }}
+        >
+          {hint}
+        </p>
+      </div>
 
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-2 gap-3 sm:gap-4">
-        <p className="text-xs sm:text-sm text-white/75 max-w-md">{topInstruction}</p>
-
+      <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center w-full max-w-2xl py-2">
         <div
           className={`relative w-full ${frameMaxW} aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl`}
         >
@@ -1881,45 +1888,27 @@ function GuidedCamera({
             </div>
           ) : null}
 
-          {/* Dynamic scanning frame that follows the bounding box.
-              Pure overlay — never crops the captured file. No fixed mask. */}
           <FaceScanOverlay guide={guide} discreet={mode === "appearance"} />
-        </div>
-
-        {/* Live coaching panel — BELOW the preview, never over the face. */}
-        <div className={`w-full ${frameMaxW} flex flex-col items-center gap-2 min-h-[96px]`}>
-          <p
-            className={`font-display text-lg sm:text-xl text-center leading-snug ${
-              guide.status === "ok" ? "text-emerald-300" : "text-white"
-            }`}
-          >
-            {hint}
-          </p>
-          {countdown !== null && countdown > 0 ? (
-            <span
-              key={countdown}
-              className="font-display text-5xl sm:text-6xl text-gold leading-none animate-pop-in"
-            >
-              {countdown}
-            </span>
-          ) : (
-            <span className="text-[10px] uppercase tracking-[0.3em] text-white/55 text-center">
-              {supportText}
-            </span>
-          )}
         </div>
       </div>
 
-      <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
+      <div
+        className="relative z-10 shrink-0 w-full flex flex-col items-center gap-2"
+        style={{ minHeight: "clamp(120px, 16dvh, 200px)" }}
+      >
+        {countdown !== null && countdown > 0 ? (
+          <span
+            key={countdown}
+            className="font-display text-gold leading-none animate-pop-in"
+            style={{ fontSize: "clamp(3rem, 8dvh, 5rem)" }}
+          >
+            {countdown}
+          </span>
+        ) : null}
         {(showFallback || detectorError) && ready ? (
-          <>
-            <p className="text-[10px] uppercase tracking-[0.3em] text-white/55">
-              Enquadramento automático indisponível
-            </p>
-            <PrimaryCta onClick={manualCapture} disabled={captureLocked}>
-              Tirar foto manualmente
-            </PrimaryCta>
-          </>
+          <PrimaryCta onClick={manualCapture} disabled={captureLocked}>
+            Tirar foto manualmente
+          </PrimaryCta>
         ) : null}
         <GhostBtn onClick={onBack}>Voltar</GhostBtn>
       </div>
