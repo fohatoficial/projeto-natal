@@ -27,6 +27,7 @@ import {
   PRIVACY_CHECKBOX_LABEL,
 } from "@/lib/pipoca/privacy-notice";
 import { formatWhatsappMask, isValidBrWhatsapp } from "@/lib/pipoca/whatsapp";
+import { PipocaImage } from "@/components/pipoca/PipocaImage";
 
 
 
