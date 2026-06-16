@@ -242,12 +242,12 @@ export function useFaceGuide(opts: {
               if (Math.abs(nx - eyeCx) > 0.05) turned = true;
             }
 
-            if (w < W_MIN) nextStatus = "too_far";
-            else if (w > W_MAX) nextStatus = "too_close";
-            else if (cx < CX_MIN) nextStatus = "off_left";
-            else if (cx > CX_MAX) nextStatus = "off_right";
-            else if (cy < CY_MIN) nextStatus = "off_high";
-            else if (cy > CY_MAX) nextStatus = "off_low";
+            if (w < th.wMin) nextStatus = "too_far";
+            else if (w > th.wMax) nextStatus = "too_close";
+            else if (cx < th.cxMin) nextStatus = "off_left";
+            else if (cx > th.cxMax) nextStatus = "off_right";
+            else if (cy < th.cyMin) nextStatus = "off_high";
+            else if (cy > th.cyMax) nextStatus = "off_low";
             else if (turned) nextStatus = "head_turned";
             else nextStatus = "ok";
           }
