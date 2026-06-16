@@ -453,8 +453,7 @@ export function PipocaFlow() {
         />
       )}
       {step === "camera_identity" && (
-        <Camera
-          variant="identity"
+        <IdentityCamera
           onCaptured={(p) => {
             console.log(`${CAPTURE_LOG} foto de identidade capturada`);
             setIdentityPhoto(p);
