@@ -91,7 +91,10 @@ function getDeviceId(): string | null {
 }
 
 const GEN_LOG = "[PIPOCA_GENERATION]";
-const BUILD_ID = "pipoca-flow-2026-06-16-viewport-diag-1";
+const BUILD_ID = "pipoca-flow-2026-06-16-poster-watchdog-1";
+if (typeof window !== "undefined") {
+  (window as unknown as { __PIPOCA_BUILD_TOKEN?: string }).__PIPOCA_BUILD_TOKEN = BUILD_ID;
+}
 
 function useViewportHeightVar(stepName: string) {
   useEffect(() => {
@@ -871,6 +874,7 @@ function PosterCard({
         src={movie.posterUrl}
         alt={movie.title}
         fit="cover"
+        eager
         logTag={`poster:${movie.id}`}
         className="transition-transform duration-700 group-hover:scale-110"
       />
@@ -1014,6 +1018,7 @@ function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
           src={movie.posterUrl}
           alt={movie.title}
           fit="cover"
+          eager
           logTag={`story-poster:${movie.id}`}
         />
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
@@ -1215,8 +1220,11 @@ function Camera({
           >
             {variant === "identity" ? (
               <>
-                {/* Head + shoulders oval, centered at ~36% of height */}
+                {/* Head + shoulders oval. cy lowered on tall portrait totems
+                    via the .pipoca-identity-mask-ellipse CSS override so the
+                    user's face doesn't end up under the totem's top camera. */}
                 <ellipse
+                  className="pipoca-identity-mask-ellipse"
                   cx="50"
                   cy="45"
                   rx="22"
