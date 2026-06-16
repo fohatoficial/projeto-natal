@@ -27,6 +27,7 @@ import {
   PRIVACY_CHECKBOX_LABEL,
 } from "@/lib/pipoca/privacy-notice";
 import { formatWhatsappMask, isValidBrWhatsapp } from "@/lib/pipoca/whatsapp";
+import { PipocaImage } from "@/components/pipoca/PipocaImage";
 
 
 
@@ -129,6 +130,14 @@ export function PipocaFlow() {
     appearanceRef.current = appearancePhoto;
   }, [appearancePhoto]);
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const orient = h >= w ? "portrait" : "landscape";
+      console.log(
+        `[PIPOCA_VIEWPORT] ${w}x${h} ${orient} dpr=${window.devicePixelRatio ?? 1}`,
+      );
+    }
     return () => {
       if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
       if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
@@ -550,7 +559,7 @@ function Screen({
 }) {
   return (
     <div
-      className={`relative h-[100svh] w-full overflow-hidden film-grain vignette flex flex-col items-center px-4 sm:px-6 lg:px-10 pt-5 pb-4 sm:pt-7 sm:pb-5 lg:pt-8 lg:pb-6 text-center ${
+      className={`pipoca-stage-dvh relative film-grain vignette flex flex-col items-center px-4 sm:px-6 lg:px-10 pt-5 pb-4 sm:pt-7 sm:pb-5 lg:pt-8 lg:pb-6 text-center box-border ${
         aurora ? "bg-aurora" : "bg-cinema"
       } ${className}`}
     >
@@ -761,10 +770,12 @@ function PosterCard({
       onClick={() => onPick(movie)}
       className="bg-card relative overflow-hidden text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl w-full h-full group rounded-2xl border border-white/10"
     >
-      <img
+      <PipocaImage
         src={movie.posterUrl}
         alt={movie.title}
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        fit="cover"
+        logTag={`poster:${movie.id}`}
+        className="transition-transform duration-700 group-hover:scale-110"
       />
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
       <div className="absolute top-3 left-4 z-10">
@@ -901,11 +912,12 @@ function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
         {prefix}
       </span>
-      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
-        <img
+      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] pipoca-kiosk-poster aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
+        <PipocaImage
           src={movie.posterUrl}
           alt={movie.title}
-          className="absolute inset-0 w-full h-full object-cover"
+          fit="cover"
+          logTag={`story-poster:${movie.id}`}
         />
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
         <div className="absolute top-3 left-3">
@@ -1266,10 +1278,11 @@ function Confirm({
         <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-[520px]">
           <div className="flex flex-col items-center gap-1.5 animate-pop-in">
             <div className="bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10">
-              <img
+              <PipocaImage
                 src={identityUrl}
                 alt="Foto de rosto"
-                className="w-full h-full object-cover"
+                fit="cover"
+                logTag="confirm-identity"
                 style={{ transform: "scaleX(-1)" }}
               />
             </div>
@@ -1279,10 +1292,11 @@ function Confirm({
           </div>
           <div className="flex flex-col items-center gap-1.5 animate-pop-in">
             <div className="bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10">
-              <img
+              <PipocaImage
                 src={appearanceUrl}
                 alt="Foto de corpo"
-                className="w-full h-full object-cover"
+                fit="cover"
+                logTag="confirm-appearance"
                 style={{ transform: "scaleX(-1)" }}
               />
             </div>
@@ -1531,11 +1545,13 @@ function Result({
               {firstName ? `${firstName}, sua ` : "Sua "}<span className="text-gold">cena</span> está pronta
             </h1>
 
-            <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto flex items-center justify-center">
-              <img
+            <div className="relative w-full flex-1 min-h-0 max-w-[560px] pipoca-kiosk-result-frame mx-auto flex items-center justify-center aspect-[4/5]">
+              <PipocaImage
                 src={imageUrl ?? movie.posterUrl}
                 alt="Cena gerada"
-                className="max-w-full max-h-full object-contain rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]"
+                fit="contain"
+                logTag="result-final"
+                wrapperClassName="rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] overflow-hidden"
               />
             </div>
 

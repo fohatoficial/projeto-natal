@@ -98,6 +98,39 @@
   .text-brand-blue { color: #2E5BE5; }
   .bg-brand-blue { background-color: #2E5BE5; }
 
+  /* Totem / kiosk stage — fills the dynamic viewport without overflowing.
+     Used by the kiosk flow (Screen component). The public mobile result
+     page does NOT use this, so its scroll behavior remains intact. */
+  .pipoca-stage-dvh {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* Tall portrait kiosk (≈ 1080×1920 totem and up): give critical images
+     more room and bump display copy. Targets portrait viewports tall
+     enough that the default tablet sizing looks tiny. */
+  @media (orientation: portrait) and (min-height: 1400px) {
+    .pipoca-kiosk-poster {
+      max-width: min(82vw, 720px);
+    }
+    .pipoca-kiosk-result-frame {
+      max-width: min(90vw, 900px);
+    }
+    .pipoca-kiosk-qr {
+      transform: scale(1.4);
+      transform-origin: center;
+    }
+    .pipoca-kiosk-title {
+      font-size: clamp(3rem, 6vw, 5.5rem);
+      line-height: 0.95;
+    }
+    .pipoca-kiosk-body {
+      font-size: clamp(1.05rem, 1.6vw, 1.5rem);
+    }
+  }
+
   .brand-pattern {
     background-image: url("/__l5e/assets-v1/c6d609ea-ed2f-42a5-a99f-1b967cf5f49f/pattern_brand.svg");
     background-size: 900px auto;
