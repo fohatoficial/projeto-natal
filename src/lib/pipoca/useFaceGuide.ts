@@ -131,10 +131,12 @@ type DetectorAny = {
 export function useFaceGuide(opts: {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   enabled: boolean;
+  mode?: GuideMode;
   /** Called with the most recent guide state on every detection tick. */
   onTick?: (s: GuideState) => void;
 }) {
-  const { videoRef, enabled, onTick } = opts;
+  const { videoRef, enabled, mode = "identity", onTick } = opts;
+  const th = THRESHOLDS[mode];
   const [detectorReady, setDetectorReady] = useState(false);
   const [detectorError, setDetectorError] = useState<string | null>(null);
   const [guide, setGuide] = useState<GuideState>({
