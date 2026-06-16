@@ -346,12 +346,12 @@
       gap: clamp(30px, 4.2dvh, 52px);
     }
     .pipoca-camera-hint {
-      font-size: clamp(3.2rem, 5dvh, 5.4rem);
+      font-size: clamp(3.6rem, 5.6dvh, 6rem);
       font-weight: 900;
       line-height: 0.98;
     }
     .pipoca-camera-countdown {
-      font-size: clamp(6.5rem, 9.5dvh, 10.5rem);
+      font-size: clamp(7.5rem, 10.5dvh, 11.5rem);
       font-weight: 900;
       line-height: 0.85;
     }
