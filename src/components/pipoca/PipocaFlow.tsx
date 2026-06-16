@@ -1909,11 +1909,38 @@ function Result({
   const [slide, setSlide] = useState(0);
   const [progress, setProgress] = useState(0);
 
+  // Canonical QR target. Build locally from publicToken so a stale or
+  // wrong-domain resultPageUrl from the server (e.g. older completed rows
+  // stored before the host fix) never makes it into the QR code.
+  const canonicalQrUrl = useMemo(() => {
+    if (!isValidPublicToken(publicToken)) return null;
+    const url = buildPublicResultUrl(publicToken);
+    return isValidResultPageUrl(url) ? url : null;
+  }, [publicToken]);
+
+  const qrState: "preparingQr" | "qrReady" | "qrError" = !publicToken
+    ? "preparingQr"
+    : canonicalQrUrl
+      ? "qrReady"
+      : "qrError";
+
   useEffect(() => {
-    if (publicToken && resultPageUrl) {
-      console.log("[PIPOCA_QR] result page URL pronta", resultPageUrl);
+    if (qrState === "preparingQr") {
+      console.log("[PIPOCA_QR] preparing");
+    } else if (qrState === "qrReady") {
+      const host = canonicalQrUrl ? new URL(canonicalQrUrl).host : "—";
+      console.log("[PIPOCA_QR] ready", { host, hasToken: true });
+      console.log("[PIPOCA_QR] scan-target", canonicalQrUrl);
+      if (resultPageUrl && resultPageUrl !== canonicalQrUrl) {
+        console.warn("[PIPOCA_QR] server-url-mismatch — using canonical host", {
+          server: resultPageUrl,
+          canonical: canonicalQrUrl,
+        });
+      }
+    } else {
+      console.warn("[PIPOCA_QR] invalid-url");
     }
-  }, [publicToken, resultPageUrl]);
+  }, [qrState, canonicalQrUrl, resultPageUrl]);
 
   // Auto-advance slide 0 -> slide 1 over 10s with progress bar
   useEffect(() => {
