@@ -28,6 +28,17 @@ import {
 } from "@/lib/pipoca/privacy-notice";
 import { formatWhatsappMask, isValidBrWhatsapp } from "@/lib/pipoca/whatsapp";
 import { PipocaImage } from "@/components/pipoca/PipocaImage";
+import {
+  useFaceGuidance,
+  FACE_GUIDE_STABLE_MS,
+  type Guidance,
+} from "@/lib/pipoca/faceGuidance";
+import {
+  buildPublicResultUrl,
+  isValidPublicToken,
+  isValidResultPageUrl,
+  prefetchImage,
+} from "@/lib/pipoca/publicResultUrl";
 
 
 
