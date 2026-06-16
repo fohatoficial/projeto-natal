@@ -2120,20 +2120,23 @@ function FaceScanOverlay({ guide, discreet = false }: { guide: GuideState; discr
       className="pointer-events-none absolute"
       style={{ left, top, width, height, transition: "all 120ms ease-out" }}
     >
-      {/* Four corner brackets — never cover eyes/mouth/face. */}
+      {/* Four corner brackets — never cover eyes/mouth/face. Smaller in appearance mode. */}
       {(["tl", "tr", "bl", "br"] as const).map((pos) => {
+        const size = discreet ? 14 : 22;
+        const bw = discreet ? "2px" : "3px";
         const base: React.CSSProperties = {
           position: "absolute",
-          width: 22,
-          height: 22,
+          width: size,
+          height: size,
           borderColor: color,
           borderStyle: "solid",
+          opacity: discreet ? 0.85 : 1,
         };
         const styles: Record<typeof pos, React.CSSProperties> = {
-          tl: { ...base, top: -2, left: -2, borderWidth: "3px 0 0 3px" },
-          tr: { ...base, top: -2, right: -2, borderWidth: "3px 3px 0 0" },
-          bl: { ...base, bottom: -2, left: -2, borderWidth: "0 0 3px 3px" },
-          br: { ...base, bottom: -2, right: -2, borderWidth: "0 3px 3px 0" },
+          tl: { ...base, top: -2, left: -2, borderWidth: `${bw} 0 0 ${bw}` },
+          tr: { ...base, top: -2, right: -2, borderWidth: `${bw} ${bw} 0 0` },
+          bl: { ...base, bottom: -2, left: -2, borderWidth: `0 0 ${bw} ${bw}` },
+          br: { ...base, bottom: -2, right: -2, borderWidth: `0 ${bw} ${bw} 0` },
         };
         return <span key={pos} style={styles[pos]} />;
       })}
