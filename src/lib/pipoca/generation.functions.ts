@@ -221,9 +221,10 @@ function buildPromptText(
   );
   if (hasHatRef) {
     parts.push(
-      "When Image 4 is used, apply it as a restrained secondary cue: preserve only the general crescent-shaped leather construction and subdued frontal decoration (stars, coins, metal ornaments). The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT replace or distort the environment. The hat must NOT become oversized, ceremonial, fantastical or theatrical.",
+      "When Image 4 is used, apply it only as a restrained secondary cue for the hat's authentic shape, scale and natural fit. The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT change the pose. The hat must NOT replace or distort the environment. The hat must NOT become oversized, theatrical, ceremonial, fantastical, a cowboy hat, a western wide-brim hat or the main subject.",
     );
   }
+
   const hatUsage = extractHatUsage(parsed);
   if (hatUsage) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
 
