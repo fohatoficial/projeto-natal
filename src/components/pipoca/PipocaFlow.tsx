@@ -871,6 +871,7 @@ function PosterCard({
         src={movie.posterUrl}
         alt={movie.title}
         fit="cover"
+        eager
         logTag={`poster:${movie.id}`}
         className="transition-transform duration-700 group-hover:scale-110"
       />
