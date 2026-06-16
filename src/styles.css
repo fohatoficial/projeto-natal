@@ -139,9 +139,13 @@
     .pipoca-kiosk-poster        { max-width: min(82vw, 760px) !important; }
     .pipoca-kiosk-result-frame  { max-width: min(94vw, 980px) !important; }
     .pipoca-kiosk-qr            {
-      transform: scale(2.2);
-      transform-origin: center;
-      margin: clamp(48px, 6vw, 110px);
+      /* QR is generated at its final pixel size below — no CSS scale. */
+      padding: clamp(16px, 1.6vw, 28px) !important;
+      margin: clamp(24px, 3vw, 60px);
+    }
+    .pipoca-kiosk-qr svg {
+      width: clamp(420px, 30vw, 520px) !important;
+      height: clamp(420px, 30vw, 520px) !important;
     }
 
     /* Typography — bump every Tailwind text-* class used in the flow. */
