@@ -198,12 +198,12 @@ function buildPromptText(
 
   // 4. Wardrobe
   parts.push(
-    "WARDROBE: rustic, timeless, non-modern, rooted in the northeastern Brazilian sertão. Avoid modern t-shirts, modern jeans, sneakers, streetwear or bright casual clothing. Clothing must remain complete, coherent and clearly visible.",
+    "WARDROBE: rustic, timeless, non-modern, rooted in the northeastern Brazilian sertão. Avoid modern t-shirts, modern jeans, sneakers, streetwear or bright casual clothing. Clothing must remain complete, coherent and clearly visible — never cropped or obscured.",
   );
 
-  // 5. Hat — cangaceiro (strictly subordinate)
+  // 5. Hat — cangaceiro (strictly subordinate, no visual reference)
   parts.push(
-    "HAT: the visitor may wear a cangaceiro-inspired northeastern Brazilian leather hat. It must be an authentic cangaceiro hat, NOT a cowboy hat, NOT western, NOT theatrical or costume-like.",
+    "HAT: only a subtle textual costume cue. The visitor may wear an authentic northeastern Brazilian cangaceiro leather hat, also known as a traditional cangaço hat. It has a characteristic silhouette with curved side flaps and subtle front ornamentation typical of cangaço leatherwork. The hat must be proportional to the head, never oversized, never theatrical, never ceremonial, never fantasy, never a cowboy or western wide-brim hat. The hat is a lower priority than the clothing and the environment.",
   );
   if (hasHatRef) {
     parts.push(
@@ -215,12 +215,18 @@ function buildPromptText(
 
   // 6. Cross
   parts.push(
-    "A small wooden cross may appear in the composition — visible but visually secondary, never the focal point.",
+    "A small wooden cross may appear in the composition — visible but visually secondary, never the focal point. The cross and the sertão landscape must remain part of the composition.",
   );
 
   // 7. Composition
   parts.push(
     "Vertical 4:5 framing, cinematic composition, shallow depth of field. The visitor anchored in the environment as if captured in a film still.",
+  );
+  parts.push(
+    "FRAMING: prefer a medium shot or medium-full shot, showing the visitor from the head down to the waist or just above the knees. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment. The environment must remain visible and legible, and the rustic clothing must remain fully visible and important.",
+  );
+  parts.push(
+    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. The hat is only a subtle textual costume cue with lower priority than clothing and environment.",
   );
 
   // 8. Film context
