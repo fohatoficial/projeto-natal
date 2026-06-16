@@ -406,15 +406,19 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
 
     const parsedScenePrompt = parseScenePackPrompt(scenePack.prompt);
-    const hatReferenceUrls = extractHatReferenceUrls(parsedScenePrompt);
-    // Pick exactly one hat reference at random when two are available.
-    const hatRefUsed: string[] =
-      hatReferenceUrls.length > 1
-        ? [hatReferenceUrls[Math.floor(Math.random() * hatReferenceUrls.length)]]
-        : hatReferenceUrls.slice(0, 1);
-    console.log(
-      `${LOG} referência de chapéu escolhida: ${hatRefUsed.length} de ${hatReferenceUrls.length}`,
-    );
+    let hatReferenceUrls: string[] = [];
+    let hatRefUsed: string[] = [];
+    if (ENABLE_HAT_REFERENCE) {
+      hatReferenceUrls = extractHatReferenceUrls(parsedScenePrompt);
+      hatRefUsed =
+        hatReferenceUrls.length > 1
+          ? [hatReferenceUrls[Math.floor(Math.random() * hatReferenceUrls.length)]]
+          : hatReferenceUrls.slice(0, 1);
+      console.log(
+        `${LOG} referência de chapéu escolhida: ${hatRefUsed.length} de ${hatReferenceUrls.length}`,
+      );
+    }
+    console.log(`${GEN_LOG} hat reference enabled: ${ENABLE_HAT_REFERENCE}`);
     const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
 
     const { data: generation, error: genErr } = await supabaseAdmin
