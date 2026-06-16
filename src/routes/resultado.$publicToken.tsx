@@ -152,9 +152,7 @@ function PublicResultPage() {
     >
       <div className="mx-auto w-full max-w-md px-5 flex flex-col items-center">
         <img src={LOGO_URL} alt="Tela Brasil" className="h-9 w-auto" />
-        <span className="mt-2 text-[10px] uppercase tracking-[0.3em] text-gold">
-          Pipoca &amp; Cena
-        </span>
+
 
         {status.kind === "loading" && (
           <div className="mt-16 flex flex-col items-center gap-4">

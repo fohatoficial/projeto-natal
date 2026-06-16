@@ -7,7 +7,7 @@ type Props = {
   showStripe?: boolean;
 };
 
-export function StageShell({ children, subtitle = "Pipoca & Cena", showStripe = true }: Props) {
+export function StageShell({ children, subtitle, showStripe = true }: Props) {
   return (
     <div
       className="pipoca-stage w-screen bg-cinema text-white relative flex flex-col min-h-[100dvh]"
