@@ -179,7 +179,6 @@ export function useFaceGuide(opts: {
 
     return () => {
       cancelled = true;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       try {
         detectorRef.current?.close?.();
       } catch {
