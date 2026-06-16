@@ -299,7 +299,7 @@ async function createReplicatePrediction(input: {
   const body = {
     input: {
       prompt: input.prompt,
-      // Order: identity, appearance, scene base, then at most 1 hat ref.
+      // Order: identity, appearance, scene base, then up to 2 hat refs.
       input_images: inputImages,
       aspect_ratio: "4:5",
       output_format: "jpg",
