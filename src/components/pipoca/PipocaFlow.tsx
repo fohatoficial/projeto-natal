@@ -10,7 +10,7 @@ import {
   getSharedStatus,
   subscribeSharedCamera,
 } from "@/lib/pipoca/sharedCamera";
-import { useFaceGuide, getGuideHint, type GuideState } from "@/lib/pipoca/useFaceGuide";
+import { useFaceGuide, getGuideHint, getStableMs, type GuideMode, type GuideState } from "@/lib/pipoca/useFaceGuide";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createPipocaCaptureUpload,
@@ -43,7 +43,7 @@ type Step =
   | "processing"
   | "result";
 
-type CameraVariant = "identity" | "appearance";
+// (CameraVariant removed — both captures now use GuidedCamera with GuideMode)
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
@@ -56,6 +56,7 @@ const LOADING_PHRASES = [
 ];
 
 const PAGE_SIZE = 4;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const COUNTDOWN_SECONDS = 10;
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -454,7 +455,8 @@ export function PipocaFlow() {
         />
       )}
       {step === "camera_identity" && (
-        <IdentityCamera
+        <GuidedCamera
+          mode="identity"
           onCaptured={(p) => {
             console.log(`${CAPTURE_LOG} foto de identidade capturada`);
             setIdentityPhoto(p);
@@ -475,8 +477,8 @@ export function PipocaFlow() {
         />
       )}
       {step === "camera_appearance" && (
-        <Camera
-          variant="appearance"
+        <GuidedCamera
+          mode="appearance"
           onCaptured={(p) => {
             console.log(`${CAPTURE_LOG} foto de aparência capturada`);
             setAppearancePhoto(p);
@@ -1191,156 +1193,8 @@ function OrientAppearance({
   );
 }
 
-/* ---------- Step 3 / 5: Camera (variant-aware) ---------- */
+/* ---------- (Legacy Camera with fixed mask removed — both captures now use GuidedCamera) ---------- */
 
-function Camera({
-  variant,
-  onCaptured,
-  onBack,
-}: {
-  variant: CameraVariant;
-  onCaptured: (p: { blob: Blob; url: string }) => void;
-  onBack: () => void;
-}) {
-  const { videoRef, ready, errorKind, retry, capture } = useCamera(true);
-  const [count, setCount] = useState<number | null>(null);
-  const startedRef = useRef(false);
-
-  useEffect(() => {
-    if (ready && count === null && !startedRef.current) {
-      console.log(`${UX} contagem iniciada`, { variant });
-      setCount(COUNTDOWN_SECONDS);
-    }
-  }, [ready, count, variant]);
-
-  useEffect(() => {
-    if (count === null) return;
-    if (count === 0) {
-      if (startedRef.current) return;
-      startedRef.current = true;
-      (async () => {
-        const result = await capture();
-        if (result) onCaptured(result);
-      })();
-      return;
-    }
-    const t = setTimeout(() => setCount((c) => (c === null ? null : c - 1)), 1000);
-    return () => clearTimeout(t);
-  }, [count, capture, onCaptured]);
-
-  if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
-
-  const title =
-    variant === "identity" ? "Posicione seu rosto na marcação" : "Encaixe o rosto e o corpo na marcação";
-  const hint =
-    variant === "identity"
-      ? "Cabelo, testa e queixo dentro da área."
-      : "Mantenha a cabeça no topo e o corpo dentro do contorno.";
-  const subtitle = variant === "identity" ? "Foto de rosto" : "Foto de corpo";
-
-  return (
-    <Screen>
-      <Header subtitle={subtitle} />
-
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-3 sm:gap-4">
-        <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-white leading-[0.95] animate-fade-up">
-          {title}
-        </h1>
-        <p className="text-xs sm:text-sm text-white/70 max-w-md">{hint}</p>
-
-        <div className="relative w-full max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: "scaleX(-1)" }}
-          />
-
-          {!ready && !errorKind ? (
-            <div className="absolute inset-0 grid place-items-center text-white/70 text-sm tracking-wide animate-pulse-soft">
-              Iniciando câmera…
-            </div>
-          ) : null}
-
-          {/* Adaptive SVG mask — pure overlay, never crops the captured file. */}
-          <svg
-            viewBox="0 0 100 125"
-            preserveAspectRatio="none"
-            className="pointer-events-none absolute inset-0 w-full h-full animate-pulse-soft"
-            aria-hidden
-          >
-            {variant === "identity" ? (
-              <>
-                {/* Head + shoulders oval. cy lowered on tall portrait totems
-                    via the .pipoca-identity-mask-ellipse CSS override so the
-                    user's face doesn't end up under the totem's top camera. */}
-                <ellipse
-                  className="pipoca-identity-mask-ellipse"
-                  cx="50"
-                  cy="45"
-                  rx="22"
-                  ry="30"
-                  fill="none"
-                  stroke="#F8BA32"
-                  strokeWidth="0.6"
-                  strokeDasharray="1.5 1.2"
-                />
-              </>
-            ) : (
-              <>
-                {/* Face oval at ~28% height */}
-                <ellipse
-                  cx="50"
-                  cy="35"
-                  rx="11"
-                  ry="14"
-                  fill="none"
-                  stroke="#F8BA32"
-                  strokeWidth="0.6"
-                  strokeDasharray="1.5 1.2"
-                />
-                {/* Shoulders + torso silhouette down to waist (~82% height) */}
-                <path
-                  d="M22 102 C 24 78, 32 60, 50 60 C 68 60, 76 78, 78 102"
-                  fill="none"
-                  stroke="#F8BA32"
-                  strokeWidth="0.6"
-                  strokeDasharray="1.5 1.2"
-                  strokeLinecap="round"
-                />
-              </>
-            )}
-          </svg>
-
-
-
-          {count !== null && count > 0 ? (
-            <div className="absolute inset-0 grid place-items-center bg-black/40 backdrop-blur-[1px]">
-              <span
-                key={count}
-                className="font-display text-white text-[140px] sm:text-[170px] lg:text-[220px] leading-none animate-pop-in"
-                style={{ textShadow: "0 6px 30px rgba(0,0,0,0.6)" }}
-              >
-                {count}
-              </span>
-            </div>
-          ) : null}
-          {count === 0 ? (
-            <div className="absolute inset-0 bg-white animate-fade-in" />
-          ) : null}
-        </div>
-
-      </div>
-
-
-      <div className="relative z-10 shrink-0">
-        <GhostBtn onClick={onBack}>Voltar</GhostBtn>
-      </div>
-    </Screen>
-  );
-}
 
 
 function CameraError({
@@ -1645,26 +1499,8 @@ function Result({
     };
   }, [slide]);
 
-  const bgUrl = imageUrl ?? movie.posterUrl;
-
   return (
     <Screen aurora>
-      {/* Blurred backdrop of the generated photo */}
-      {bgUrl && (
-        <div
-          aria-hidden
-          className="absolute inset-0 z-0 pointer-events-none"
-          style={{
-            backgroundImage: `url(${bgUrl})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            filter: "blur(40px) brightness(0.45)",
-            transform: "scale(1.15)",
-          }}
-        />
-      )}
-      <div aria-hidden className="absolute inset-0 z-0 bg-black/55 pointer-events-none" />
-
       {/* Progress bars */}
       <div className="relative z-20 w-full max-w-2xl flex gap-1.5 px-1 pt-1">
         {[0, 1].map((i) => {
@@ -1687,13 +1523,15 @@ function Result({
               {firstName ? `${firstName}, sua ` : "Sua "}<span className="text-gold">cena</span> está pronta
             </h1>
 
-            <div className="relative w-full flex-1 min-h-0 max-w-[560px] pipoca-kiosk-result-frame mx-auto flex items-center justify-center aspect-[4/5]">
+            {/* Edge-to-edge 4:5 frame — single image element, object-cover, no
+                blurred backdrop, no padding, no inner border-radius bands. */}
+            <div className="relative w-full flex-1 min-h-0 max-w-[560px] pipoca-kiosk-result-frame mx-auto aspect-[4/5] overflow-hidden bg-black">
               <PipocaImage
                 src={imageUrl ?? movie.posterUrl}
                 alt="Cena gerada"
-                fit="contain"
+                fit="cover"
                 logTag="result-final"
-                wrapperClassName="rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] overflow-hidden"
+                eager
               />
             </div>
 
@@ -1907,40 +1745,28 @@ function ConfirmThumb({
 }) {
   return (
     <div className="relative w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10 bg-black">
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: `url(${url})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          filter: "blur(28px) brightness(0.55)",
-          transform: "scale(1.18)",
-        }}
+      <PipocaImage
+        src={url}
+        alt={alt}
+        fit="cover"
+        logTag={logTag}
+        style={mirror ? { transform: "scaleX(-1)" } : undefined}
       />
-      <div className="absolute inset-0">
-        <PipocaImage
-          src={url}
-          alt={alt}
-          fit="contain"
-          logTag={logTag}
-          style={mirror ? { transform: "scaleX(-1)" } : undefined}
-        />
-      </div>
     </div>
   );
 }
 
 /* ---------- Identity camera (face detection + auto-capture, no fixed mask) ---------- */
 
-const IDENTITY_STABLE_MS = 1200;
 const IDENTITY_COUNTDOWN = 3;
 const IDENTITY_FALLBACK_HINT_MS = 6000;
 
-function IdentityCamera({
+function GuidedCamera({
+  mode,
   onCaptured,
   onBack,
 }: {
+  mode: GuideMode;
   onCaptured: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
 }) {
@@ -1948,11 +1774,13 @@ function IdentityCamera({
   const { detectorReady, detectorError, guide } = useFaceGuide({
     videoRef,
     enabled: ready,
+    mode,
   });
   const [countdown, setCountdown] = useState<number | null>(null);
   const [captureLocked, setCaptureLocked] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
   const captureRef = useRef(false);
+  const stableMs = getStableMs(mode);
 
   // Surface a manual fallback if the detector never comes up within ~6s.
   useEffect(() => {
@@ -1967,13 +1795,13 @@ function IdentityCamera({
   // Start countdown when stability threshold is met.
   useEffect(() => {
     if (captureLocked) return;
-    if (guide.status === "ok" && guide.stableMs >= IDENTITY_STABLE_MS) {
+    if (guide.status === "ok" && guide.stableMs >= stableMs) {
       if (countdown === null) setCountdown(IDENTITY_COUNTDOWN);
     } else if (countdown !== null) {
       // User moved — cancel.
       setCountdown(null);
     }
-  }, [guide.status, guide.stableMs, captureLocked, countdown]);
+  }, [guide.status, guide.stableMs, captureLocked, countdown, stableMs]);
 
   // Tick countdown and capture at 0.
   useEffect(() => {
@@ -2015,19 +1843,29 @@ function IdentityCamera({
     ? "ABRINDO A CÂMERA..."
     : !detectorReady && !detectorError
       ? "PREPARANDO O ENQUADRAMENTO..."
-      : getGuideHint(guide.status);
+      : getGuideHint(guide.status, mode);
+
+  const subtitle = mode === "identity" ? "Foto de rosto" : "Foto de corpo";
+  const topInstruction =
+    mode === "identity"
+      ? "OLHE DIRETAMENTE PARA A CÂMERA NO TOPO DA TELA. Se os óculos refletirem a luz, incline levemente o rosto."
+      : "POSICIONE-SE PARA MOSTRAR O ROSTO E A CINTURA.";
+  const supportText =
+    mode === "identity"
+      ? "Captura automática quando estiver perfeito"
+      : "MANTENHA O ROSTO E A CINTURA VISÍVEIS";
+  const frameMaxW = mode === "identity" ? "max-w-[460px]" : "max-w-[520px]";
 
   return (
     <Screen>
-      <Header subtitle="Foto de rosto" />
+      <Header subtitle={subtitle} />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-2 gap-3 sm:gap-4">
-        <p className="text-xs sm:text-sm text-white/75 max-w-md">
-          OLHE DIRETAMENTE PARA A CÂMERA NO TOPO DA TELA.
-          Se os óculos refletirem a luz, incline levemente o rosto.
-        </p>
+        <p className="text-xs sm:text-sm text-white/75 max-w-md">{topInstruction}</p>
 
-        <div className="relative w-full max-w-[460px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
+        <div
+          className={`relative w-full ${frameMaxW} aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl`}
+        >
           <video
             ref={videoRef}
             autoPlay
@@ -2044,12 +1882,12 @@ function IdentityCamera({
           ) : null}
 
           {/* Dynamic scanning frame that follows the bounding box.
-              Pure overlay — never crops the captured file. */}
-          <FaceScanOverlay guide={guide} />
+              Pure overlay — never crops the captured file. No fixed mask. */}
+          <FaceScanOverlay guide={guide} discreet={mode === "appearance"} />
         </div>
 
         {/* Live coaching panel — BELOW the preview, never over the face. */}
-        <div className="w-full max-w-[460px] flex flex-col items-center gap-2 min-h-[88px]">
+        <div className={`w-full ${frameMaxW} flex flex-col items-center gap-2 min-h-[96px]`}>
           <p
             className={`font-display text-lg sm:text-xl text-center leading-snug ${
               guide.status === "ok" ? "text-emerald-300" : "text-white"
@@ -2065,8 +1903,8 @@ function IdentityCamera({
               {countdown}
             </span>
           ) : (
-            <span className="text-[10px] uppercase tracking-[0.3em] text-white/55">
-              Captura automática quando estiver perfeito
+            <span className="text-[10px] uppercase tracking-[0.3em] text-white/55 text-center">
+              {supportText}
             </span>
           )}
         </div>
@@ -2089,7 +1927,7 @@ function IdentityCamera({
   );
 }
 
-function FaceScanOverlay({ guide }: { guide: GuideState }) {
+function FaceScanOverlay({ guide, discreet = false }: { guide: GuideState; discreet?: boolean }) {
   const box = guide.box;
   if (!box) return null;
   const ok = guide.status === "ok";
@@ -2106,20 +1944,23 @@ function FaceScanOverlay({ guide }: { guide: GuideState }) {
       className="pointer-events-none absolute"
       style={{ left, top, width, height, transition: "all 120ms ease-out" }}
     >
-      {/* Four corner brackets — never cover eyes/mouth/face. */}
+      {/* Four corner brackets — never cover eyes/mouth/face. Smaller in appearance mode. */}
       {(["tl", "tr", "bl", "br"] as const).map((pos) => {
+        const size = discreet ? 14 : 22;
+        const bw = discreet ? "2px" : "3px";
         const base: React.CSSProperties = {
           position: "absolute",
-          width: 22,
-          height: 22,
+          width: size,
+          height: size,
           borderColor: color,
           borderStyle: "solid",
+          opacity: discreet ? 0.85 : 1,
         };
         const styles: Record<typeof pos, React.CSSProperties> = {
-          tl: { ...base, top: -2, left: -2, borderWidth: "3px 0 0 3px" },
-          tr: { ...base, top: -2, right: -2, borderWidth: "3px 3px 0 0" },
-          bl: { ...base, bottom: -2, left: -2, borderWidth: "0 0 3px 3px" },
-          br: { ...base, bottom: -2, right: -2, borderWidth: "0 3px 3px 0" },
+          tl: { ...base, top: -2, left: -2, borderWidth: `${bw} 0 0 ${bw}` },
+          tr: { ...base, top: -2, right: -2, borderWidth: `${bw} ${bw} 0 0` },
+          bl: { ...base, bottom: -2, left: -2, borderWidth: `0 0 ${bw} ${bw}` },
+          br: { ...base, bottom: -2, right: -2, borderWidth: `0 ${bw} ${bw} 0` },
         };
         return <span key={pos} style={styles[pos]} />;
       })}
