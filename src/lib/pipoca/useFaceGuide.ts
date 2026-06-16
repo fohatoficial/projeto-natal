@@ -277,7 +277,7 @@ export function useFaceGuide(opts: {
 
       rafRef.current = requestAnimationFrame(evalFrame);
     },
-    [enabled, videoRef, onTick],
+    [enabled, videoRef, onTick, th],
   );
 
   useEffect(() => {
