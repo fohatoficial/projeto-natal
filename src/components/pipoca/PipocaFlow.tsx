@@ -399,6 +399,7 @@ export function PipocaFlow() {
 
   return (
     <div className="bg-cinema text-white relative">
+      {debugViewport && <DebugViewportPanel step={step} />}
       {step === "choose" && (
         <Choose
           movies={films}
