@@ -911,6 +911,9 @@ function Stories({
   const [idx, setIdx] = useState(0);
   const [progress, setProgress] = useState(0);
   const [cameraStatus, setCameraStatus] = useState(getSharedStatus());
+  // Story 0 (the film poster) must NOT start its timer until the poster
+  // image is fully loaded — otherwise the totem can skip past a blank card.
+  const [posterReady, setPosterReady] = useState(false);
   const advanceLockRef = useRef(false);
 
   useEffect(() => {
@@ -924,21 +927,29 @@ function Stories({
     setProgress(0);
     const duration = STORY_DURATIONS_MS[idx];
     if (duration === undefined) return;
-    const start = performance.now();
+    // Gate story 0 until the poster is on screen.
+    if (idx === 0 && !posterReady) return;
+    // Small breathing room before the timer kicks in, per spec.
+    const startDelay = idx === 0 ? 350 : 0;
     let raf = 0;
+    let startedAt = 0;
     const tick = (now: number) => {
-      const pct = Math.min(1, (now - start) / duration);
+      if (!startedAt) startedAt = now;
+      const pct = Math.min(1, (now - startedAt) / duration);
       setProgress(pct);
       if (pct < 1) raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    const t = window.setTimeout(() => advance(), duration);
+    const startTimeout = window.setTimeout(() => {
+      raf = requestAnimationFrame(tick);
+    }, startDelay);
+    const t = window.setTimeout(() => advance(), duration + startDelay);
     return () => {
+      window.clearTimeout(startTimeout);
       window.clearTimeout(t);
       cancelAnimationFrame(raf);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx]);
+  }, [idx, posterReady]);
 
   function advance() {
     if (advanceLockRef.current) return;
@@ -970,16 +981,25 @@ function Stories({
         })}
       </div>
 
-      {/* Tap-to-advance area */}
+      {/* Tap-to-advance area — only after poster is ready on story 0. */}
       <button
         type="button"
-        onClick={advance}
+        onClick={() => {
+          if (idx === 0 && !posterReady) return;
+          advance();
+        }}
         aria-label="Próximo"
         className="absolute inset-0 z-10 cursor-pointer"
       />
 
       <div className="relative z-20 flex-1 min-h-0 w-full flex flex-col items-center justify-center max-w-2xl py-3 pointer-events-none">
-        {idx === 0 && <StoryFilm movie={movie} firstName={firstName} />}
+        {idx === 0 && (
+          <StoryFilm
+            movie={movie}
+            firstName={firstName}
+            onPosterReady={() => setPosterReady(true)}
+          />
+        )}
         {idx === 1 && <StoryTwoPhotos firstName={firstName} />}
         {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} firstName={firstName} />}
       </div>
@@ -998,7 +1018,7 @@ function Stories({
           </button>
         ) : (
           <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
-            toque para avançar
+            {idx === 0 && !posterReady ? "carregando pôster…" : "toque para avançar"}
           </span>
         )}
       </div>
@@ -1006,8 +1026,41 @@ function Stories({
   );
 }
 
-function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
+function StoryFilm({
+  movie,
+  firstName,
+  onPosterReady,
+}: {
+  movie: Movie;
+  firstName?: string;
+  onPosterReady?: () => void;
+}) {
   const prefix = firstName ? `${firstName.toUpperCase()}, você escolheu` : "Você escolheu";
+  const firedRef = useRef(false);
+  // Prefetch decode so the timer can start as soon as bytes are in.
+  useEffect(() => {
+    if (!movie.posterUrl) return;
+    const img = new Image();
+    img.src = movie.posterUrl;
+    let cancelled = false;
+    const done = () => {
+      if (cancelled || firedRef.current) return;
+      firedRef.current = true;
+      console.log("[PIPOCA_STORY_POSTER] prefetch ready");
+      onPosterReady?.();
+    };
+    if (img.decode) {
+      img.decode().then(done).catch(() => {
+        // Fallback to onload if decode rejects (rare on some browsers).
+        if (img.complete) done();
+      });
+    }
+    img.onload = done;
+    return () => {
+      cancelled = true;
+    };
+  }, [movie.posterUrl, onPosterReady]);
+
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
