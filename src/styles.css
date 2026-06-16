@@ -364,13 +364,13 @@
   /* Real 43" totem (1080x1920+). Same model, larger scale. */
   @media screen and (min-height: 1400px) and (min-width: 700px) {
     .pipoca-camera-preview-wrap {
-      gap: clamp(20px, 2.6svh, 44px);
+      gap: clamp(30px, 3.8svh, 56px);
     }
     .pipoca-camera-hint {
-      font-size: clamp(3.6rem, 5dvh, 6rem) !important;
+      font-size: clamp(4rem, 5.6dvh, 6.6rem) !important;
     }
     .pipoca-camera-countdown {
-      font-size: clamp(7rem, 10dvh, 12rem) !important;
+      font-size: clamp(7.8rem, 11dvh, 13rem) !important;
     }
     .pipoca-camera-frame {
       width: min(82vw, 820px) !important;
