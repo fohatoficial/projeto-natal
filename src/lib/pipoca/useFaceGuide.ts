@@ -30,6 +30,8 @@ export type GuideStatus =
   | "head_turned"
   | "ok";
 
+export type GuideMode = "identity" | "appearance";
+
 export type FaceBox = {
   /** Normalized (0..1) relative to preview width/height. */
   x: number;
@@ -44,32 +46,74 @@ export type GuideState = {
   stableMs: number;
 };
 
-const HINT: Record<GuideStatus, string> = {
-  no_face: "POSICIONE SEU ROSTO",
-  multi_face: "APENAS UMA PESSOA NA FOTO",
-  too_far: "APROXIME-SE UM POUCO",
-  too_close: "AFASTE-SE UM POUCO",
-  off_left: "CENTRALIZE SEU ROSTO",
-  off_right: "CENTRALIZE SEU ROSTO",
-  off_high: "ABAIXE UM POUCO",
-  off_low: "SUBA UM POUCO",
-  head_turned: "OLHE DIRETAMENTE PARA A CÂMERA",
-  ok: "PERFEITO, FIQUE PARADO",
+const HINTS: Record<GuideMode, Record<GuideStatus, string>> = {
+  identity: {
+    no_face: "POSICIONE SEU ROSTO",
+    multi_face: "APENAS UMA PESSOA NA FOTO",
+    too_far: "APROXIME-SE UM POUCO",
+    too_close: "AFASTE-SE UM POUCO",
+    off_left: "CENTRALIZE SEU ROSTO",
+    off_right: "CENTRALIZE SEU ROSTO",
+    off_high: "ABAIXE UM POUCO",
+    off_low: "SUBA UM POUCO",
+    head_turned: "OLHE DIRETAMENTE PARA A CÂMERA",
+    ok: "PERFEITO, FIQUE PARADO",
+  },
+  appearance: {
+    no_face: "POSICIONE-SE DIANTE DA CÂMERA",
+    multi_face: "APENAS UMA PESSOA NA FOTO",
+    too_far: "APROXIME-SE UM POUCO",
+    too_close: "AFASTE-SE UM POUCO",
+    off_left: "CENTRALIZE-SE",
+    off_right: "CENTRALIZE-SE",
+    off_high: "ABAIXE UM POUCO",
+    off_low: "SUBA UM POUCO",
+    head_turned: "OLHE DIRETAMENTE PARA A CÂMERA",
+    ok: "PERFEITO, FIQUE PARADO",
+  },
 };
 
-export function getGuideHint(status: GuideStatus): string {
-  return HINT[status];
+export function getGuideHint(status: GuideStatus, mode: GuideMode = "identity"): string {
+  return HINTS[mode][status];
 }
 
-// Framing thresholds (face width as a % of preview width).
-const W_MIN = 0.24;
-const W_MAX = 0.46;
-// Horizontal center tolerance.
-const CX_MIN = 0.42;
-const CX_MAX = 0.58;
-// Vertical center sweet spot (face center y).
-const CY_MIN = 0.42;
-const CY_MAX = 0.62;
+type Thresholds = {
+  wMin: number;
+  wMax: number;
+  cxMin: number;
+  cxMax: number;
+  cyMin: number;
+  cyMax: number;
+  stableMs: number;
+};
+
+const THRESHOLDS: Record<GuideMode, Thresholds> = {
+  // Close-up: face fills frame.
+  identity: {
+    wMin: 0.24,
+    wMax: 0.46,
+    cxMin: 0.42,
+    cxMax: 0.58,
+    cyMin: 0.42,
+    cyMax: 0.62,
+    stableMs: 1200,
+  },
+  // Medium shot: head + shoulders + torso to waist.
+  // Face is smaller and sits higher in the frame.
+  appearance: {
+    wMin: 0.12,
+    wMax: 0.24,
+    cxMin: 0.4,
+    cxMax: 0.6,
+    cyMin: 0.26,
+    cyMax: 0.44,
+    stableMs: 1400,
+  },
+};
+
+export function getStableMs(mode: GuideMode): number {
+  return THRESHOLDS[mode].stableMs;
+}
 
 type DetectorAny = {
   detectForVideo: (
