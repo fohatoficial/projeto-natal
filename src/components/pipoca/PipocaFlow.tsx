@@ -2029,18 +2029,24 @@ function Result({
             </h1>
 
             <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-3 sm:p-4 w-full max-w-sm">
-              <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center pipoca-kiosk-qr">
-                {resultPageUrl ? (
+              {/* QR is rendered at its final pixel size — no CSS scale, no
+                  transform, no logo overlay — so phones can decode it. */}
+              <div className="bg-white p-3 rounded-lg shrink-0 grid place-items-center pipoca-kiosk-qr">
+                {qrState === "qrReady" && canonicalQrUrl ? (
                   <QRCodeSVG
-                    value={resultPageUrl}
-                    size={110}
-                    level="M"
-                    marginSize={2}
+                    value={canonicalQrUrl}
+                    size={220}
+                    level="H"
+                    marginSize={4}
                     bgColor="#FFFFFF"
                     fgColor="#000000"
                   />
+                ) : qrState === "qrError" ? (
+                  <div className="w-[220px] h-[220px] grid place-items-center text-center text-cinema text-xs px-3">
+                    Link indisponível
+                  </div>
                 ) : (
-                  <div className="w-28 h-28 bg-white/40 animate-pulse rounded" />
+                  <div className="w-[220px] h-[220px] bg-white/40 animate-pulse rounded" />
                 )}
               </div>
               <div className="text-left min-w-0">
