@@ -288,8 +288,8 @@ async function createReplicatePrediction(input: {
   hatReferenceUrls: string[];
 }): Promise<ReplicatePrediction> {
   const token = getReplicateToken();
-  // Only one hat reference is ever sent, even if two are available.
-  const hatRefs = input.hatReferenceUrls.slice(0, 1);
+  // Send both hat references when available: front (image 4) and side (image 5).
+  const hatRefs = input.hatReferenceUrls.slice(0, 2);
   const inputImages = [
     input.identityUrl,
     input.appearanceUrl,
