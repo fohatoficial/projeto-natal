@@ -1745,26 +1745,13 @@ function ConfirmThumb({
 }) {
   return (
     <div className="relative w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10 bg-black">
-      <div
-        aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: `url(${url})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          filter: "blur(28px) brightness(0.55)",
-          transform: "scale(1.18)",
-        }}
+      <PipocaImage
+        src={url}
+        alt={alt}
+        fit="cover"
+        logTag={logTag}
+        style={mirror ? { transform: "scaleX(-1)" } : undefined}
       />
-      <div className="absolute inset-0">
-        <PipocaImage
-          src={url}
-          alt={alt}
-          fit="contain"
-          logTag={logTag}
-          style={mirror ? { transform: "scaleX(-1)" } : undefined}
-        />
-      </div>
     </div>
   );
 }
