@@ -13,6 +13,8 @@ const PUBLIC_RESULT_BASE_URL = "https://pipoca-cena-studio.lovable.app".replace(
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
 
+const ENABLE_HAT_REFERENCE = false;
+
 function isUuid(value: unknown): value is string {
   return (
     typeof value === "string" &&
