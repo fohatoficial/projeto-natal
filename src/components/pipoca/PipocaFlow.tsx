@@ -1269,15 +1269,52 @@ function Camera({
   onBack: () => void;
 }) {
   const { videoRef, ready, errorKind, retry, capture } = useCamera(true);
+  // Identity variant uses face-guided countdown. Appearance variant keeps
+  // the simple ready-then-count flow that already works well for body shots.
+  const isIdentity = variant === "identity";
+  const guidance: Guidance = useFaceGuidance(videoRef, isIdentity && ready);
   const [count, setCount] = useState<number | null>(null);
   const startedRef = useRef(false);
+  const [manualStart, setManualStart] = useState(false);
 
+  // Appearance: start countdown as soon as camera is ready (legacy behaviour).
   useEffect(() => {
+    if (isIdentity) return;
     if (ready && count === null && !startedRef.current) {
       console.log(`${UX} contagem iniciada`, { variant });
       setCount(COUNTDOWN_SECONDS);
     }
-  }, [ready, count, variant]);
+  }, [ready, count, variant, isIdentity]);
+
+  // Identity: start when guidance has been "perfect" long enough, OR when
+  // the user taps the manual fallback (detector unavailable / never settles).
+  useEffect(() => {
+    if (!isIdentity) return;
+    if (!ready || count !== null || startedRef.current) return;
+    const canManual = manualStart || guidance.kind === "unavailable";
+    const guidedOk =
+      guidance.kind === "perfect" && guidance.stableMs >= FACE_GUIDE_STABLE_MS;
+    if (canManual || guidedOk) {
+      console.log(`${UX} contagem iniciada (identity)`, {
+        reason: guidedOk ? "guided" : "manual",
+      });
+      setCount(3); // shorter countdown after guided framing
+    }
+  }, [isIdentity, ready, count, guidance, manualStart]);
+
+  // Cancel countdown if framing degrades during the count.
+  useEffect(() => {
+    if (!isIdentity || count === null || count <= 0 || startedRef.current) return;
+    if (manualStart) return; // user opted out of guidance
+    if (
+      guidance.kind !== "perfect" &&
+      guidance.kind !== "loading" &&
+      guidance.kind !== "unavailable"
+    ) {
+      console.log(`${UX} contagem cancelada — framing perdido`, guidance.kind);
+      setCount(null);
+    }
+  }, [isIdentity, count, guidance, manualStart]);
 
   useEffect(() => {
     if (count === null) return;
@@ -1296,13 +1333,24 @@ function Camera({
 
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
-  const title =
-    variant === "identity" ? "Posicione seu rosto na marcação" : "Encaixe o rosto e o corpo na marcação";
-  const hint =
-    variant === "identity"
-      ? "Cabelo, testa e queixo dentro da área."
-      : "Mantenha a cabeça no topo e o corpo dentro do contorno.";
-  const subtitle = variant === "identity" ? "Foto de rosto" : "Foto de corpo";
+  const title = isIdentity ? "Foto de rosto" : "Encaixe o rosto e o corpo na marcação";
+  const subtitle = isIdentity ? "Foto de rosto" : "Foto de corpo";
+  const previewSrc = videoRef.current?.srcObject ? "" : "";
+  void previewSrc;
+
+  // Status text shown BELOW the preview (never over the face).
+  let statusMessage: string;
+  let statusHint: string | undefined;
+  if (isIdentity) {
+    statusMessage = guidance.message;
+    statusHint = guidance.hint ?? "Olhe para a câmera no topo do totem e evite reflexos no rosto.";
+  } else {
+    statusMessage = "Encaixe o rosto e o corpo na marcação.";
+    statusHint = "Mantenha a cabeça no topo e o corpo dentro do contorno.";
+  }
+
+  const isCountdownActive = count !== null && count > 0;
+  const isGuidedPerfect = isIdentity && guidance.kind === "perfect";
 
   return (
     <Screen>
@@ -1312,51 +1360,60 @@ function Camera({
         <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-white leading-[0.95] animate-fade-up">
           {title}
         </h1>
-        <p className="text-xs sm:text-sm text-white/70 max-w-md">{hint}</p>
 
-        <div className="relative w-full max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
+        {/* Camera frame — no black background. A blurred mirror of the live
+            stream fills any letterbox area so the preview never shows bars. */}
+        <div className="relative w-full max-w-[420px] pipoca-kiosk-camera-frame aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 shadow-2xl">
+          {/* Blurred underlay = same video, scaled up, blurred. */}
           <video
             ref={videoRef}
             autoPlay
             muted
             playsInline
+            aria-hidden
             className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: "scaleX(-1)" }}
+            style={{
+              transform: "scaleX(-1) scale(1.2)",
+              filter: "blur(28px) brightness(0.55)",
+            }}
           />
+          {/* Main preview — same MediaStream is auto-shared because srcObject
+              on the ref above is the singleton. Render a second <video>
+              element here that mirrors the live stream via the same ref
+              would not work; instead we layer a sibling video with the same
+              srcObject mounted by a tiny effect. */}
+          <PreviewMirror videoRef={videoRef} />
 
           {!ready && !errorKind ? (
-            <div className="absolute inset-0 grid place-items-center text-white/70 text-sm tracking-wide animate-pulse-soft">
+            <div className="absolute inset-0 grid place-items-center text-white/85 text-sm tracking-wide animate-pulse-soft bg-black/30">
               Iniciando câmera…
             </div>
           ) : null}
 
-          {/* Adaptive SVG mask — pure overlay, never crops the captured file. */}
+          {/* Fallback geometric mask (always rendered, dimmed once a real
+              face is detected so it isn't redundant with the live frame). */}
           <svg
             viewBox="0 0 100 125"
             preserveAspectRatio="none"
-            className="pointer-events-none absolute inset-0 w-full h-full animate-pulse-soft"
+            className={`pointer-events-none absolute inset-0 w-full h-full transition-opacity duration-300 ${
+              isIdentity && guidance.box ? "opacity-30" : "opacity-100 animate-pulse-soft"
+            }`}
             aria-hidden
           >
-            {variant === "identity" ? (
-              <>
-                {/* Head + shoulders oval. cy lowered on tall portrait totems
-                    via the .pipoca-identity-mask-ellipse CSS override so the
-                    user's face doesn't end up under the totem's top camera. */}
-                <ellipse
-                  className="pipoca-identity-mask-ellipse"
-                  cx="50"
-                  cy="45"
-                  rx="22"
-                  ry="30"
-                  fill="none"
-                  stroke="#F8BA32"
-                  strokeWidth="0.6"
-                  strokeDasharray="1.5 1.2"
-                />
-              </>
+            {isIdentity ? (
+              <ellipse
+                className="pipoca-identity-mask-ellipse"
+                cx="50"
+                cy="45"
+                rx="22"
+                ry="30"
+                fill="none"
+                stroke="#F8BA32"
+                strokeWidth="0.6"
+                strokeDasharray="1.5 1.2"
+              />
             ) : (
               <>
-                {/* Face oval at ~28% height */}
                 <ellipse
                   cx="50"
                   cy="35"
@@ -1367,7 +1424,6 @@ function Camera({
                   strokeWidth="0.6"
                   strokeDasharray="1.5 1.2"
                 />
-                {/* Shoulders + torso silhouette down to waist (~82% height) */}
                 <path
                   d="M22 102 C 24 78, 32 60, 50 60 C 68 60, 76 78, 78 102"
                   fill="none"
@@ -1380,24 +1436,52 @@ function Camera({
             )}
           </svg>
 
+          {/* Live scanning frame around detected face. */}
+          {isIdentity && guidance.box && (
+            <FaceScanOverlay box={guidance.box} good={isGuidedPerfect} />
+          )}
+        </div>
 
-
-          {count !== null && count > 0 ? (
-            <div className="absolute inset-0 grid place-items-center bg-black/40 backdrop-blur-[1px]">
+        {/* STATUS AREA — always below the preview. Contains the orientation
+            message, the countdown number and the secondary hint. Never
+            overlays the face. */}
+        <div className="w-full max-w-md flex flex-col items-center gap-2 min-h-[120px]">
+          <p
+            className={`font-display text-2xl sm:text-3xl leading-tight transition-colors ${
+              isGuidedPerfect || !isIdentity ? "text-gold" : "text-white"
+            }`}
+          >
+            {statusMessage}
+          </p>
+          {isCountdownActive ? (
+            <div className="flex items-baseline gap-3">
+              <span className="text-[10px] uppercase tracking-[0.3em] text-white/55">
+                Capturando em
+              </span>
               <span
                 key={count}
-                className="font-display text-white text-[140px] sm:text-[170px] lg:text-[220px] leading-none animate-pop-in"
-                style={{ textShadow: "0 6px 30px rgba(0,0,0,0.6)" }}
+                className="font-display text-gold text-6xl sm:text-7xl leading-none animate-pop-in"
               >
                 {count}
               </span>
             </div>
+          ) : statusHint ? (
+            <p className="text-xs sm:text-sm text-white/70 max-w-md">{statusHint}</p>
           ) : null}
-          {count === 0 ? (
-            <div className="absolute inset-0 bg-white animate-fade-in" />
-          ) : null}
+          {isIdentity && !isCountdownActive && !manualStart && guidance.kind !== "perfect" && (
+            <button
+              type="button"
+              onClick={() => setManualStart(true)}
+              className="mt-1 text-[11px] uppercase tracking-[0.25em] text-white/70 border border-white/30 rounded-md px-3 py-1.5 hover:text-white"
+            >
+              Tirar foto agora
+            </button>
+          )}
         </div>
 
+        {count === 0 ? (
+          <div className="fixed inset-0 z-30 bg-white animate-fade-in pointer-events-none" />
+        ) : null}
       </div>
 
 
@@ -1407,6 +1491,123 @@ function Camera({
     </Screen>
   );
 }
+
+// Renders a second <video> element pointing at the same MediaStream as the
+// blurred backdrop, so the live preview shows on top WITHOUT a black box.
+function PreviewMirror({
+  videoRef,
+}: {
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+}) {
+  const mirrorRef = useRef<HTMLVideoElement | null>(null);
+  useEffect(() => {
+    const main = videoRef.current;
+    const mirror = mirrorRef.current;
+    if (!main || !mirror) return;
+    const sync = () => {
+      if (main.srcObject && mirror.srcObject !== main.srcObject) {
+        mirror.srcObject = main.srcObject;
+        mirror.play().catch(() => {});
+      }
+    };
+    sync();
+    const id = window.setInterval(sync, 250);
+    return () => window.clearInterval(id);
+  }, [videoRef]);
+  return (
+    <video
+      ref={mirrorRef}
+      autoPlay
+      muted
+      playsInline
+      className="absolute inset-0 w-full h-full object-contain"
+      style={{ transform: "scaleX(-1)" }}
+    />
+  );
+}
+
+function FaceScanOverlay({
+  box,
+  good,
+}: {
+  box: { x: number; y: number; w: number; h: number };
+  good: boolean;
+}) {
+  const color = good ? "#92C37A" : "#F8BA32";
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-0 w-full h-full"
+      aria-hidden
+    >
+      {/* Corner brackets around the detected face. */}
+      {(() => {
+        const x = box.x * 100;
+        const y = box.y * 100;
+        const w = box.w * 100;
+        const h = box.h * 100;
+        const c = 4; // corner length
+        const lines = [
+          [x, y, x + c, y],          [x, y, x, y + c],
+          [x + w - c, y, x + w, y],  [x + w, y, x + w, y + c],
+          [x, y + h - c, x, y + h],  [x, y + h, x + c, y + h],
+          [x + w, y + h - c, x + w, y + h], [x + w - c, y + h, x + w, y + h],
+        ];
+        return lines.map((l, i) => (
+          <line
+            key={i}
+            x1={l[0]}
+            y1={l[1]}
+            x2={l[2]}
+            y2={l[3]}
+            stroke={color}
+            strokeWidth="0.6"
+            strokeLinecap="round"
+          />
+        ));
+      })()}
+      {/* Animated scan line inside the bbox. */}
+      <defs>
+        <clipPath id="face-clip">
+          <rect
+            x={box.x * 100}
+            y={box.y * 100}
+            width={box.w * 100}
+            height={box.h * 100}
+          />
+        </clipPath>
+      </defs>
+      <g clipPath="url(#face-clip)">
+        <line
+          x1={box.x * 100}
+          x2={(box.x + box.w) * 100}
+          y1={(box.y + box.h * 0.5) * 100}
+          y2={(box.y + box.h * 0.5) * 100}
+          stroke={color}
+          strokeWidth="0.35"
+          opacity="0.85"
+        >
+          <animate
+            attributeName="y1"
+            from={box.y * 100}
+            to={(box.y + box.h) * 100}
+            dur="2.2s"
+            repeatCount="indefinite"
+          />
+          <animate
+            attributeName="y2"
+            from={box.y * 100}
+            to={(box.y + box.h) * 100}
+            dur="2.2s"
+            repeatCount="indefinite"
+          />
+        </line>
+      </g>
+    </svg>
+  );
+}
+
 
 
 function CameraError({
