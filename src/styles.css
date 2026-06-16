@@ -209,7 +209,14 @@
        Effective downward shift ≈ clamp(90px, 7dvh, 140px). Second-photo mask
        is untouched. */
     .pipoca-stage-dvh .pipoca-identity-mask-ellipse {
-      cy: 62;
+      cy: 78;
+    }
+
+    /* Identity camera frame: no fixed aspect on the totem — the preview
+       fills the available vertical space without letterboxing. */
+    .pipoca-stage-dvh .pipoca-kiosk-camera-frame {
+      width: min(82vw, 860px) !important;
+      max-width: min(82vw, 860px) !important;
     }
 
     /* Privacy notice modal — fills the totem instead of a tablet column. */
