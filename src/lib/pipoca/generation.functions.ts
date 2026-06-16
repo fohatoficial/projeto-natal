@@ -13,10 +13,16 @@ const PUBLIC_RESULT_BASE_URL = "https://pipoca-cena-studio.lovable.app".replace(
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
 
-const ENABLE_HAT_REFERENCE = false;
+const ENABLE_HAT_REFERENCE = true;
 
 const FIXED_HAT_REFERENCE_URL =
   "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-em-uso-v2.jpg";
+
+const FIXED_HAT_REFERENCE_FRONT_URL =
+  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-frente-v3.png";
+
+const FIXED_HAT_REFERENCE_SIDE_URL =
+  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-lado-v3.png.png";
 
 
 function isUuid(value: unknown): value is string {
@@ -168,19 +174,19 @@ function buildPromptText(
 
   if (hasHatRef) {
     parts.push(
-      "Image 4 is a low-priority hat design and fit reference only.",
+      "Images 4 and 5 are low-priority hat design and fit references only.",
     );
     parts.push(
-      "Use it only to guide the authentic shape, scale and natural fit of a northeastern Brazilian cangaceiro leather hat.",
+      "Image 4 is the front hat reference. Image 5 is the side hat reference. Use them only to guide the authentic shape, scale, side profile and natural fit of a northeastern Brazilian cangaceiro leather hat.",
     );
     parts.push(
       "The hat must remain proportional to the visitor's head and naturally integrated into the costume.",
     );
     parts.push(
-      "Image 4 must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
+      "Images 4 and 5 must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
     );
     parts.push(
-      "The hat must not dominate the image, become oversized, cover the face or cause close-up framing.",
+      "The hat must not dominate the image, become oversized, become too small, cover the face or cause close-up framing.",
     );
   }
 
@@ -221,7 +227,7 @@ function buildPromptText(
   );
   if (hasHatRef) {
     parts.push(
-      "When Image 4 is used, apply it only as a restrained secondary cue for the hat's authentic shape, scale and natural fit. The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT change the pose. The hat must NOT replace or distort the environment. The hat must NOT become oversized, theatrical, ceremonial, fantastical, a cowboy hat, a western wide-brim hat or the main subject.",
+      "When Images 4 and 5 are used, apply them only as restrained secondary cues for the hat's authentic shape, scale, side profile and natural fit. The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT change the pose. The hat must NOT replace or distort the environment. The hat must NOT become oversized, theatrical, ceremonial, fantastical, a cowboy hat, a western wide-brim hat or the main subject.",
     );
   }
 
@@ -241,7 +247,7 @@ function buildPromptText(
     "FRAMING: prefer a medium shot or medium-full shot, showing the visitor from the head down to the waist or just above the knees. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment. The environment must remain visible and legible, and the rustic clothing must remain fully visible and important.",
   );
   parts.push(
-    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Image 4, when present, is the lowest priority and must only guide the shape, scale and natural fit of the cangaceiro hat. Image 4 must never replace or weaken Images 1, 2 or 3.",
+    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Images 4 and 5, when present, are the lowest priority and must only guide the shape, scale, side profile and natural fit of the cangaceiro hat. Images 4 and 5 must never replace or weaken Images 1, 2 or 3.",
   );
 
 
@@ -282,8 +288,8 @@ async function createReplicatePrediction(input: {
   hatReferenceUrls: string[];
 }): Promise<ReplicatePrediction> {
   const token = getReplicateToken();
-  // Only one hat reference is ever sent, even if two are available.
-  const hatRefs = input.hatReferenceUrls.slice(0, 1);
+  // Send both hat references when available: front (image 4) and side (image 5).
+  const hatRefs = input.hatReferenceUrls.slice(0, 2);
   const inputImages = [
     input.identityUrl,
     input.appearanceUrl,
@@ -293,7 +299,7 @@ async function createReplicatePrediction(input: {
   const body = {
     input: {
       prompt: input.prompt,
-      // Order: identity, appearance, scene base, then at most 1 hat ref.
+      // Order: identity, appearance, scene base, then up to 2 hat refs.
       input_images: inputImages,
       aspect_ratio: "4:5",
       output_format: "jpg",
@@ -431,12 +437,12 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     let hatReferenceUrls: string[] = [];
     let hatRefUsed: string[] = [];
     if (ENABLE_HAT_REFERENCE) {
-      hatReferenceUrls = [FIXED_HAT_REFERENCE_URL];
-      hatRefUsed = [FIXED_HAT_REFERENCE_URL];
-      console.log(`${LOG} referência de chapéu fixa ativa (1 URL)`);
+      hatReferenceUrls = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
+      hatRefUsed = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
+      console.log(`${LOG} referências de chapéu fixas ativas (2 URLs)`);
     }
     console.log(`${GEN_LOG} hat reference enabled: ${ENABLE_HAT_REFERENCE}`);
-    console.log(`${GEN_LOG} fixed hat reference: true`);
+    console.log(`${GEN_LOG} fixed hat references: ${hatRefUsed.length}`);
     const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
 
 
@@ -464,8 +470,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         "identity-close",
         "appearance-medium",
         "scene-base",
-        ...hatRefUsed.map(() => "hat-secondary"),
-      ],
+        "hat-front",
+        "hat-side",
+      ].slice(0, 3 + hatRefUsed.length),
     });
     if (hatRefUsed.length > 0) {
       console.log(`${GEN_LOG} usando chapéu como referência secundária`);
@@ -508,6 +515,8 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           hat_reference_count_available: hatReferenceUrls.length,
           hat_reference_count_used: hatRefUsed.length,
           hat_reference_url_used: hatRefUsed[0] ?? null,
+          hat_reference_front_url: hatRefUsed[0] ?? null,
+          hat_reference_side_url: hatRefUsed[1] ?? null,
           post_process: "neutral-grayscale",
           post_process_contrast: 8,
         },
