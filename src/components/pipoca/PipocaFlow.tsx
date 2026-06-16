@@ -1568,7 +1568,7 @@ function Result({
             </h1>
 
             <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-3 sm:p-4 w-full max-w-sm">
-              <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center">
+              <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center pipoca-kiosk-qr">
                 {resultPageUrl ? (
                   <QRCodeSVG
                     value={resultPageUrl}
