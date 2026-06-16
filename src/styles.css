@@ -368,17 +368,18 @@
   }
 
   /* Real 43" totem — treat it as a giant tablet in portrait.
-     Balance vertically: instruction + timer occupy the upper third (anchored
-     to the bottom of that band, just above the camera), then a centered
-     camera frame fills the remaining space. */
+     Chrome/Windows scaling can change CSS px and dvh, so the vertical model
+     uses percentages of the measured screen container instead of a pure dvh
+     offset. The top band pushes the instruction/timer close to the camera
+     without moving the camera by an arbitrary margin. */
   @media screen and (min-height: 1400px) and (min-width: 700px) {
     .pipoca-camera-screen {
       display: grid;
-      grid-template-rows: 32dvh 1fr;
+      grid-template-rows: minmax(420px, 36%) minmax(0, 1fr);
       align-items: stretch;
-      gap: clamp(20px, 2.5dvh, 50px);
+      gap: clamp(18px, 2svh, 42px);
       height: var(--pipoca-app-height, 100dvh);
-      padding: clamp(20px, 3dvh, 60px) clamp(20px, 3vw, 60px);
+      padding: clamp(24px, 3svh, 56px) clamp(20px, 3vw, 60px);
       overflow: hidden;
     }
     .pipoca-camera-top {
@@ -412,7 +413,7 @@
     }
     .pipoca-camera-frame {
       width: min(82vw, 820px) !important;
-      max-height: 60dvh !important;
+      max-height: 56svh !important;
       align-self: center;
       margin: 0;
     }
