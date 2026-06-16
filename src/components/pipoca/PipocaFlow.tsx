@@ -926,35 +926,99 @@ function Stories({
   const [cameraStatus, setCameraStatus] = useState(getSharedStatus());
   const advanceLockRef = useRef(false);
 
+  // Poster state: the first story can NOT start its timer until the poster
+  // is fully decoded and visible. Without this gate the slide auto-advances
+  // before the visitor sees the film they picked.
+  type PosterState = "pending" | "loading" | "ready" | "error";
+  const [posterState, setPosterState] = useState<PosterState>("pending");
+  const [posterAttempt, setPosterAttempt] = useState(0);
+
   useEffect(() => {
     const unsub = subscribeSharedCamera(() => setCameraStatus(getSharedStatus()));
     return unsub;
   }, []);
 
+  // Decode poster off-DOM so we know the exact moment it's visually ready.
+  useEffect(() => {
+    if (!movie.posterUrl) {
+      setPosterState("error");
+      return;
+    }
+    let cancelled = false;
+    setPosterState("loading");
+    console.log("[PIPOCA_STORY_POSTER] loading", { attempt: posterAttempt });
+    const img = new Image();
+    img.decoding = "async";
+    img.src =
+      posterAttempt === 0
+        ? movie.posterUrl
+        : `${movie.posterUrl}${movie.posterUrl.includes("?") ? "&" : "?"}__cb=${BUILD_ID}-${posterAttempt}`;
+    const done = () => {
+      if (cancelled) return;
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        console.log("[PIPOCA_STORY_POSTER] ready", `${img.naturalWidth}x${img.naturalHeight}`);
+        setPosterState("ready");
+      } else {
+        console.warn("[PIPOCA_STORY_POSTER] empty-natural");
+        setPosterState("error");
+      }
+    };
+    if ("decode" in img) {
+      img.decode().then(done).catch(() => {
+        if (cancelled) return;
+        console.warn("[PIPOCA_STORY_POSTER] decode-failed");
+        setPosterState("error");
+      });
+    } else {
+      img.onload = done;
+      img.onerror = () => {
+        if (cancelled) return;
+        setPosterState("error");
+      };
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [movie.posterUrl, posterAttempt]);
+
   // Reset advance lock + progress whenever the story index changes.
   useEffect(() => {
     advanceLockRef.current = false;
     setProgress(0);
-    const duration = STORY_DURATIONS_MS[idx];
-    if (duration === undefined) return;
-    const start = performance.now();
+
+    // Slide 0 (film poster): wait until the poster is decoded + a small
+    // settle window so the visitor actually sees it before the bar moves.
+    if (idx === 0 && posterState !== "ready") return;
+
+    const baseDuration = STORY_DURATIONS_MS[idx];
+    if (baseDuration === undefined) return;
+    const startDelay = idx === 0 ? 400 : 0;
+
     let raf = 0;
-    const tick = (now: number) => {
-      const pct = Math.min(1, (now - start) / duration);
-      setProgress(pct);
-      if (pct < 1) raf = requestAnimationFrame(tick);
+    let timeoutId = 0;
+    const begin = () => {
+      const start = performance.now();
+      const tick = (now: number) => {
+        const pct = Math.min(1, (now - start) / baseDuration);
+        setProgress(pct);
+        if (pct < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+      timeoutId = window.setTimeout(() => advance(), baseDuration);
     };
-    raf = requestAnimationFrame(tick);
-    const t = window.setTimeout(() => advance(), duration);
+    const startId = window.setTimeout(begin, startDelay);
     return () => {
-      window.clearTimeout(t);
+      window.clearTimeout(startId);
+      window.clearTimeout(timeoutId);
       cancelAnimationFrame(raf);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx]);
+  }, [idx, posterState]);
 
   function advance() {
     if (advanceLockRef.current) return;
+    // Tap-to-advance during slide 0 is allowed even if the poster errored,
+    // so the visitor isn't stuck. Auto-advance never fires on error.
     advanceLockRef.current = true;
     if (idx >= STORY_DURATIONS_MS.length - 1) {
       onDone();
@@ -992,7 +1056,14 @@ function Stories({
       />
 
       <div className="relative z-20 flex-1 min-h-0 w-full flex flex-col items-center justify-center max-w-2xl py-3 pointer-events-none">
-        {idx === 0 && <StoryFilm movie={movie} firstName={firstName} />}
+        {idx === 0 && (
+          <StoryFilm
+            movie={movie}
+            firstName={firstName}
+            posterState={posterState}
+            onRetryPoster={() => setPosterAttempt((n) => n + 1)}
+          />
+        )}
         {idx === 1 && <StoryTwoPhotos firstName={firstName} />}
         {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} firstName={firstName} />}
       </div>
@@ -1019,21 +1090,56 @@ function Stories({
   );
 }
 
-function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
+function StoryFilm({
+  movie,
+  firstName,
+  posterState,
+  onRetryPoster,
+}: {
+  movie: Movie;
+  firstName?: string;
+  posterState: "pending" | "loading" | "ready" | "error";
+  onRetryPoster: () => void;
+}) {
   const prefix = firstName ? `${firstName.toUpperCase()}, você escolheu` : "Você escolheu";
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
         {prefix}
       </span>
-      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] pipoca-kiosk-poster aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
-        <PipocaImage
-          src={movie.posterUrl}
-          alt={movie.title}
-          fit="cover"
-          eager
-          logTag={`story-poster:${movie.id}`}
-        />
+      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] pipoca-kiosk-poster aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] bg-black/30">
+        {posterState === "ready" && (
+          <PipocaImage
+            src={movie.posterUrl}
+            alt={movie.title}
+            fit="cover"
+            eager
+            logTag={`story-poster:${movie.id}`}
+          />
+        )}
+        {(posterState === "pending" || posterState === "loading") && (
+          <div className="absolute inset-0 grid place-items-center">
+            <div className="w-10 h-10 rounded-full border-2 border-transparent border-t-gold border-r-gold/40 animate-spin" />
+          </div>
+        )}
+        {posterState === "error" && (
+          <div className="absolute inset-0 grid place-items-center text-center p-5 pointer-events-auto">
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-[10px] uppercase tracking-[0.25em] text-white/60">{movie.title}</span>
+              <p className="font-display text-base text-white">NÃO CARREGOU O CARTAZ</p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRetryPoster();
+                }}
+                className="mt-1 text-[11px] uppercase tracking-[0.25em] text-gold border border-gold/60 rounded-md px-3 py-1.5"
+              >
+                TENTAR NOVAMENTE
+              </button>
+            </div>
+          </div>
+        )}
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
         <div className="absolute top-3 left-3">
           <span className="inline-block bg-gold text-cinema text-[10px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded">
