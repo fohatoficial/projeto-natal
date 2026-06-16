@@ -191,6 +191,7 @@ function DebugViewportPanel({ step }: { step: string }) {
   );
 }
 
+export function PipocaFlow() {
   const [step, setStep] = useState<Step>("choose");
   const [selected, setSelected] = useState<Movie | null>(null);
   const [visitorId, setVisitorId] = useState<string | null>(null);
