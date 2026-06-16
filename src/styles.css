@@ -257,7 +257,7 @@
     text-shadow: 0 2px 14px rgba(0,0,0,0.6);
     max-width: 94vw;
     transition: color 180ms ease;
-    font-size: clamp(1.8rem, 3.4dvh, 3rem);
+    font-size: clamp(2rem, 3.8dvh, 3.4rem);
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -274,7 +274,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(8px, 1.4dvh, 22px);
+    gap: clamp(14px, 2.2dvh, 28px);
   }
   .pipoca-camera-frame {
     position: relative;
@@ -303,7 +303,7 @@
     line-height: 0.9;
     color: var(--gold);
     text-shadow: 0 4px 28px rgba(248,186,50,0.55);
-    font-size: clamp(4rem, 7dvh, 7rem);
+    font-size: clamp(4.5rem, 7.5dvh, 7.5rem);
     transform-origin: center;
     will-change: transform, opacity;
     animation: pipoca-count-pop 320ms cubic-bezier(.34,1.56,.64,1) both;
