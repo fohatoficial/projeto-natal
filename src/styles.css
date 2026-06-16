@@ -340,27 +340,33 @@
 
   /* Totem portrait — bigger but still equilibrated. */
   @media (orientation: portrait) and (min-height: 1400px) {
+    .pipoca-camera-screen {
+      gap: clamp(8px, 1dvh, 20px);
+    }
     .pipoca-camera-frame {
       width: min(82vw, 760px);
       max-height: 52dvh;
     }
     .pipoca-camera-top {
-      padding-top: clamp(120px, 10dvh, 220px);
-      min-height: clamp(260px, 24dvh, 420px);
+      padding-top: 0;
+      min-height: clamp(180px, 15dvh, 260px);
+      margin-bottom: clamp(10px, 2dvh, 30px);
+      justify-content: flex-end;
       gap: clamp(10px, 1.4dvh, 22px);
     }
     .pipoca-camera-hint {
-      font-size: clamp(4rem, 5dvh, 6rem);
+      font-size: clamp(4.5rem, 5.5dvh, 6.5rem);
       font-weight: 900;
-      line-height: 1;
-      max-width: 94vw;
+      line-height: 0.95;
+      max-width: 96vw;
     }
     .pipoca-camera-countdown {
-      font-size: clamp(9rem, 12dvh, 14rem);
+      font-size: clamp(10rem, 13dvh, 15rem);
       font-weight: 900;
-      line-height: 0.85;
+      line-height: 0.8;
     }
   }
+
 
 
 
