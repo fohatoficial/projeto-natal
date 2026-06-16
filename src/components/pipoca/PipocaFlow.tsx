@@ -421,6 +421,8 @@ export function PipocaFlow() {
           error={error}
           onPick={(m) => {
             console.log(`${UX} filme selecionado`, { id: m.id, title: m.title });
+            // Prefetch poster immediately so the Story can render without delay.
+            prefetchImage(m.posterUrl);
             transitionTo(() => {
               setSelected(m);
               setStep("visitor_registration");
