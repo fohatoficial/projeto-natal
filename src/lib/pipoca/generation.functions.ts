@@ -168,12 +168,22 @@ function buildPromptText(
 
   if (hasHatRef) {
     parts.push(
-      "Image 4, when present, is a SECONDARY HAT DESIGN CUE ONLY. It is the lowest-priority reference.",
+      "Image 4 is a low-priority hat design and fit reference only.",
     );
     parts.push(
-      "Use Image 4 only as a subtle design cue. Preserve only the general crescent-shaped leather construction and restrained frontal decoration. Do NOT copy any person's face, skin tone, hair or clothing from Image 4.",
+      "Use it only to guide the authentic shape, scale and natural fit of a northeastern Brazilian cangaceiro leather hat.",
+    );
+    parts.push(
+      "The hat must remain proportional to the visitor's head and naturally integrated into the costume.",
+    );
+    parts.push(
+      "Image 4 must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
+    );
+    parts.push(
+      "The hat must not dominate the image, become oversized, cover the face or cause close-up framing.",
     );
   }
+
 
   // 2. Hard identity rules
   parts.push(
