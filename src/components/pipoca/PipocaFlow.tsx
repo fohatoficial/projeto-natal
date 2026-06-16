@@ -2007,6 +2007,19 @@ function Result({
             </h1>
 
             <div className="relative w-full flex-1 min-h-0 max-w-[560px] pipoca-kiosk-result-frame mx-auto flex items-center justify-center aspect-[4/5]">
+              {imageUrl && (
+                <div
+                  aria-hidden
+                  className="absolute inset-0 rounded-2xl overflow-hidden"
+                  style={{
+                    backgroundImage: `url(${imageUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    filter: "blur(28px) brightness(0.55)",
+                    transform: "scale(1.1)",
+                  }}
+                />
+              )}
               <PipocaImage
                 src={imageUrl ?? movie.posterUrl}
                 alt="Cena gerada"
