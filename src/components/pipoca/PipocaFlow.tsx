@@ -129,15 +129,8 @@ export function PipocaFlow() {
   useEffect(() => {
     appearanceRef.current = appearancePhoto;
   }, [appearancePhoto]);
+  useViewportHeightVar(step);
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const orient = h >= w ? "portrait" : "landscape";
-      console.log(
-        `[PIPOCA_VIEWPORT] ${w}x${h} ${orient} dpr=${window.devicePixelRatio ?? 1}`,
-      );
-    }
     return () => {
       if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
       if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
@@ -145,6 +138,10 @@ export function PipocaFlow() {
       releaseSharedCamera();
     };
   }, []);
+
+  const debugViewport =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debugViewport") === "1";
 
   function transitionTo(swap: () => void) {
     setTransitioning(true);
