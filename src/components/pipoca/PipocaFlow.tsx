@@ -130,6 +130,14 @@ export function PipocaFlow() {
     appearanceRef.current = appearancePhoto;
   }, [appearancePhoto]);
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const orient = h >= w ? "portrait" : "landscape";
+      console.log(
+        `[PIPOCA_VIEWPORT] ${w}x${h} ${orient} dpr=${window.devicePixelRatio ?? 1}`,
+      );
+    }
     return () => {
       if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
       if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
