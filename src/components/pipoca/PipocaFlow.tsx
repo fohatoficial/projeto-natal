@@ -1499,26 +1499,8 @@ function Result({
     };
   }, [slide]);
 
-  const bgUrl = imageUrl ?? movie.posterUrl;
-
   return (
     <Screen aurora>
-      {/* Blurred backdrop of the generated photo */}
-      {bgUrl && (
-        <div
-          aria-hidden
-          className="absolute inset-0 z-0 pointer-events-none"
-          style={{
-            backgroundImage: `url(${bgUrl})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            filter: "blur(40px) brightness(0.45)",
-            transform: "scale(1.15)",
-          }}
-        />
-      )}
-      <div aria-hidden className="absolute inset-0 z-0 bg-black/55 pointer-events-none" />
-
       {/* Progress bars */}
       <div className="relative z-20 w-full max-w-2xl flex gap-1.5 px-1 pt-1">
         {[0, 1].map((i) => {
@@ -1541,13 +1523,15 @@ function Result({
               {firstName ? `${firstName}, sua ` : "Sua "}<span className="text-gold">cena</span> está pronta
             </h1>
 
-            <div className="relative w-full flex-1 min-h-0 max-w-[560px] pipoca-kiosk-result-frame mx-auto flex items-center justify-center aspect-[4/5]">
+            {/* Edge-to-edge 4:5 frame — single image element, object-cover, no
+                blurred backdrop, no padding, no inner border-radius bands. */}
+            <div className="relative w-full flex-1 min-h-0 max-w-[560px] pipoca-kiosk-result-frame mx-auto aspect-[4/5] overflow-hidden bg-black">
               <PipocaImage
                 src={imageUrl ?? movie.posterUrl}
                 alt="Cena gerada"
-                fit="contain"
+                fit="cover"
                 logTag="result-final"
-                wrapperClassName="rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] overflow-hidden"
+                eager
               />
             </div>
 
