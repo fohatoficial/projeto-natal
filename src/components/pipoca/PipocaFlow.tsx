@@ -1922,27 +1922,41 @@ const CameraPreviewSurface = React.memo(function CameraPreviewSurface({
   );
 });
 
-function FaceScanOverlay({ guide, discreet = false }: { guide: GuideState; discreet?: boolean }) {
+const FaceScanOverlay = React.memo(function FaceScanOverlay({
+  guide,
+  discreet = false,
+}: {
+  guide: GuideState;
+  discreet?: boolean;
+}) {
   const box = guide.box;
   if (!box) return null;
   const ok = guide.status === "ok";
   const color = ok ? "#7CFC9B" : "#F8BA32";
-  // Convert normalized box to % so the corners follow the face within the
-  // preview, regardless of preview pixel size on the totem.
-  const left = `${Math.max(0, box.x) * 100}%`;
-  const top = `${Math.max(0, box.y) * 100}%`;
-  const width = `${Math.max(0.05, box.w) * 100}%`;
-  const height = `${Math.max(0.05, box.h) * 100}%`;
+  // translate3d on a single element + scale for the box — only transform/opacity
+  // are animated, never layout (top/left/width/height).
+  const tx = `${Math.max(0, box.x) * 100}%`;
+  const ty = `${Math.max(0, box.y) * 100}%`;
+  const w = `${Math.max(0.05, box.w) * 100}%`;
+  const h = `${Math.max(0.05, box.h) * 100}%`;
+  const slowMode =
+    typeof window !== "undefined" &&
+    (window as unknown as { __pipocaSlowMode?: boolean }).__pipocaSlowMode === true;
+  const size = discreet ? 14 : 22;
+  const bw = discreet ? 2 : 3;
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute"
-      style={{ left, top, width, height, transition: "all 120ms ease-out" }}
+      className="pointer-events-none absolute top-0 left-0"
+      style={{
+        width: w,
+        height: h,
+        transform: `translate3d(${tx}, ${ty}, 0)`,
+        transition: "transform 140ms linear, width 140ms linear, height 140ms linear",
+        willChange: "transform",
+      }}
     >
-      {/* Four corner brackets — never cover eyes/mouth/face. Smaller in appearance mode. */}
       {(["tl", "tr", "bl", "br"] as const).map((pos) => {
-        const size = discreet ? 14 : 22;
-        const bw = discreet ? "2px" : "3px";
         const base: React.CSSProperties = {
           position: "absolute",
           width: size,
@@ -1952,27 +1966,28 @@ function FaceScanOverlay({ guide, discreet = false }: { guide: GuideState; discr
           opacity: discreet ? 0.85 : 1,
         };
         const styles: Record<typeof pos, React.CSSProperties> = {
-          tl: { ...base, top: -2, left: -2, borderWidth: `${bw} 0 0 ${bw}` },
-          tr: { ...base, top: -2, right: -2, borderWidth: `${bw} ${bw} 0 0` },
-          bl: { ...base, bottom: -2, left: -2, borderWidth: `0 0 ${bw} ${bw}` },
-          br: { ...base, bottom: -2, right: -2, borderWidth: `0 ${bw} ${bw} 0` },
+          tl: { ...base, top: -2, left: -2, borderWidth: `${bw}px 0 0 ${bw}px` },
+          tr: { ...base, top: -2, right: -2, borderWidth: `${bw}px ${bw}px 0 0` },
+          bl: { ...base, bottom: -2, left: -2, borderWidth: `0 0 ${bw}px ${bw}px` },
+          br: { ...base, bottom: -2, right: -2, borderWidth: `0 ${bw}px ${bw}px 0` },
         };
         return <span key={pos} style={styles[pos]} />;
       })}
-      {/* Scanning line — only when actively coaching, not on success. */}
-      {!ok ? (
+      {!ok && !slowMode ? (
         <span
+          className="pipoca-scan-line"
           style={{
             position: "absolute",
             left: 0,
             right: 0,
+            top: 0,
             height: 2,
             background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
-            animation: "pipoca-scan-line 1.6s ease-in-out infinite",
-            top: "50%",
+            animation: "pipoca-scan-line 2.2s ease-in-out infinite",
+            willChange: "transform, opacity",
           }}
         />
       ) : null}
     </div>
   );
-}
+});
