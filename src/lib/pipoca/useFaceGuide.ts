@@ -145,10 +145,8 @@ export function useFaceGuide(opts: {
     stableMs: 0,
   });
   const detectorRef = useRef<DetectorAny | null>(null);
-  const rafRef = useRef<number | null>(null);
   const lastOkSinceRef = useRef<number | null>(null);
-  const lastStatusRef = useRef<GuideStatus>("no_face");
-  const lastTickRef = useRef<number>(0);
+  const lastStateRef = useRef<GuideState>({ status: "no_face", box: null, stableMs: 0 });
 
   useEffect(() => {
     if (!enabled) return;
