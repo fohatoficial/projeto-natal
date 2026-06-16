@@ -56,6 +56,7 @@ const LOADING_PHRASES = [
 ];
 
 const PAGE_SIZE = 4;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const COUNTDOWN_SECONDS = 10;
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
