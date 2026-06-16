@@ -103,8 +103,15 @@
      page does NOT use this, so its scroll behavior remains intact. */
   .pipoca-stage-dvh {
     width: 100vw;
+    /* Fallback chain — the JS-measured --pipoca-app-height always wins
+       on devices where visualViewport differs from 100dvh (totem, Chrome
+       fullscreen kiosk, Android WebView). */
+    height: 100vh;
+    height: 100svh;
     height: 100dvh;
-    min-height: 100dvh;
+    height: var(--pipoca-app-height, 100dvh);
+    min-height: var(--pipoca-app-height, 100dvh);
+    max-height: var(--pipoca-app-height, 100dvh);
     overflow: hidden;
   }
 
