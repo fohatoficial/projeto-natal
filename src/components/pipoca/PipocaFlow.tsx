@@ -912,11 +912,12 @@ function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
         {prefix}
       </span>
-      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
-        <img
+      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] pipoca-kiosk-poster aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
+        <PipocaImage
           src={movie.posterUrl}
           alt={movie.title}
-          className="absolute inset-0 w-full h-full object-cover"
+          fit="cover"
+          logTag={`story-poster:${movie.id}`}
         />
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
         <div className="absolute top-3 left-3">
