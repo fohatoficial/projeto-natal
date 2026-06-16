@@ -91,8 +91,106 @@ function getDeviceId(): string | null {
 }
 
 const GEN_LOG = "[PIPOCA_GENERATION]";
+const BUILD_ID = "pipoca-flow-2026-06-16-viewport-diag-1";
 
-export function PipocaFlow() {
+function useViewportHeightVar(stepName: string) {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    console.log(`[PIPOCA_BUILD] ${BUILD_ID}`);
+    let logged = false;
+    const apply = () => {
+      const vv = window.visualViewport;
+      const h = Math.round(vv?.height ?? window.innerHeight);
+      const w = Math.round(vv?.width ?? window.innerWidth);
+      document.documentElement.style.setProperty("--pipoca-app-height", `${h}px`);
+      if (!logged) {
+        logged = true;
+        const orient =
+          (screen.orientation && screen.orientation.type) ||
+          (h >= w ? "portrait" : "landscape");
+        console.log(
+          `[PIPOCA_VIEWPORT_DEBUG] inner=${window.innerWidth}x${window.innerHeight} ` +
+            `client=${document.documentElement.clientWidth}x${document.documentElement.clientHeight} ` +
+            `vv=${w}x${h} dpr=${window.devicePixelRatio} orient=${orient} step=${stepName}`,
+        );
+      }
+    };
+    apply();
+    const onResize = () => apply();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
+    document.addEventListener("fullscreenchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
+      document.removeEventListener("fullscreenchange", onResize);
+    };
+  }, [stepName]);
+}
+
+function DebugViewportPanel({ step }: { step: string }) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const tick = () => force((n) => n + 1);
+    window.addEventListener("resize", tick);
+    window.addEventListener("orientationchange", tick);
+    window.visualViewport?.addEventListener("resize", tick);
+    const id = window.setInterval(tick, 1000);
+    return () => {
+      window.removeEventListener("resize", tick);
+      window.removeEventListener("orientationchange", tick);
+      window.visualViewport?.removeEventListener("resize", tick);
+      window.clearInterval(id);
+    };
+  }, []);
+  if (typeof window === "undefined") return null;
+  const vv = window.visualViewport;
+  const cssH = getComputedStyle(document.documentElement).getPropertyValue("--pipoca-app-height").trim() || "—";
+  const zoom = vv ? Math.round((window.innerWidth / vv.width) * 100) / 100 : 1;
+  const ua = navigator.userAgent.length > 80 ? navigator.userAgent.slice(0, 80) + "…" : navigator.userAgent;
+  const rows: Array<[string, string | number]> = [
+    ["step", step],
+    ["window.inner", `${window.innerWidth} × ${window.innerHeight}`],
+    ["doc.client", `${document.documentElement.clientWidth} × ${document.documentElement.clientHeight}`],
+    ["visualViewport", vv ? `${Math.round(vv.width)} × ${Math.round(vv.height)}` : "n/a"],
+    ["--pipoca-app-height", cssH],
+    ["dpr", window.devicePixelRatio],
+    ["orientation", (screen.orientation && screen.orientation.type) || "—"],
+    ["zoom est.", zoom],
+    ["UA", ua],
+  ];
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 8,
+        right: 8,
+        zIndex: 99999,
+        background: "rgba(0,0,0,0.82)",
+        color: "#7CFC9B",
+        font: "11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace",
+        padding: "8px 10px",
+        borderRadius: 6,
+        border: "1px solid #1f8a4d",
+        maxWidth: 360,
+        pointerEvents: "none",
+      }}
+    >
+      <div style={{ color: "#F8BA32", marginBottom: 4 }}>PIPOCA viewport debug</div>
+      {rows.map(([k, v]) => (
+        <div key={k}>
+          <span style={{ color: "#9aa" }}>{k}:</span> {String(v)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
   const [step, setStep] = useState<Step>("choose");
   const [selected, setSelected] = useState<Movie | null>(null);
   const [visitorId, setVisitorId] = useState<string | null>(null);
