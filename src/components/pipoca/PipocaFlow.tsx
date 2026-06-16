@@ -770,10 +770,12 @@ function PosterCard({
       onClick={() => onPick(movie)}
       className="bg-card relative overflow-hidden text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl w-full h-full group rounded-2xl border border-white/10"
     >
-      <img
+      <PipocaImage
         src={movie.posterUrl}
         alt={movie.title}
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        fit="cover"
+        logTag={`poster:${movie.id}`}
+        className="transition-transform duration-700 group-hover:scale-110"
       />
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
       <div className="absolute top-3 left-4 z-10">
