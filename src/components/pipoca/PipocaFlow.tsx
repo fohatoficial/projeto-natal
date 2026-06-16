@@ -43,7 +43,7 @@ type Step =
   | "processing"
   | "result";
 
-type CameraVariant = "identity" | "appearance";
+// (CameraVariant removed — both captures now use GuidedCamera with GuideMode)
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
