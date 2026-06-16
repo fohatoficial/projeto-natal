@@ -132,7 +132,6 @@ export function useFaceGuide(opts: {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   enabled: boolean;
   mode?: GuideMode;
-  /** Called with the most recent guide state on every detection tick. */
   onTick?: (s: GuideState) => void;
 }) {
   const { videoRef, enabled, mode = "identity", onTick } = opts;
@@ -146,7 +145,7 @@ export function useFaceGuide(opts: {
   });
   const detectorRef = useRef<DetectorAny | null>(null);
   const lastOkSinceRef = useRef<number | null>(null);
-  const lastStateRef = useRef<GuideState>({ status: "no_face", box: null, stableMs: 0 });
+  const readyLoggedRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -169,7 +168,10 @@ export function useFaceGuide(opts: {
         }
         detectorRef.current = det as DetectorAny;
         setDetectorReady(true);
-        console.log(`${LOG} detector pronto (CDN)`);
+        if (!readyLoggedRef.current) {
+          readyLoggedRef.current = true;
+          console.log("[PIPOCA_FACE_DEBUG] detector-ready");
+        }
       } catch (err) {
         if (cancelled) return;
         console.warn(`${LOG} detector falhou`, err);
@@ -189,16 +191,28 @@ export function useFaceGuide(opts: {
     };
   }, [enabled]);
 
-  const evalOnce = useCallback(
-    (now: number): { dur: number } | null => {
+  // ---- Simple rAF loop, throttled to ~180ms, one inference at a time. ----
+  useEffect(() => {
+    if (!enabled || !detectorReady) return;
+    let cancelled = false;
+    let raf = 0;
+    let inflight = false;
+    let lastRun = 0;
+    let logCounter = 0;
+
+    const loop = (now: number) => {
+      if (cancelled) return;
+      raf = requestAnimationFrame(loop);
+      if (inflight) return;
+      if (now - lastRun < 180) return;
       const v = videoRef.current;
       const det = detectorRef.current;
-      if (!v || !det || v.videoWidth === 0 || v.videoHeight === 0) return null;
-
-      const t0 = performance.now();
-      let nextStatus: GuideStatus = "no_face";
-      let nextBox: FaceBox | null = null;
+      if (!v || !det || v.videoWidth === 0 || v.videoHeight === 0 || v.paused || v.ended) return;
+      lastRun = now;
+      inflight = true;
       try {
+        let nextStatus: GuideStatus = "no_face";
+        let nextBox: FaceBox | null = null;
         const result = det.detectForVideo(v, now);
         const dets = result?.detections ?? [];
         if (dets.length > 1) {
@@ -213,6 +227,7 @@ export function useFaceGuide(opts: {
             const y = bb.originY / vh;
             const w = bb.width / vw;
             const h = bb.height / vh;
+            // Mirror X to match scaleX(-1) preview.
             const mx = 1 - (x + w);
             nextBox = { x: mx, y, w, h };
             const cx = mx + w / 2;
@@ -238,150 +253,43 @@ export function useFaceGuide(opts: {
             else nextStatus = "ok";
           }
         }
-      } catch (err) {
-        console.warn(`${LOG} detect erro`, err);
-      }
 
-      const dur = performance.now() - t0;
-      const t = performance.now();
-      if (nextStatus === "ok") {
-        if (lastOkSinceRef.current === null) lastOkSinceRef.current = t;
-      } else {
-        lastOkSinceRef.current = null;
-      }
-      const stableMs =
-        nextStatus === "ok" && lastOkSinceRef.current !== null
-          ? Math.round(t - lastOkSinceRef.current)
-          : 0;
+        const t = performance.now();
+        if (nextStatus === "ok") {
+          if (lastOkSinceRef.current === null) lastOkSinceRef.current = t;
+        } else {
+          lastOkSinceRef.current = null;
+        }
+        const stableMs =
+          nextStatus === "ok" && lastOkSinceRef.current !== null
+            ? Math.round(t - lastOkSinceRef.current)
+            : 0;
 
-      // Skip React update when nothing material changed. Quantize the box
-      // to ~1% steps so micro-jitter doesn't re-render the overlay.
-      const prev = lastStateRef.current;
-      const qBox =
-        nextBox === null
-          ? null
-          : {
-              x: Math.round(nextBox.x * 100) / 100,
-              y: Math.round(nextBox.y * 100) / 100,
-              w: Math.round(nextBox.w * 100) / 100,
-              h: Math.round(nextBox.h * 100) / 100,
-            };
-      const boxChanged =
-        (prev.box === null) !== (qBox === null) ||
-        (qBox !== null &&
-          prev.box !== null &&
-          (qBox.x !== prev.box.x ||
-            qBox.y !== prev.box.y ||
-            qBox.w !== prev.box.w ||
-            qBox.h !== prev.box.h));
-      const statusChanged = prev.status !== nextStatus;
-      // Update on status change, box change, or every ~400ms while OK
-      // so stableMs progresses for the countdown trigger.
-      const stableTick = nextStatus === "ok" && stableMs - prev.stableMs >= 200;
-      if (statusChanged || boxChanged || stableTick) {
-        const s: GuideState = { status: nextStatus, box: qBox, stableMs };
-        lastStateRef.current = s;
+        const s: GuideState = { status: nextStatus, box: nextBox, stableMs };
         setGuide(s);
         onTick?.(s);
-      } else {
-        // Still surface stableMs internally to the caller via onTick lightly.
-        onTick?.({ ...prev, stableMs });
-      }
 
-      return { dur };
-    },
-    [videoRef, onTick, th],
-  );
-
-  // ---- Adaptive cadence loop with inference lock + visibility pause. ----
-  useEffect(() => {
-    if (!enabled || !detectorReady) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let inflight = false;
-    const times: number[] = [];
-    let interval = 280;
-    let slowMode = false;
-    let logCounter = 0;
-    let dropped = 0;
-
-    const schedule = (ms: number) => {
-      if (cancelled) return;
-      timer = setTimeout(run, ms);
-    };
-
-    const run = async () => {
-      if (cancelled) return;
-      if (document.visibilityState !== "visible") {
-        schedule(interval);
-        return;
-      }
-      const v = videoRef.current;
-      if (!v || v.paused || v.ended || v.videoWidth === 0) {
-        schedule(interval);
-        return;
-      }
-      if (inflight) {
-        dropped++;
-        if (dropped === 1) console.log(`${LOG} [PIPOCA_FACE_PERF] dropped-frame`);
-        schedule(interval);
-        return;
-      }
-      inflight = true;
-      try {
-        const r = evalOnce(performance.now());
-        if (r) {
-          times.push(r.dur);
-          if (times.length > 12) times.shift();
-          const avg = times.reduce((a, b) => a + b, 0) / times.length;
-          const prevInterval = interval;
-          const prevSlow = slowMode;
-          if (avg > 220) {
-            interval = 550;
-            slowMode = true;
-          } else if (avg > 120) {
-            interval = 400;
-            slowMode = true;
-          } else {
-            interval = 280;
-            slowMode = false;
-          }
-          // Log sparingly to avoid console churn.
-          if (++logCounter % 10 === 0) {
-            console.log(
-              `${LOG} [PIPOCA_FACE_PERF] mode=${mode} inference-ms=${Math.round(
-                avg,
-              )} interval-ms=${interval}${slowMode ? " slow-mode" : ""}`,
-            );
-          }
-          if (prevInterval !== interval || prevSlow !== slowMode) {
-            (window as unknown as { __pipocaSlowMode?: boolean }).__pipocaSlowMode = slowMode;
-          }
+        if (++logCounter % 20 === 0) {
+          console.log(
+            `[PIPOCA_FACE_DEBUG] face-count=${dets.length} status=${nextStatus} video=${v.videoWidth}x${v.videoHeight}`,
+          );
         }
+      } catch (err) {
+        console.warn(`${LOG} detect erro`, err);
       } finally {
         inflight = false;
       }
-      schedule(interval);
     };
 
-    const onVis = () => {
-      if (document.visibilityState === "visible" && !timer && !cancelled) {
-        schedule(0);
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-
-    schedule(0);
+    raf = requestAnimationFrame(loop);
     return () => {
       cancelled = true;
-      if (timer) clearTimeout(timer);
-      timer = null;
-      document.removeEventListener("visibilitychange", onVis);
+      cancelAnimationFrame(raf);
       lastOkSinceRef.current = null;
-      lastStateRef.current = { status: "no_face", box: null, stableMs: 0 };
       setGuide({ status: "no_face", box: null, stableMs: 0 });
     };
-  }, [enabled, detectorReady, evalOnce, mode, videoRef]);
+  }, [enabled, detectorReady, videoRef, onTick, th]);
 
   return { detectorReady, detectorError, guide };
 }
+

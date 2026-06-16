@@ -1845,35 +1845,41 @@ function GuidedCamera({
       ? "PREPARANDO O ENQUADRAMENTO"
       : getGuideHint(guide.status, mode);
 
-  const frameMaxW = mode === "identity" ? "max-w-[680px]" : "max-w-[760px]";
-
   return (
     <div
-      className="pipoca-camera-grid bg-cinema relative"
+      className="pipoca-camera-screen bg-cinema relative"
       data-pipoca-camera={mode}
     >
-      {/* Row 1 — dynamic hint only (no logo, no fixed text). */}
+      {/* Top — dynamic hint only (no logo, no fixed text). */}
       <div className="pipoca-camera-hint-slot">
         <p
-          key={hint}
           className={`pipoca-camera-hint ${guide.status === "ok" ? "pipoca-camera-hint--ok" : ""}`}
         >
           {hint}
         </p>
       </div>
 
-      {/* Row 2 — preview fills available vertical space, never cropped. */}
-      <div className="w-full min-h-0 h-full flex items-center justify-center">
-        <div
-          className={`relative w-full ${frameMaxW} h-full max-h-full aspect-[4/5] mx-auto rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl`}
-          style={{ maxHeight: "100%" }}
-        >
-          <CameraPreviewSurface videoRef={videoRef} ready={ready} />
-          <FaceScanOverlay guide={guide} discreet={mode === "appearance"} />
+      {/* Middle — preview, conservative max size. */}
+      <div className="pipoca-camera-preview-wrap">
+        <div className="pipoca-camera-frame">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ transform: "scaleX(-1)" }}
+          />
+          {!ready ? (
+            <div className="absolute inset-0 grid place-items-center text-white/75 text-sm tracking-wide animate-pulse-soft">
+              Iniciando câmera…
+            </div>
+          ) : null}
+          <FaceScanOverlay guide={guide} videoRef={videoRef} discreet={mode === "appearance"} />
         </div>
       </div>
 
-      {/* Row 3 — countdown / fallback / back. Reserved height prevents jumps. */}
+      {/* Bottom — countdown / fallback / back. */}
       <div className="pipoca-camera-countdown-slot">
         {countdown !== null && countdown > 0 ? (
           <span key={countdown} className="pipoca-camera-countdown">
@@ -1892,102 +1898,141 @@ function GuidedCamera({
 }
 
 /**
- * Isolated, memoized <video> surface so countdown/hint/box state updates in
- * the parent never remount the video element (which would flash and drop
- * frames). Re-renders only when `ready` flips.
+ * Overlay frame that follows the detected face. Accounts for object-fit: cover
+ * by measuring container vs video and applying the cover offset, so the
+ * bracket follows the visible face rather than the raw video coordinates.
  */
-const CameraPreviewSurface = React.memo(function CameraPreviewSurface({
-  videoRef,
-  ready,
-}: {
-  videoRef: React.RefObject<HTMLVideoElement | null>;
-  ready: boolean;
-}) {
-  return (
-    <>
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover"
-        style={{ transform: "scaleX(-1)" }}
-      />
-      {!ready ? (
-        <div className="absolute inset-0 grid place-items-center text-white/75 text-sm tracking-wide animate-pulse-soft">
-          Iniciando câmera…
-        </div>
-      ) : null}
-    </>
-  );
-});
-
-const FaceScanOverlay = React.memo(function FaceScanOverlay({
+function FaceScanOverlay({
   guide,
+  videoRef,
   discreet = false,
 }: {
   guide: GuideState;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   discreet?: boolean;
 }) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ cw: 0, ch: 0, vw: 0, vh: 0 });
+  const logRef = useRef(0);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => {
+      const v = videoRef.current;
+      const rect = el.getBoundingClientRect();
+      const cw = rect.width;
+      const ch = rect.height;
+      const vw = v?.videoWidth ?? 0;
+      const vh = v?.videoHeight ?? 0;
+      setSize((prev) =>
+        prev.cw === cw && prev.ch === ch && prev.vw === vw && prev.vh === vh
+          ? prev
+          : { cw, ch, vw, vh },
+      );
+      if (++logRef.current % 30 === 0) {
+        console.log(
+          `[PIPOCA_FACE_DEBUG] preview-size=${Math.round(cw)}x${Math.round(ch)} video-size=${vw}x${vh}`,
+        );
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    const v = videoRef.current;
+    v?.addEventListener("loadedmetadata", update);
+    const interval = window.setInterval(update, 500);
+    return () => {
+      ro.disconnect();
+      v?.removeEventListener("loadedmetadata", update);
+      window.clearInterval(interval);
+    };
+  }, [videoRef]);
+
   const box = guide.box;
-  if (!box) return null;
+  if (!box) {
+    return <div ref={wrapRef} aria-hidden className="absolute inset-0 pointer-events-none" />;
+  }
+
+  const { cw, ch, vw, vh } = size;
+  let left = box.x * 100;
+  let top = box.y * 100;
+  let width = box.w * 100;
+  let height = box.h * 100;
+
+  if (cw > 0 && ch > 0 && vw > 0 && vh > 0) {
+    // object-fit: cover mapping
+    const scale = Math.max(cw / vw, ch / vh);
+    const rw = vw * scale;
+    const rh = vh * scale;
+    const offX = (rw - cw) / 2;
+    const offY = (rh - ch) / 2;
+    const pxX = box.x * rw - offX;
+    const pxY = box.y * rh - offY;
+    const pxW = box.w * rw;
+    const pxH = box.h * rh;
+    left = (pxX / cw) * 100;
+    top = (pxY / ch) * 100;
+    width = (pxW / cw) * 100;
+    height = (pxH / ch) * 100;
+    if (logRef.current % 30 === 1) {
+      console.log(
+        `[PIPOCA_FACE_DEBUG] cover-offset offX=${Math.round(offX)} offY=${Math.round(offY)} scale=${scale.toFixed(3)}`,
+      );
+    }
+  }
+
   const ok = guide.status === "ok";
   const color = ok ? "#7CFC9B" : "#F8BA32";
-  // translate3d on a single element + scale for the box — only transform/opacity
-  // are animated, never layout (top/left/width/height).
-  const tx = `${Math.max(0, box.x) * 100}%`;
-  const ty = `${Math.max(0, box.y) * 100}%`;
-  const w = `${Math.max(0.05, box.w) * 100}%`;
-  const h = `${Math.max(0.05, box.h) * 100}%`;
-  const slowMode =
-    typeof window !== "undefined" &&
-    (window as unknown as { __pipocaSlowMode?: boolean }).__pipocaSlowMode === true;
-  const size = discreet ? 14 : 22;
+  const cornerSize = discreet ? 14 : 22;
   const bw = discreet ? 2 : 3;
+
   return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute top-0 left-0"
-      style={{
-        width: w,
-        height: h,
-        transform: `translate3d(${tx}, ${ty}, 0)`,
-        transition: "transform 140ms linear, width 140ms linear, height 140ms linear",
-        willChange: "transform",
-      }}
-    >
-      {(["tl", "tr", "bl", "br"] as const).map((pos) => {
-        const base: React.CSSProperties = {
+    <div ref={wrapRef} aria-hidden className="absolute inset-0 pointer-events-none">
+      <div
+        style={{
           position: "absolute",
-          width: size,
-          height: size,
-          borderColor: color,
-          borderStyle: "solid",
-          opacity: discreet ? 0.85 : 1,
-        };
-        const styles: Record<typeof pos, React.CSSProperties> = {
-          tl: { ...base, top: -2, left: -2, borderWidth: `${bw}px 0 0 ${bw}px` },
-          tr: { ...base, top: -2, right: -2, borderWidth: `${bw}px ${bw}px 0 0` },
-          bl: { ...base, bottom: -2, left: -2, borderWidth: `0 0 ${bw}px ${bw}px` },
-          br: { ...base, bottom: -2, right: -2, borderWidth: `0 ${bw}px ${bw}px 0` },
-        };
-        return <span key={pos} style={styles[pos]} />;
-      })}
-      {!ok && !slowMode ? (
-        <span
-          className="pipoca-scan-line"
-          style={{
+          left: `${left}%`,
+          top: `${top}%`,
+          width: `${Math.max(5, width)}%`,
+          height: `${Math.max(5, height)}%`,
+          transition: "left 120ms linear, top 120ms linear, width 120ms linear, height 120ms linear",
+        }}
+      >
+        {(["tl", "tr", "bl", "br"] as const).map((pos) => {
+          const base: React.CSSProperties = {
             position: "absolute",
-            left: 0,
-            right: 0,
-            top: 0,
-            height: 2,
-            background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
-            animation: "pipoca-scan-line 2.2s ease-in-out infinite",
-            willChange: "transform, opacity",
-          }}
-        />
-      ) : null}
+            width: cornerSize,
+            height: cornerSize,
+            borderColor: color,
+            borderStyle: "solid",
+            opacity: discreet ? 0.85 : 1,
+          };
+          const styles: Record<typeof pos, React.CSSProperties> = {
+            tl: { ...base, top: -2, left: -2, borderWidth: `${bw}px 0 0 ${bw}px` },
+            tr: { ...base, top: -2, right: -2, borderWidth: `${bw}px ${bw}px 0 0` },
+            bl: { ...base, bottom: -2, left: -2, borderWidth: `0 0 ${bw}px ${bw}px` },
+            br: { ...base, bottom: -2, right: -2, borderWidth: `0 ${bw}px ${bw}px 0` },
+          };
+          return <span key={pos} style={styles[pos]} />;
+        })}
+        {!ok ? (
+          <span
+            className="pipoca-scan-line"
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              top: 0,
+              height: 2,
+              background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
+              animation: "pipoca-scan-line 2.2s ease-in-out infinite",
+              willChange: "transform, opacity",
+            }}
+          />
+        ) : null}
+      </div>
     </div>
   );
-});
+}
+

@@ -225,48 +225,71 @@
      Camera capture screens (identity + appearance) — large legible UX
      for tablet (>=768px portrait) and totem (>=1400px portrait).
      ======================================================================= */
-  .pipoca-camera-grid {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+  .pipoca-camera-screen {
+    display: flex;
+    flex-direction: column;
     width: 100vw;
     height: var(--pipoca-app-height, 100dvh);
     overflow: hidden;
-    align-items: stretch;
-    justify-items: center;
-    row-gap: clamp(8px, 1.2dvh, 24px);
-    padding: clamp(8px, 1.4dvh, 24px) clamp(8px, 2vw, 32px);
+    padding: clamp(8px, 1.2dvh, 20px) clamp(8px, 2vw, 28px);
     box-sizing: border-box;
+    gap: clamp(6px, 1dvh, 16px);
   }
   .pipoca-camera-hint-slot {
+    flex-shrink: 0;
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: clamp(110px, 13dvh, 220px);
+    min-height: 88px;
+    position: relative;
+    z-index: 2;
   }
   .pipoca-camera-hint {
     font-family: var(--font-display);
     font-weight: 700;
-    line-height: 1.05;
+    line-height: 1.1;
     letter-spacing: 0.02em;
     text-align: center;
     color: #ffffff;
     text-shadow: 0 2px 12px rgba(0,0,0,0.55);
-    max-width: 90vw;
-    /* Allow up to 2 lines without squeezing. */
-    overflow-wrap: balance;
-    transition: opacity 180ms ease, color 180ms ease;
-    font-size: clamp(2rem, 3.4dvh, 3.5rem);
+    max-width: 92vw;
+    transition: color 180ms ease;
+    font-size: clamp(1.75rem, 3dvh, 2.5rem);
   }
   .pipoca-camera-hint--ok { color: #7CFC9B; }
+  .pipoca-camera-preview-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pipoca-camera-frame {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    width: min(
+      68vw,
+      calc((var(--pipoca-app-height, 100dvh) - 360px) * 0.8),
+      520px
+    );
+    max-height: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: #000;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+  }
   .pipoca-camera-countdown-slot {
+    flex-shrink: 0;
     width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(8px, 1dvh, 18px);
-    min-height: clamp(110px, 14dvh, 230px);
+    gap: clamp(8px, 1dvh, 16px);
+    min-height: 86px;
   }
   .pipoca-camera-countdown {
     font-family: var(--font-display);
@@ -274,7 +297,7 @@
     line-height: 1;
     color: var(--gold);
     text-shadow: 0 4px 24px rgba(248,186,50,0.45);
-    font-size: clamp(5rem, 9dvh, 8rem);
+    font-size: clamp(4rem, 7dvh, 6rem);
     transform-origin: center;
     will-change: transform, opacity;
     animation: pipoca-count-pop 320ms cubic-bezier(.34,1.56,.64,1) both;
@@ -288,13 +311,21 @@
     .pipoca-camera-countdown { animation: none !important; }
   }
 
-  /* Totem portrait — bump instruction and counter further. */
+  /* Totem portrait — bigger but still equilibrated. */
   @media (orientation: portrait) and (min-height: 1400px) {
-    .pipoca-camera-hint     { font-size: clamp(2.75rem, 4dvh, 4.75rem); }
-    .pipoca-camera-countdown{ font-size: clamp(7rem, 10dvh, 12rem); }
-    .pipoca-camera-hint-slot      { min-height: clamp(140px, 13dvh, 240px); }
-    .pipoca-camera-countdown-slot { min-height: clamp(160px, 14dvh, 240px); }
+    .pipoca-camera-frame {
+      width: min(
+        68vw,
+        calc((var(--pipoca-app-height, 100dvh) - 420px) * 0.8),
+        680px
+      );
+    }
+    .pipoca-camera-hint     { font-size: clamp(2.5rem, 3.2dvh, 3.75rem); }
+    .pipoca-camera-countdown{ font-size: clamp(5.5rem, 7.5dvh, 8rem); }
+    .pipoca-camera-hint-slot      { min-height: 120px; }
+    .pipoca-camera-countdown-slot { min-height: 125px; }
   }
+
 
   .brand-pattern {
     background-image: url("/__l5e/assets-v1/c6d609ea-ed2f-42a5-a99f-1b967cf5f49f/pattern_brand.svg");
