@@ -174,19 +174,19 @@ function buildPromptText(
 
   if (hasHatRef) {
     parts.push(
-      "Image 4 is a low-priority hat design and fit reference only.",
+      "Images 4 and 5 are low-priority hat design and fit references only.",
     );
     parts.push(
-      "Use it only to guide the authentic shape, scale and natural fit of a northeastern Brazilian cangaceiro leather hat.",
+      "Image 4 is the front hat reference. Image 5 is the side hat reference. Use them only to guide the authentic shape, scale, side profile and natural fit of a northeastern Brazilian cangaceiro leather hat.",
     );
     parts.push(
       "The hat must remain proportional to the visitor's head and naturally integrated into the costume.",
     );
     parts.push(
-      "Image 4 must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
+      "Images 4 and 5 must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
     );
     parts.push(
-      "The hat must not dominate the image, become oversized, cover the face or cause close-up framing.",
+      "The hat must not dominate the image, become oversized, become too small, cover the face or cause close-up framing.",
     );
   }
 
