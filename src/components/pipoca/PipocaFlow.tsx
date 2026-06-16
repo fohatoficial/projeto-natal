@@ -963,18 +963,18 @@ function Stories({
         setPosterState("error");
       }
     };
-    if ("decode" in img) {
+    img.onload = done;
+    img.onerror = () => {
+      if (cancelled) return;
+      console.warn("[PIPOCA_STORY_POSTER] error");
+      setPosterState("error");
+    };
+    if (typeof img.decode === "function") {
       img.decode().then(done).catch(() => {
         if (cancelled) return;
         console.warn("[PIPOCA_STORY_POSTER] decode-failed");
-        setPosterState("error");
+        // onload may still fire — keep loading state.
       });
-    } else {
-      img.onload = done;
-      img.onerror = () => {
-        if (cancelled) return;
-        setPosterState("error");
-      };
     }
     return () => {
       cancelled = true;
