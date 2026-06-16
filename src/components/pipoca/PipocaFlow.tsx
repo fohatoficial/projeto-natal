@@ -10,6 +10,7 @@ import {
   getSharedStatus,
   subscribeSharedCamera,
 } from "@/lib/pipoca/sharedCamera";
+import { useFaceGuide, getGuideHint, type GuideState } from "@/lib/pipoca/useFaceGuide";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createPipocaCaptureUpload,
@@ -91,7 +92,7 @@ function getDeviceId(): string | null {
 }
 
 const GEN_LOG = "[PIPOCA_GENERATION]";
-const BUILD_ID = "pipoca-flow-2026-06-16-poster-watchdog-1";
+const BUILD_ID = "pipoca-flow-2026-06-16-identity-faceguide-1";
 if (typeof window !== "undefined") {
   (window as unknown as { __PIPOCA_BUILD_TOKEN?: string }).__PIPOCA_BUILD_TOKEN = BUILD_ID;
 }
@@ -453,8 +454,7 @@ export function PipocaFlow() {
         />
       )}
       {step === "camera_identity" && (
-        <Camera
-          variant="identity"
+        <IdentityCamera
           onCaptured={(p) => {
             console.log(`${CAPTURE_LOG} foto de identidade capturada`);
             setIdentityPhoto(p);
@@ -911,6 +911,9 @@ function Stories({
   const [idx, setIdx] = useState(0);
   const [progress, setProgress] = useState(0);
   const [cameraStatus, setCameraStatus] = useState(getSharedStatus());
+  // Story 0 (the film poster) must NOT start its timer until the poster
+  // image is fully loaded — otherwise the totem can skip past a blank card.
+  const [posterReady, setPosterReady] = useState(false);
   const advanceLockRef = useRef(false);
 
   useEffect(() => {
@@ -924,21 +927,29 @@ function Stories({
     setProgress(0);
     const duration = STORY_DURATIONS_MS[idx];
     if (duration === undefined) return;
-    const start = performance.now();
+    // Gate story 0 until the poster is on screen.
+    if (idx === 0 && !posterReady) return;
+    // Small breathing room before the timer kicks in, per spec.
+    const startDelay = idx === 0 ? 350 : 0;
     let raf = 0;
+    let startedAt = 0;
     const tick = (now: number) => {
-      const pct = Math.min(1, (now - start) / duration);
+      if (!startedAt) startedAt = now;
+      const pct = Math.min(1, (now - startedAt) / duration);
       setProgress(pct);
       if (pct < 1) raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    const t = window.setTimeout(() => advance(), duration);
+    const startTimeout = window.setTimeout(() => {
+      raf = requestAnimationFrame(tick);
+    }, startDelay);
+    const t = window.setTimeout(() => advance(), duration + startDelay);
     return () => {
+      window.clearTimeout(startTimeout);
       window.clearTimeout(t);
       cancelAnimationFrame(raf);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx]);
+  }, [idx, posterReady]);
 
   function advance() {
     if (advanceLockRef.current) return;
@@ -970,16 +981,25 @@ function Stories({
         })}
       </div>
 
-      {/* Tap-to-advance area */}
+      {/* Tap-to-advance area — only after poster is ready on story 0. */}
       <button
         type="button"
-        onClick={advance}
+        onClick={() => {
+          if (idx === 0 && !posterReady) return;
+          advance();
+        }}
         aria-label="Próximo"
         className="absolute inset-0 z-10 cursor-pointer"
       />
 
       <div className="relative z-20 flex-1 min-h-0 w-full flex flex-col items-center justify-center max-w-2xl py-3 pointer-events-none">
-        {idx === 0 && <StoryFilm movie={movie} firstName={firstName} />}
+        {idx === 0 && (
+          <StoryFilm
+            movie={movie}
+            firstName={firstName}
+            onPosterReady={() => setPosterReady(true)}
+          />
+        )}
         {idx === 1 && <StoryTwoPhotos firstName={firstName} />}
         {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} firstName={firstName} />}
       </div>
@@ -998,7 +1018,7 @@ function Stories({
           </button>
         ) : (
           <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
-            toque para avançar
+            {idx === 0 && !posterReady ? "carregando pôster…" : "toque para avançar"}
           </span>
         )}
       </div>
@@ -1006,8 +1026,41 @@ function Stories({
   );
 }
 
-function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
+function StoryFilm({
+  movie,
+  firstName,
+  onPosterReady,
+}: {
+  movie: Movie;
+  firstName?: string;
+  onPosterReady?: () => void;
+}) {
   const prefix = firstName ? `${firstName.toUpperCase()}, você escolheu` : "Você escolheu";
+  const firedRef = useRef(false);
+  // Prefetch decode so the timer can start as soon as bytes are in.
+  useEffect(() => {
+    if (!movie.posterUrl) return;
+    const img = new Image();
+    img.src = movie.posterUrl;
+    let cancelled = false;
+    const done = () => {
+      if (cancelled || firedRef.current) return;
+      firedRef.current = true;
+      console.log("[PIPOCA_STORY_POSTER] prefetch ready");
+      onPosterReady?.();
+    };
+    if (img.decode) {
+      img.decode().then(done).catch(() => {
+        // Fallback to onload if decode rejects (rare on some browsers).
+        if (img.complete) done();
+      });
+    }
+    img.onload = done;
+    return () => {
+      cancelled = true;
+    };
+  }, [movie.posterUrl, onPosterReady]);
+
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
@@ -1382,29 +1435,13 @@ function Confirm({
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-[520px]">
           <div className="flex flex-col items-center gap-1.5 animate-pop-in">
-            <div className="bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10">
-              <PipocaImage
-                src={identityUrl}
-                alt="Foto de rosto"
-                fit="cover"
-                logTag="confirm-identity"
-                style={{ transform: "scaleX(-1)" }}
-              />
-            </div>
+            <ConfirmThumb url={identityUrl} alt="Foto de rosto" mirror logTag="confirm-identity" />
             <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
               Foto de rosto
             </span>
           </div>
           <div className="flex flex-col items-center gap-1.5 animate-pop-in">
-            <div className="bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10">
-              <PipocaImage
-                src={appearanceUrl}
-                alt="Foto de corpo"
-                fit="cover"
-                logTag="confirm-appearance"
-                style={{ transform: "scaleX(-1)" }}
-              />
-            </div>
+            <ConfirmThumb url={appearanceUrl} alt="Foto de corpo" mirror logTag="confirm-appearance" />
             <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
               Foto de corpo
             </span>
@@ -1854,3 +1891,252 @@ function VisitorRegistration({
   );
 }
 
+
+/* ---------- Confirm thumbnail (no black bars: blurred bg + contain) ---------- */
+
+function ConfirmThumb({
+  url,
+  alt,
+  mirror,
+  logTag,
+}: {
+  url: string;
+  alt: string;
+  mirror?: boolean;
+  logTag: string;
+}) {
+  return (
+    <div className="relative w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10 bg-black">
+      <div
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: `url(${url})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(28px) brightness(0.55)",
+          transform: "scale(1.18)",
+        }}
+      />
+      <div className="absolute inset-0">
+        <PipocaImage
+          src={url}
+          alt={alt}
+          fit="contain"
+          logTag={logTag}
+          style={mirror ? { transform: "scaleX(-1)" } : undefined}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Identity camera (face detection + auto-capture, no fixed mask) ---------- */
+
+const IDENTITY_STABLE_MS = 1200;
+const IDENTITY_COUNTDOWN = 3;
+const IDENTITY_FALLBACK_HINT_MS = 6000;
+
+function IdentityCamera({
+  onCaptured,
+  onBack,
+}: {
+  onCaptured: (p: { blob: Blob; url: string }) => void;
+  onBack: () => void;
+}) {
+  const { videoRef, ready, errorKind, retry, capture } = useCamera(true);
+  const { detectorReady, detectorError, guide } = useFaceGuide({
+    videoRef,
+    enabled: ready,
+  });
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [captureLocked, setCaptureLocked] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
+  const captureRef = useRef(false);
+
+  // Surface a manual fallback if the detector never comes up within ~6s.
+  useEffect(() => {
+    if (detectorReady || detectorError) {
+      if (detectorError) setShowFallback(true);
+      return;
+    }
+    const t = window.setTimeout(() => setShowFallback(true), IDENTITY_FALLBACK_HINT_MS);
+    return () => window.clearTimeout(t);
+  }, [detectorReady, detectorError]);
+
+  // Start countdown when stability threshold is met.
+  useEffect(() => {
+    if (captureLocked) return;
+    if (guide.status === "ok" && guide.stableMs >= IDENTITY_STABLE_MS) {
+      if (countdown === null) setCountdown(IDENTITY_COUNTDOWN);
+    } else if (countdown !== null) {
+      // User moved — cancel.
+      setCountdown(null);
+    }
+  }, [guide.status, guide.stableMs, captureLocked, countdown]);
+
+  // Tick countdown and capture at 0.
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown === 0) {
+      if (captureRef.current) return;
+      captureRef.current = true;
+      setCaptureLocked(true);
+      (async () => {
+        const result = await capture();
+        if (result) onCaptured(result);
+        else {
+          captureRef.current = false;
+          setCaptureLocked(false);
+          setCountdown(null);
+        }
+      })();
+      return;
+    }
+    const t = window.setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
+    return () => window.clearTimeout(t);
+  }, [countdown, capture, onCaptured]);
+
+  const manualCapture = useCallback(async () => {
+    if (captureRef.current || !ready) return;
+    captureRef.current = true;
+    setCaptureLocked(true);
+    const result = await capture();
+    if (result) onCaptured(result);
+    else {
+      captureRef.current = false;
+      setCaptureLocked(false);
+    }
+  }, [capture, onCaptured, ready]);
+
+  if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
+
+  const hint: string = !ready
+    ? "ABRINDO A CÂMERA..."
+    : !detectorReady && !detectorError
+      ? "PREPARANDO O ENQUADRAMENTO..."
+      : getGuideHint(guide.status);
+
+  return (
+    <Screen>
+      <Header subtitle="Foto de rosto" />
+
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-2 gap-3 sm:gap-4">
+        <p className="text-xs sm:text-sm text-white/75 max-w-md">
+          OLHE DIRETAMENTE PARA A CÂMERA NO TOPO DA TELA.
+          Se os óculos refletirem a luz, incline levemente o rosto.
+        </p>
+
+        <div className="relative w-full max-w-[460px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ transform: "scaleX(-1)" }}
+          />
+
+          {!ready ? (
+            <div className="absolute inset-0 grid place-items-center text-white/75 text-sm tracking-wide animate-pulse-soft">
+              Iniciando câmera…
+            </div>
+          ) : null}
+
+          {/* Dynamic scanning frame that follows the bounding box.
+              Pure overlay — never crops the captured file. */}
+          <FaceScanOverlay guide={guide} />
+        </div>
+
+        {/* Live coaching panel — BELOW the preview, never over the face. */}
+        <div className="w-full max-w-[460px] flex flex-col items-center gap-2 min-h-[88px]">
+          <p
+            className={`font-display text-lg sm:text-xl text-center leading-snug ${
+              guide.status === "ok" ? "text-emerald-300" : "text-white"
+            }`}
+          >
+            {hint}
+          </p>
+          {countdown !== null && countdown > 0 ? (
+            <span
+              key={countdown}
+              className="font-display text-5xl sm:text-6xl text-gold leading-none animate-pop-in"
+            >
+              {countdown}
+            </span>
+          ) : (
+            <span className="text-[10px] uppercase tracking-[0.3em] text-white/55">
+              Captura automática quando estiver perfeito
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
+        {(showFallback || detectorError) && ready ? (
+          <>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-white/55">
+              Enquadramento automático indisponível
+            </p>
+            <PrimaryCta onClick={manualCapture} disabled={captureLocked}>
+              Tirar foto manualmente
+            </PrimaryCta>
+          </>
+        ) : null}
+        <GhostBtn onClick={onBack}>Voltar</GhostBtn>
+      </div>
+    </Screen>
+  );
+}
+
+function FaceScanOverlay({ guide }: { guide: GuideState }) {
+  const box = guide.box;
+  if (!box) return null;
+  const ok = guide.status === "ok";
+  const color = ok ? "#7CFC9B" : "#F8BA32";
+  // Convert normalized box to % so the corners follow the face within the
+  // preview, regardless of preview pixel size on the totem.
+  const left = `${Math.max(0, box.x) * 100}%`;
+  const top = `${Math.max(0, box.y) * 100}%`;
+  const width = `${Math.max(0.05, box.w) * 100}%`;
+  const height = `${Math.max(0.05, box.h) * 100}%`;
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute"
+      style={{ left, top, width, height, transition: "all 120ms ease-out" }}
+    >
+      {/* Four corner brackets — never cover eyes/mouth/face. */}
+      {(["tl", "tr", "bl", "br"] as const).map((pos) => {
+        const base: React.CSSProperties = {
+          position: "absolute",
+          width: 22,
+          height: 22,
+          borderColor: color,
+          borderStyle: "solid",
+        };
+        const styles: Record<typeof pos, React.CSSProperties> = {
+          tl: { ...base, top: -2, left: -2, borderWidth: "3px 0 0 3px" },
+          tr: { ...base, top: -2, right: -2, borderWidth: "3px 3px 0 0" },
+          bl: { ...base, bottom: -2, left: -2, borderWidth: "0 0 3px 3px" },
+          br: { ...base, bottom: -2, right: -2, borderWidth: "0 3px 3px 0" },
+        };
+        return <span key={pos} style={styles[pos]} />;
+      })}
+      {/* Scanning line — only when actively coaching, not on success. */}
+      {!ok ? (
+        <span
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            height: 2,
+            background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
+            animation: "pipoca-scan-line 1.6s ease-in-out infinite",
+            top: "50%",
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}

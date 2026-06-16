@@ -46,8 +46,21 @@ export function PipocaImage({
 
   // (Re)start loading state whenever src or attempt changes.
   useEffect(() => {
-    setState(src ? "loading" : "error");
-    if (src) console.log(`${log} loading`, logTag ?? "", `attempt=${attempt}`);
+    if (!src) {
+      setState("error");
+      return;
+    }
+    // If the <img> already has the bytes (cached, SSR, or re-mount with same
+    // src), don't show the spinner OR start the watchdog — that was the
+    // cause of false "timeout after 8s" on totems with HTTP cache.
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+      console.log(`${log} ready-from-cache`, logTag ?? "", `${img.naturalWidth}x${img.naturalHeight}`);
+      setState("ready");
+      return;
+    }
+    setState("loading");
+    console.log(`${log} loading`, logTag ?? "", `attempt=${attempt}`);
   }, [src, attempt, log, logTag]);
 
   // Watchdog timeout: if the image hasn't fired onLoad within timeoutMs,
@@ -59,6 +72,13 @@ export function PipocaImage({
       const complete = !!img?.complete;
       const w = img?.naturalWidth ?? 0;
       const h = img?.naturalHeight ?? 0;
+      // If the bytes actually arrived but onLoad never fired (some Android
+      // WebViews after a re-mount), promote to ready instead of erroring.
+      if (complete && w > 0 && h > 0) {
+        console.log(`${log} late-ready`, logTag ?? "", `${w}x${h}`);
+        setState("ready");
+        return;
+      }
       console.warn(
         `${log} timeout`,
         logTag ?? "",
