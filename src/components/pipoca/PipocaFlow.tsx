@@ -102,7 +102,7 @@ function getDeviceId(): string | null {
 }
 
 const GEN_LOG = "[PIPOCA_GENERATION]";
-const BUILD_ID = "pipoca-flow-2026-06-16-poster-watchdog-1";
+const BUILD_ID = "pipoca-flow-2026-06-16-face-guide-qr-1";
 if (typeof window !== "undefined") {
   (window as unknown as { __PIPOCA_BUILD_TOKEN?: string }).__PIPOCA_BUILD_TOKEN = BUILD_ID;
 }
