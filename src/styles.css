@@ -341,8 +341,8 @@
   /* Totem portrait — bigger but still equilibrated. */
   @media (orientation: portrait) and (min-height: 1400px) {
     .pipoca-camera-frame {
-      width: min(84vw, 900px);
-      max-height: 48dvh;
+      width: min(82vw, 760px);
+      max-height: 52dvh;
     }
     .pipoca-camera-hint     { font-size: clamp(3.5rem, 4.5dvh, 5.4rem); line-height: 1; }
     .pipoca-camera-countdown{ font-size: clamp(8rem, 10dvh, 12rem); line-height: 0.85; }
