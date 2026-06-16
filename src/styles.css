@@ -344,10 +344,24 @@
       width: min(82vw, 760px);
       max-height: 52dvh;
     }
-    .pipoca-camera-hint     { font-size: clamp(3.5rem, 4.5dvh, 5.4rem); line-height: 1; }
-    .pipoca-camera-countdown{ font-size: clamp(8rem, 10dvh, 12rem); line-height: 0.85; }
-    .pipoca-camera-top      { min-height: clamp(220px, 21dvh, 340px); }
+    .pipoca-camera-top {
+      padding-top: clamp(120px, 10dvh, 220px);
+      min-height: clamp(260px, 24dvh, 420px);
+      gap: clamp(10px, 1.4dvh, 22px);
+    }
+    .pipoca-camera-hint {
+      font-size: clamp(4rem, 5dvh, 6rem);
+      font-weight: 900;
+      line-height: 1;
+      max-width: 94vw;
+    }
+    .pipoca-camera-countdown {
+      font-size: clamp(9rem, 12dvh, 14rem);
+      font-weight: 900;
+      line-height: 0.85;
+    }
   }
+
 
 
   .brand-pattern {
