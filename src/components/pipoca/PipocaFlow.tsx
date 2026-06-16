@@ -559,7 +559,7 @@ function Screen({
 }) {
   return (
     <div
-      className={`relative h-[100svh] w-full overflow-hidden film-grain vignette flex flex-col items-center px-4 sm:px-6 lg:px-10 pt-5 pb-4 sm:pt-7 sm:pb-5 lg:pt-8 lg:pb-6 text-center ${
+      className={`pipoca-stage-dvh relative film-grain vignette flex flex-col items-center px-4 sm:px-6 lg:px-10 pt-5 pb-4 sm:pt-7 sm:pb-5 lg:pt-8 lg:pb-6 text-center box-border ${
         aurora ? "bg-aurora" : "bg-cinema"
       } ${className}`}
     >
