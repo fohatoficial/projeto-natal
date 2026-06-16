@@ -1934,14 +1934,15 @@ function ConfirmThumb({
 
 /* ---------- Identity camera (face detection + auto-capture, no fixed mask) ---------- */
 
-const IDENTITY_STABLE_MS = 1200;
 const IDENTITY_COUNTDOWN = 3;
 const IDENTITY_FALLBACK_HINT_MS = 6000;
 
-function IdentityCamera({
+function GuidedCamera({
+  mode,
   onCaptured,
   onBack,
 }: {
+  mode: GuideMode;
   onCaptured: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
 }) {
@@ -1949,11 +1950,13 @@ function IdentityCamera({
   const { detectorReady, detectorError, guide } = useFaceGuide({
     videoRef,
     enabled: ready,
+    mode,
   });
   const [countdown, setCountdown] = useState<number | null>(null);
   const [captureLocked, setCaptureLocked] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
   const captureRef = useRef(false);
+  const stableMs = getStableMs(mode);
 
   // Surface a manual fallback if the detector never comes up within ~6s.
   useEffect(() => {
@@ -1968,13 +1971,13 @@ function IdentityCamera({
   // Start countdown when stability threshold is met.
   useEffect(() => {
     if (captureLocked) return;
-    if (guide.status === "ok" && guide.stableMs >= IDENTITY_STABLE_MS) {
+    if (guide.status === "ok" && guide.stableMs >= stableMs) {
       if (countdown === null) setCountdown(IDENTITY_COUNTDOWN);
     } else if (countdown !== null) {
       // User moved — cancel.
       setCountdown(null);
     }
-  }, [guide.status, guide.stableMs, captureLocked, countdown]);
+  }, [guide.status, guide.stableMs, captureLocked, countdown, stableMs]);
 
   // Tick countdown and capture at 0.
   useEffect(() => {
@@ -2016,19 +2019,29 @@ function IdentityCamera({
     ? "ABRINDO A CÂMERA..."
     : !detectorReady && !detectorError
       ? "PREPARANDO O ENQUADRAMENTO..."
-      : getGuideHint(guide.status);
+      : getGuideHint(guide.status, mode);
+
+  const subtitle = mode === "identity" ? "Foto de rosto" : "Foto de corpo";
+  const topInstruction =
+    mode === "identity"
+      ? "OLHE DIRETAMENTE PARA A CÂMERA NO TOPO DA TELA. Se os óculos refletirem a luz, incline levemente o rosto."
+      : "POSICIONE-SE PARA MOSTRAR O ROSTO E A CINTURA.";
+  const supportText =
+    mode === "identity"
+      ? "Captura automática quando estiver perfeito"
+      : "MANTENHA O ROSTO E A CINTURA VISÍVEIS";
+  const frameMaxW = mode === "identity" ? "max-w-[460px]" : "max-w-[520px]";
 
   return (
     <Screen>
-      <Header subtitle="Foto de rosto" />
+      <Header subtitle={subtitle} />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-2 gap-3 sm:gap-4">
-        <p className="text-xs sm:text-sm text-white/75 max-w-md">
-          OLHE DIRETAMENTE PARA A CÂMERA NO TOPO DA TELA.
-          Se os óculos refletirem a luz, incline levemente o rosto.
-        </p>
+        <p className="text-xs sm:text-sm text-white/75 max-w-md">{topInstruction}</p>
 
-        <div className="relative w-full max-w-[460px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
+        <div
+          className={`relative w-full ${frameMaxW} aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl`}
+        >
           <video
             ref={videoRef}
             autoPlay
@@ -2045,12 +2058,12 @@ function IdentityCamera({
           ) : null}
 
           {/* Dynamic scanning frame that follows the bounding box.
-              Pure overlay — never crops the captured file. */}
-          <FaceScanOverlay guide={guide} />
+              Pure overlay — never crops the captured file. No fixed mask. */}
+          <FaceScanOverlay guide={guide} discreet={mode === "appearance"} />
         </div>
 
         {/* Live coaching panel — BELOW the preview, never over the face. */}
-        <div className="w-full max-w-[460px] flex flex-col items-center gap-2 min-h-[88px]">
+        <div className={`w-full ${frameMaxW} flex flex-col items-center gap-2 min-h-[96px]`}>
           <p
             className={`font-display text-lg sm:text-xl text-center leading-snug ${
               guide.status === "ok" ? "text-emerald-300" : "text-white"
@@ -2066,8 +2079,8 @@ function IdentityCamera({
               {countdown}
             </span>
           ) : (
-            <span className="text-[10px] uppercase tracking-[0.3em] text-white/55">
-              Captura automática quando estiver perfeito
+            <span className="text-[10px] uppercase tracking-[0.3em] text-white/55 text-center">
+              {supportText}
             </span>
           )}
         </div>
@@ -2090,7 +2103,7 @@ function IdentityCamera({
   );
 }
 
-function FaceScanOverlay({ guide }: { guide: GuideState }) {
+function FaceScanOverlay({ guide, discreet = false }: { guide: GuideState; discreet?: boolean }) {
   const box = guide.box;
   if (!box) return null;
   const ok = guide.status === "ok";
