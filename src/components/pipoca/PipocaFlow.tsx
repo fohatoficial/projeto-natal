@@ -1770,128 +1770,189 @@ function GuidedCamera({
   onCaptured: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
 }) {
-  const { videoRef, ready, errorKind, retry, capture } = useCamera(true);
+  const { videoRef, ready, errorKind, retry } = useCamera(true);
+  const [captured, setCaptured] = useState<{ blob: Blob; url: string } | null>(null);
   const { detectorReady, detectorError, guide } = useFaceGuide({
     videoRef,
-    enabled: ready,
+    enabled: ready && !captured,
     mode,
   });
   const [countdown, setCountdown] = useState<number | null>(null);
   const [captureLocked, setCaptureLocked] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
+  const [flashKey, setFlashKey] = useState(0);
   const captureRef = useRef(false);
+  const handoffRef = useRef(false);
   const stableMs = getStableMs(mode);
 
-  // Surface a manual fallback if the detector never comes up within ~6s.
+  // 16:9 center-crop capture, preserving max video resolution.
+  const capture16x9 = useCallback(async (): Promise<{ blob: Blob; url: string } | null> => {
+    const v = videoRef.current;
+    if (!v || !v.videoWidth || !v.videoHeight) return null;
+    const vw = v.videoWidth;
+    const vh = v.videoHeight;
+    const targetRatio = 16 / 9;
+    let cropW = vw;
+    let cropH = Math.round(vw / targetRatio);
+    if (cropH > vh) {
+      cropH = vh;
+      cropW = Math.round(vh * targetRatio);
+    }
+    const sx = Math.round((vw - cropW) / 2);
+    const sy = Math.round((vh - cropH) / 2);
+    const canvas = document.createElement("canvas");
+    canvas.width = cropW;
+    canvas.height = cropH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(v, sx, sy, cropW, cropH, 0, 0, cropW, cropH);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92),
+    );
+    if (!blob) return null;
+    const url = URL.createObjectURL(blob);
+    console.log("[PIPOCA_CAMERA] capture-16x9", {
+      videoWidth: vw,
+      videoHeight: vh,
+      cropWidth: cropW,
+      cropHeight: cropH,
+      outputWidth: cropW,
+      outputHeight: cropH,
+    });
+    return { blob, url };
+  }, [videoRef]);
+
+  // Freeze + hand off to parent shortly after.
+  const performCapture = useCallback(async () => {
+    if (captureRef.current) return;
+    captureRef.current = true;
+    setCaptureLocked(true);
+    const result = await capture16x9();
+    if (!result) {
+      captureRef.current = false;
+      setCaptureLocked(false);
+      setCountdown(null);
+      return;
+    }
+    setFlashKey((k) => k + 1);
+    setCaptured(result);
+    setCountdown(null);
+  }, [capture16x9]);
+
+  // After freeze, hand off to the parent so it can advance.
   useEffect(() => {
+    if (!captured || handoffRef.current) return;
+    handoffRef.current = true;
+    const t = window.setTimeout(() => onCaptured(captured), 750);
+    return () => window.clearTimeout(t);
+  }, [captured, onCaptured]);
+
+  // Surface manual fallback if the detector never comes up within ~6s.
+  useEffect(() => {
+    if (captured) return;
     if (detectorReady || detectorError) {
       if (detectorError) setShowFallback(true);
       return;
     }
     const t = window.setTimeout(() => setShowFallback(true), IDENTITY_FALLBACK_HINT_MS);
     return () => window.clearTimeout(t);
-  }, [detectorReady, detectorError]);
+  }, [detectorReady, detectorError, captured]);
 
   // Start countdown when stability threshold is met.
   useEffect(() => {
-    if (captureLocked) return;
+    if (captured || captureLocked) return;
     if (guide.status === "ok" && guide.stableMs >= stableMs) {
       if (countdown === null) setCountdown(IDENTITY_COUNTDOWN);
     } else if (countdown !== null) {
-      // User moved — cancel.
       setCountdown(null);
     }
-  }, [guide.status, guide.stableMs, captureLocked, countdown, stableMs]);
+  }, [guide.status, guide.stableMs, captureLocked, captured, countdown, stableMs]);
 
   // Tick countdown and capture at 0.
   useEffect(() => {
-    if (countdown === null) return;
+    if (countdown === null || captured) return;
     if (countdown === 0) {
-      if (captureRef.current) return;
-      captureRef.current = true;
-      setCaptureLocked(true);
-      (async () => {
-        const result = await capture();
-        if (result) onCaptured(result);
-        else {
-          captureRef.current = false;
-          setCaptureLocked(false);
-          setCountdown(null);
-        }
-      })();
+      void performCapture();
       return;
     }
     const t = window.setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
     return () => window.clearTimeout(t);
-  }, [countdown, capture, onCaptured]);
+  }, [countdown, captured, performCapture]);
 
-  const manualCapture = useCallback(async () => {
-    if (captureRef.current || !ready) return;
-    captureRef.current = true;
-    setCaptureLocked(true);
-    const result = await capture();
-    if (result) onCaptured(result);
-    else {
-      captureRef.current = false;
-      setCaptureLocked(false);
-    }
-  }, [capture, onCaptured, ready]);
+  const manualCapture = useCallback(() => {
+    if (!ready || captured) return;
+    void performCapture();
+  }, [performCapture, ready, captured]);
 
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
-  const hint: string = !ready
+  const showCountdown = !captured && countdown !== null && countdown > 0;
+  const baseHint: string = !ready
     ? "ABRINDO A CÂMERA"
     : !detectorReady && !detectorError
       ? "PREPARANDO O ENQUADRAMENTO"
       : getGuideHint(guide.status, mode);
+  const hint = captured ? "FOTO CAPTURADA!" : baseHint;
+  const hintClass = captured
+    ? "pipoca-camera-hint pipoca-camera-hint--success"
+    : `pipoca-camera-hint ${guide.status === "ok" ? "pipoca-camera-hint--ok" : ""}`;
 
   return (
     <div
       className="pipoca-camera-screen bg-cinema relative"
       data-pipoca-camera={mode}
+      data-pipoca-state={captured ? "captured" : countdown !== null ? "counting" : "guiding"}
     >
-      {/* Top — dynamic hint only (no logo, no fixed text). */}
-      <div className="pipoca-camera-hint-slot">
-        <p
-          className={`pipoca-camera-hint ${guide.status === "ok" ? "pipoca-camera-hint--ok" : ""}`}
-        >
-          {hint}
-        </p>
-      </div>
-
-      {/* Middle — preview, conservative max size. */}
-      <div className="pipoca-camera-preview-wrap">
-        <div className="pipoca-camera-frame">
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ transform: "scaleX(-1)" }}
-          />
-          {!ready ? (
-            <div className="absolute inset-0 grid place-items-center text-white/75 text-sm tracking-wide animate-pulse-soft">
-              Iniciando câmera…
-            </div>
-          ) : null}
-          <FaceScanOverlay guide={guide} videoRef={videoRef} discreet={mode === "appearance"} />
-        </div>
-      </div>
-
-      {/* Bottom — countdown / fallback / back. */}
-      <div className="pipoca-camera-countdown-slot">
-        {countdown !== null && countdown > 0 ? (
+      {/* Top — dynamic hint + countdown. */}
+      <div className="pipoca-camera-top">
+        <p className={hintClass}>{hint}</p>
+        {showCountdown ? (
           <span key={countdown} className="pipoca-camera-countdown">
             {countdown}
           </span>
         ) : null}
-        {(showFallback || detectorError) && ready ? (
+      </div>
+
+      {/* Middle — 16:9 preview or frozen photo. */}
+      <div className="pipoca-camera-preview-wrap">
+        <div className="pipoca-camera-frame">
+          {captured ? (
+            <img src={captured.url} alt="" style={{ transform: "scaleX(-1)" }} />
+          ) : (
+            <>
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                style={{ transform: "scaleX(-1)" }}
+              />
+              {!ready ? (
+                <div className="absolute inset-0 grid place-items-center text-white/75 text-sm tracking-wide animate-pulse-soft">
+                  Iniciando câmera…
+                </div>
+              ) : null}
+              <FaceScanOverlay
+                guide={guide}
+                videoRef={videoRef}
+                discreet={mode === "appearance"}
+              />
+            </>
+          )}
+          {flashKey > 0 ? (
+            <span key={`flash-${flashKey}`} className="pipoca-camera-flash" aria-hidden />
+          ) : null}
+        </div>
+      </div>
+
+      {/* Bottom — fallback / back only. */}
+      <div className="pipoca-camera-footer">
+        {!captured && (showFallback || detectorError) && ready ? (
           <PrimaryCta onClick={manualCapture} disabled={captureLocked}>
             Tirar foto manualmente
           </PrimaryCta>
         ) : null}
-        <GhostBtn onClick={onBack}>Voltar</GhostBtn>
+        {!captured ? <GhostBtn onClick={onBack}>Voltar</GhostBtn> : null}
       </div>
     </div>
   );
