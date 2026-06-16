@@ -13,7 +13,11 @@ const PUBLIC_RESULT_BASE_URL = "https://pipoca-cena-studio.lovable.app".replace(
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
 
-const ENABLE_HAT_REFERENCE = false;
+const ENABLE_HAT_REFERENCE = true;
+
+const FIXED_HAT_REFERENCE_URL =
+  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-em-uso-v2.jpg";
+
 
 function isUuid(value: unknown): value is string {
   return (
@@ -164,12 +168,22 @@ function buildPromptText(
 
   if (hasHatRef) {
     parts.push(
-      "Image 4, when present, is a SECONDARY HAT DESIGN CUE ONLY. It is the lowest-priority reference.",
+      "Image 4 is a low-priority hat design and fit reference only.",
     );
     parts.push(
-      "Use Image 4 only as a subtle design cue. Preserve only the general crescent-shaped leather construction and restrained frontal decoration. Do NOT copy any person's face, skin tone, hair or clothing from Image 4.",
+      "Use it only to guide the authentic shape, scale and natural fit of a northeastern Brazilian cangaceiro leather hat.",
+    );
+    parts.push(
+      "The hat must remain proportional to the visitor's head and naturally integrated into the costume.",
+    );
+    parts.push(
+      "Image 4 must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
+    );
+    parts.push(
+      "The hat must not dominate the image, become oversized, cover the face or cause close-up framing.",
     );
   }
+
 
   // 2. Hard identity rules
   parts.push(
@@ -207,9 +221,10 @@ function buildPromptText(
   );
   if (hasHatRef) {
     parts.push(
-      "When Image 4 is used, apply it as a restrained secondary cue: preserve only the general crescent-shaped leather construction and subdued frontal decoration (stars, coins, metal ornaments). The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT replace or distort the environment. The hat must NOT become oversized, ceremonial, fantastical or theatrical.",
+      "When Image 4 is used, apply it only as a restrained secondary cue for the hat's authentic shape, scale and natural fit. The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT change the pose. The hat must NOT replace or distort the environment. The hat must NOT become oversized, theatrical, ceremonial, fantastical, a cowboy hat, a western wide-brim hat or the main subject.",
     );
   }
+
   const hatUsage = extractHatUsage(parsed);
   if (hatUsage) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
 
@@ -226,8 +241,9 @@ function buildPromptText(
     "FRAMING: prefer a medium shot or medium-full shot, showing the visitor from the head down to the waist or just above the knees. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment. The environment must remain visible and legible, and the rustic clothing must remain fully visible and important.",
   );
   parts.push(
-    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. The hat is only a subtle textual costume cue with lower priority than clothing and environment.",
+    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Image 4, when present, is the lowest priority and must only guide the shape, scale and natural fit of the cangaceiro hat. Image 4 must never replace or weaken Images 1, 2 or 3.",
   );
+
 
   // 8. Film context
   parts.push(
@@ -415,17 +431,14 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     let hatReferenceUrls: string[] = [];
     let hatRefUsed: string[] = [];
     if (ENABLE_HAT_REFERENCE) {
-      hatReferenceUrls = extractHatReferenceUrls(parsedScenePrompt);
-      hatRefUsed =
-        hatReferenceUrls.length > 1
-          ? [hatReferenceUrls[Math.floor(Math.random() * hatReferenceUrls.length)]]
-          : hatReferenceUrls.slice(0, 1);
-      console.log(
-        `${LOG} referência de chapéu escolhida: ${hatRefUsed.length} de ${hatReferenceUrls.length}`,
-      );
+      hatReferenceUrls = [FIXED_HAT_REFERENCE_URL];
+      hatRefUsed = [FIXED_HAT_REFERENCE_URL];
+      console.log(`${LOG} referência de chapéu fixa ativa (1 URL)`);
     }
     console.log(`${GEN_LOG} hat reference enabled: ${ENABLE_HAT_REFERENCE}`);
+    console.log(`${GEN_LOG} fixed hat reference: true`);
     const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
+
 
     const { data: generation, error: genErr } = await supabaseAdmin
       .from("pipoca_generations")
