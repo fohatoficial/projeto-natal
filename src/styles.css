@@ -242,11 +242,10 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(6px, 0.8dvh, 14px);
-    min-height: clamp(150px, 20dvh, 240px);
+    gap: clamp(4px, 0.6dvh, 10px);
+    text-align: center;
     position: relative;
     z-index: 2;
-    text-align: center;
   }
   .pipoca-camera-hint {
     font-family: var(--font-display);
@@ -258,11 +257,12 @@
     text-shadow: 0 2px 14px rgba(0,0,0,0.6);
     max-width: 94vw;
     transition: color 180ms ease;
-    font-size: clamp(2.4rem, 4.6dvh, 3.8rem);
+    font-size: clamp(1.8rem, 3.4dvh, 3rem);
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+    margin: 0;
   }
   .pipoca-camera-hint--ok { color: #7CFC9B; }
   .pipoca-camera-hint--success { color: #7CFC9B; }
@@ -271,14 +271,16 @@
     min-height: 0;
     width: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: clamp(8px, 1.4dvh, 22px);
   }
   .pipoca-camera-frame {
     position: relative;
     aspect-ratio: 4 / 5;
     width: min(78vw, 520px);
-    max-height: 56dvh;
+    max-height: 62dvh;
     border-radius: 18px;
     overflow: hidden;
     border: 1px solid rgba(255,255,255,0.15);
@@ -301,7 +303,7 @@
     line-height: 0.9;
     color: var(--gold);
     text-shadow: 0 4px 28px rgba(248,186,50,0.55);
-    font-size: clamp(6rem, 10dvh, 9rem);
+    font-size: clamp(4rem, 7dvh, 7rem);
     transform-origin: center;
     will-change: transform, opacity;
     animation: pipoca-count-pop 320ms cubic-bezier(.34,1.56,.64,1) both;
@@ -338,86 +340,44 @@
     .pipoca-camera-flash { animation: none !important; }
   }
 
-  /* Totem portrait — bigger but still equilibrated. */
-  @media (orientation: portrait) and (min-height: 1400px) {
-    .pipoca-camera-screen {
-      gap: clamp(8px, 1dvh, 20px);
+  /* Tablet/totem portrait — bigger text, kept right above the preview. */
+  @media (orientation: portrait) and (min-height: 1100px) {
+    .pipoca-camera-preview-wrap {
+      gap: clamp(14px, 2.2dvh, 32px);
+    }
+    .pipoca-camera-hint {
+      font-size: clamp(3rem, 4.6dvh, 5rem);
+      font-weight: 900;
+      line-height: 0.98;
+    }
+    .pipoca-camera-countdown {
+      font-size: clamp(6rem, 9dvh, 10rem);
+      font-weight: 900;
+      line-height: 0.85;
     }
     .pipoca-camera-frame {
       width: min(82vw, 760px);
-      max-height: 52dvh;
-    }
-    .pipoca-camera-top {
-      padding-top: 0;
-      min-height: clamp(180px, 15dvh, 260px);
-      margin-bottom: clamp(10px, 2dvh, 30px);
-      justify-content: flex-end;
-      gap: clamp(10px, 1.4dvh, 22px);
-    }
-    .pipoca-camera-hint {
-      font-size: clamp(4.5rem, 5.5dvh, 6.5rem);
-      font-weight: 900;
-      line-height: 0.95;
-      max-width: 96vw;
-    }
-    .pipoca-camera-countdown {
-      font-size: clamp(10rem, 13dvh, 15rem);
-      font-weight: 900;
-      line-height: 0.8;
+      max-height: 60dvh;
     }
   }
 
-  /* Real 43" totem — treat it as a giant tablet in portrait.
-     Chrome/Windows scaling can change CSS px and dvh, so the vertical model
-     uses percentages of the measured screen container instead of a pure dvh
-     offset. The top band pushes the instruction/timer close to the camera
-     without moving the camera by an arbitrary margin. */
+  /* Real 43" totem (1080x1920+). Same model, larger scale. */
   @media screen and (min-height: 1400px) and (min-width: 700px) {
-    .pipoca-camera-screen {
-      display: grid;
-      grid-template-rows: minmax(420px, 36%) minmax(0, 1fr);
-      align-items: stretch;
-      gap: clamp(18px, 2svh, 42px);
-      height: var(--pipoca-app-height, 100dvh);
-      padding: clamp(24px, 3svh, 56px) clamp(20px, 3vw, 60px);
-      overflow: hidden;
-    }
-    .pipoca-camera-top {
-      padding: 0;
-      margin: 0;
-      min-height: auto;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      align-items: center;
-      gap: clamp(14px, 2dvh, 30px);
+    .pipoca-camera-preview-wrap {
+      gap: clamp(20px, 2.6svh, 44px);
     }
     .pipoca-camera-hint {
-      font-size: clamp(4rem, 6dvh, 7rem) !important;
-      font-weight: 900;
-      line-height: 0.95;
-      max-width: 96vw;
-      text-align: center;
+      font-size: clamp(3.6rem, 5dvh, 6rem) !important;
     }
     .pipoca-camera-countdown {
-      font-size: clamp(9rem, 12dvh, 14rem) !important;
-      font-weight: 900;
-      line-height: 0.85;
-      margin: 0;
-    }
-    .pipoca-camera-preview-wrap {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 0;
+      font-size: clamp(7rem, 10dvh, 12rem) !important;
     }
     .pipoca-camera-frame {
       width: min(82vw, 820px) !important;
-      max-height: 56svh !important;
-      align-self: center;
-      margin: 0;
+      max-height: 62svh !important;
     }
   }
+
 
 
 
