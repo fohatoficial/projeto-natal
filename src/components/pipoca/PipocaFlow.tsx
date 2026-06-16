@@ -454,7 +454,8 @@ export function PipocaFlow() {
         />
       )}
       {step === "camera_identity" && (
-        <IdentityCamera
+        <GuidedCamera
+          mode="identity"
           onCaptured={(p) => {
             console.log(`${CAPTURE_LOG} foto de identidade capturada`);
             setIdentityPhoto(p);
@@ -475,8 +476,8 @@ export function PipocaFlow() {
         />
       )}
       {step === "camera_appearance" && (
-        <Camera
-          variant="appearance"
+        <GuidedCamera
+          mode="appearance"
           onCaptured={(p) => {
             console.log(`${CAPTURE_LOG} foto de aparência capturada`);
             setAppearancePhoto(p);
