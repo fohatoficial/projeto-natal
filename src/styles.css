@@ -343,7 +343,7 @@
   /* Tablet/totem portrait — bigger text, kept right above the preview. */
   @media (orientation: portrait) and (min-height: 1100px) {
     .pipoca-camera-preview-wrap {
-      gap: clamp(22px, 3.2dvh, 42px);
+      gap: clamp(30px, 4.2dvh, 52px);
     }
     .pipoca-camera-hint {
       font-size: clamp(3.2rem, 5dvh, 5.4rem);
