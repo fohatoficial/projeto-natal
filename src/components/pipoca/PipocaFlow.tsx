@@ -1785,13 +1785,13 @@ function GuidedCamera({
   const handoffRef = useRef(false);
   const stableMs = getStableMs(mode);
 
-  // 16:9 center-crop capture, preserving max video resolution.
-  const capture16x9 = useCallback(async (): Promise<{ blob: Blob; url: string } | null> => {
+  // 4:5 center-crop capture (vertical), preserving max video resolution.
+  const capture4x5 = useCallback(async (): Promise<{ blob: Blob; url: string } | null> => {
     const v = videoRef.current;
     if (!v || !v.videoWidth || !v.videoHeight) return null;
     const vw = v.videoWidth;
     const vh = v.videoHeight;
-    const targetRatio = 16 / 9;
+    const targetRatio = 4 / 5;
     let cropW = vw;
     let cropH = Math.round(vw / targetRatio);
     if (cropH > vh) {
@@ -1811,13 +1811,11 @@ function GuidedCamera({
     );
     if (!blob) return null;
     const url = URL.createObjectURL(blob);
-    console.log("[PIPOCA_CAMERA] capture-16x9", {
+    console.log("[PIPOCA_CAMERA] capture-4x5", {
       videoWidth: vw,
       videoHeight: vh,
       cropWidth: cropW,
       cropHeight: cropH,
-      outputWidth: cropW,
-      outputHeight: cropH,
     });
     return { blob, url };
   }, [videoRef]);
@@ -1827,7 +1825,7 @@ function GuidedCamera({
     if (captureRef.current) return;
     captureRef.current = true;
     setCaptureLocked(true);
-    const result = await capture16x9();
+    const result = await capture4x5();
     if (!result) {
       captureRef.current = false;
       setCaptureLocked(false);
@@ -1837,7 +1835,7 @@ function GuidedCamera({
     setFlashKey((k) => k + 1);
     setCaptured(result);
     setCountdown(null);
-  }, [capture16x9]);
+  }, [capture4x5]);
 
   // After freeze, hand off to the parent so it can advance.
   useEffect(() => {
