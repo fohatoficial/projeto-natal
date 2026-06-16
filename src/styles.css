@@ -367,15 +367,18 @@
     }
   }
 
-  /* Real 43" totem — robust rule that does not rely on orientation alone.
-     Targets screens with height >= 1400px AND width >= 700px. */
+  /* Real 43" totem — treat it as a giant tablet in portrait.
+     Balance vertically: instruction + timer occupy the upper third (anchored
+     to the bottom of that band, just above the camera), then a centered
+     camera frame fills the remaining space. */
   @media screen and (min-height: 1400px) and (min-width: 700px) {
     .pipoca-camera-screen {
       display: grid;
-      grid-template-rows: auto auto 1fr;
-      align-items: center;
-      gap: clamp(20px, 2dvh, 40px);
+      grid-template-rows: 32dvh 1fr;
+      align-items: stretch;
+      gap: clamp(20px, 2.5dvh, 50px);
       height: var(--pipoca-app-height, 100dvh);
+      padding: clamp(20px, 3dvh, 60px) clamp(20px, 3vw, 60px);
       overflow: hidden;
     }
     .pipoca-camera-top {
@@ -383,9 +386,10 @@
       margin: 0;
       min-height: auto;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      justify-content: flex-end;
       align-items: center;
-      gap: clamp(10px, 1.4dvh, 22px);
+      gap: clamp(14px, 2dvh, 30px);
     }
     .pipoca-camera-hint {
       font-size: clamp(4rem, 6dvh, 7rem) !important;
@@ -395,17 +399,25 @@
       text-align: center;
     }
     .pipoca-camera-countdown {
-      font-size: clamp(10rem, 14dvh, 16rem) !important;
+      font-size: clamp(9rem, 12dvh, 14rem) !important;
       font-weight: 900;
-      line-height: 0.8;
+      line-height: 0.85;
       margin: 0;
     }
-    .pipoca-camera-preview,
+    .pipoca-camera-preview-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
     .pipoca-camera-frame {
-      margin-top: 0;
+      width: min(82vw, 820px) !important;
+      max-height: 60dvh !important;
       align-self: center;
+      margin: 0;
     }
   }
+
 
 
 
