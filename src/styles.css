@@ -204,6 +204,14 @@
       width: min(82vw, 860px);
     }
 
+    /* Lower ONLY the first-photo (identity) mask on the tall totem so the
+       face sits below the physical camera mounted at the top of the screen.
+       Effective downward shift ≈ clamp(90px, 7dvh, 140px). Second-photo mask
+       is untouched. */
+    .pipoca-stage-dvh .pipoca-identity-mask-ellipse {
+      cy: 62;
+    }
+
     /* Privacy notice modal — fills the totem instead of a tablet column. */
     body > .fixed .max-w-md { max-width: min(86vw, 820px) !important; }
   }
