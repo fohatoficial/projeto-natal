@@ -13,7 +13,11 @@ const PUBLIC_RESULT_BASE_URL = "https://pipoca-cena-studio.lovable.app".replace(
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
 
-const ENABLE_HAT_REFERENCE = false;
+const ENABLE_HAT_REFERENCE = true;
+
+const FIXED_HAT_REFERENCE_URL =
+  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-em-uso-v2.jpg";
+
 
 function isUuid(value: unknown): value is string {
   return (
