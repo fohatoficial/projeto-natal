@@ -1278,10 +1278,11 @@ function Confirm({
         <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-[520px]">
           <div className="flex flex-col items-center gap-1.5 animate-pop-in">
             <div className="bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10">
-              <img
+              <PipocaImage
                 src={identityUrl}
                 alt="Foto de rosto"
-                className="w-full h-full object-cover"
+                fit="cover"
+                logTag="confirm-identity"
                 style={{ transform: "scaleX(-1)" }}
               />
             </div>
@@ -1291,10 +1292,11 @@ function Confirm({
           </div>
           <div className="flex flex-col items-center gap-1.5 animate-pop-in">
             <div className="bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10">
-              <img
+              <PipocaImage
                 src={appearanceUrl}
                 alt="Foto de corpo"
-                className="w-full h-full object-cover"
+                fit="cover"
+                logTag="confirm-appearance"
                 style={{ transform: "scaleX(-1)" }}
               />
             </div>
