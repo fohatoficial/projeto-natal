@@ -437,12 +437,12 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     let hatReferenceUrls: string[] = [];
     let hatRefUsed: string[] = [];
     if (ENABLE_HAT_REFERENCE) {
-      hatReferenceUrls = [FIXED_HAT_REFERENCE_URL];
-      hatRefUsed = [FIXED_HAT_REFERENCE_URL];
-      console.log(`${LOG} referência de chapéu fixa ativa (1 URL)`);
+      hatReferenceUrls = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
+      hatRefUsed = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
+      console.log(`${LOG} referências de chapéu fixas ativas (2 URLs)`);
     }
     console.log(`${GEN_LOG} hat reference enabled: ${ENABLE_HAT_REFERENCE}`);
-    console.log(`${GEN_LOG} fixed hat reference: true`);
+    console.log(`${GEN_LOG} fixed hat references: ${hatRefUsed.length}`);
     const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
 
 
@@ -470,8 +470,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         "identity-close",
         "appearance-medium",
         "scene-base",
-        ...hatRefUsed.map(() => "hat-secondary"),
-      ],
+        "hat-front",
+        "hat-side",
+      ].slice(0, 3 + hatRefUsed.length),
     });
     if (hatRefUsed.length > 0) {
       console.log(`${GEN_LOG} usando chapéu como referência secundária`);
