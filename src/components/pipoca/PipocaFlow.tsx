@@ -1543,11 +1543,13 @@ function Result({
               {firstName ? `${firstName}, sua ` : "Sua "}<span className="text-gold">cena</span> está pronta
             </h1>
 
-            <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto flex items-center justify-center">
-              <img
+            <div className="relative w-full flex-1 min-h-0 max-w-[560px] pipoca-kiosk-result-frame mx-auto flex items-center justify-center aspect-[4/5]">
+              <PipocaImage
                 src={imageUrl ?? movie.posterUrl}
                 alt="Cena gerada"
-                className="max-w-full max-h-full object-contain rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]"
+                fit="contain"
+                logTag="result-final"
+                wrapperClassName="rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] overflow-hidden"
               />
             </div>
 
