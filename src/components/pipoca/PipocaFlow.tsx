@@ -1901,18 +1901,16 @@ function GuidedCamera({
       data-pipoca-camera={mode}
       data-pipoca-state={captured ? "captured" : countdown !== null ? "counting" : "guiding"}
     >
-      {/* Top — dynamic hint + countdown. */}
-      <div className="pipoca-camera-top">
-        <p className={hintClass}>{hint}</p>
-        {showCountdown ? (
-          <span key={countdown} className="pipoca-camera-countdown">
-            {countdown}
-          </span>
-        ) : null}
-      </div>
-
-      {/* Middle — 16:9 preview or frozen photo. */}
+      {/* Middle — preview with hint/countdown sitting right above it. */}
       <div className="pipoca-camera-preview-wrap">
+        <div className="pipoca-camera-top">
+          <p className={hintClass}>{hint}</p>
+          {showCountdown ? (
+            <span key={countdown} className="pipoca-camera-countdown">
+              {countdown}
+            </span>
+          ) : null}
+        </div>
         <div className="pipoca-camera-frame">
           {captured ? (
             <img src={captured.url} alt="" style={{ transform: "scaleX(-1)" }} />
@@ -1942,6 +1940,7 @@ function GuidedCamera({
           ) : null}
         </div>
       </div>
+
 
       {/* Bottom — fallback / back only. */}
       <div className="pipoca-camera-footer">
