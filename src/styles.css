@@ -199,21 +199,21 @@
     .pipoca-stage-dvh .h-1        { height: 6px !important; border-radius: 999px; }
     .pipoca-stage-dvh .h-1\.5     { height: 8px !important; border-radius: 999px; }
 
-    /* Camera frame & confirm thumbnails — make the 4:5 frame use the totem. */
+    /* Camera frame & confirm thumbnails — make the 4:5 frame use the totem
+       width but never overflow the dynamic viewport height. */
     .pipoca-stage-dvh .aspect-\[4\/5\] {
       width: min(82vw, 860px);
-    }
-
-    /* Lower ONLY the first-photo (identity) mask on the tall totem so the
-       face sits below the physical camera mounted at the top of the screen.
-       Effective downward shift ≈ clamp(90px, 7dvh, 140px). Second-photo mask
-       is untouched. */
-    .pipoca-stage-dvh .pipoca-identity-mask-ellipse {
-      cy: 62;
+      max-height: 60dvh;
     }
 
     /* Privacy notice modal — fills the totem instead of a tablet column. */
     body > .fixed .max-w-md { max-width: min(86vw, 820px) !important; }
+  }
+
+  /* Scanning line animation for the dynamic face frame (identity camera). */
+  @keyframes pipoca-scan-line {
+    0%, 100% { top: 18%; opacity: 0.2; }
+    50% { top: 82%; opacity: 0.9; }
   }
 
   .brand-pattern {
