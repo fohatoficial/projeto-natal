@@ -1736,6 +1736,41 @@ function Confirm({
 }
 
 
+function ConfirmPhoto({ url, label, tag }: { url: string; label: string; tag: string }) {
+  // Show the full captured photo (contain) over a blurred copy of itself so
+  // there are no black bars even when the photo's aspect doesn't match 4:5.
+  // The mirroring (scaleX(-1)) matches what the visitor saw in the preview.
+  return (
+    <div className="flex flex-col items-center gap-1.5 animate-pop-in">
+      <div className="relative w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10 bg-black/30">
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url(${url})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            filter: "blur(28px) brightness(0.55)",
+            transform: "scaleX(-1) scale(1.15)",
+          }}
+        />
+        <div className="absolute inset-0">
+          <PipocaImage
+            src={url}
+            alt={label}
+            fit="contain"
+            logTag={tag}
+            style={{ transform: "scaleX(-1)" }}
+          />
+        </div>
+      </div>
+      <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 /* ---------- Step 5: Processing ---------- */
 
 type StatusFn = (args: { data: { generationId: string } }) => Promise<
