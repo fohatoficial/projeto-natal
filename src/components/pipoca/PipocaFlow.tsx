@@ -1904,12 +1904,12 @@ function GuidedCamera({
       {/* Middle — preview with hint/countdown sitting right above it. */}
       <div className="pipoca-camera-preview-wrap">
         <div className="pipoca-camera-top">
-          <p className={hintClass}>{hint}</p>
           {showCountdown ? (
             <span key={countdown} className="pipoca-camera-countdown">
               {countdown}
             </span>
           ) : null}
+          <p className={hintClass}>{hint}</p>
         </div>
         <div className="pipoca-camera-frame">
           {captured ? (
