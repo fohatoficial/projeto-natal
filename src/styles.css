@@ -371,19 +371,19 @@
      Targets screens with height >= 1400px AND width >= 700px. */
   @media screen and (min-height: 1400px) and (min-width: 700px) {
     .pipoca-camera-screen {
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-start;
-      gap: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      align-items: center;
+      gap: clamp(20px, 2dvh, 40px);
+      height: var(--pipoca-app-height, 100dvh);
+      overflow: hidden;
     }
     .pipoca-camera-top {
-      padding-top: 0;
-      margin-top: clamp(260px, 18dvh, 420px);
-      margin-bottom: clamp(20px, 3dvh, 50px);
+      padding: 0;
+      margin: 0;
       min-height: auto;
       display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
+      justify-content: center;
       align-items: center;
       gap: clamp(10px, 1.4dvh, 22px);
     }
@@ -398,12 +398,16 @@
       font-size: clamp(10rem, 14dvh, 16rem) !important;
       font-weight: 900;
       line-height: 0.8;
-      margin-top: 10px;
+      margin: 0;
     }
-    .pipoca-camera-preview-wrap {
+    .pipoca-camera-preview,
+    .pipoca-camera-frame {
       margin-top: 0;
+      align-self: center;
     }
   }
+
+
 
   /* Optional debug outline for the kiosk panel. Add class `debug-kiosk` to body to enable. */
   body.debug-kiosk .pipoca-camera-top {
