@@ -241,8 +241,9 @@ function buildPromptText(
     "FRAMING: prefer a medium shot or medium-full shot, showing the visitor from the head down to the waist or just above the knees. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment. The environment must remain visible and legible, and the rustic clothing must remain fully visible and important.",
   );
   parts.push(
-    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. The hat is only a subtle textual costume cue with lower priority than clothing and environment.",
+    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Image 4, when present, is the lowest priority and must only guide the shape, scale and natural fit of the cangaceiro hat. Image 4 must never replace or weaken Images 1, 2 or 3.",
   );
+
 
   // 8. Film context
   parts.push(
