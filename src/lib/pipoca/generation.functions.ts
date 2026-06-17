@@ -646,8 +646,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       hat_reference_count: hatRefUsed.length,
     });
     const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0);
+    const sceneImageUrl = scenePack.reference_image_url;
     const referenceImageFilename = safeFilenameFromUrl(scenePack.reference_image_url);
-    const image3MatchesScenePack = scenePack.reference_image_url === scenePack.reference_image_url;
+    const image3MatchesScenePack = sceneImageUrl === scenePack.reference_image_url;
     const circoReferenceMismatch =
       scenePack.id === CIRCO_SCENE_PACK_ID && scenePack.reference_image_url !== CIRCO_REFERENCE_IMAGE_URL;
     const promptPreparedFromResolvedScenePack = chosenScenePackId === scenePack.id;
@@ -742,7 +743,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         prompt: builtPrompt.promptText,
         identityUrl: signedIdentity.signedUrl,
         appearanceUrl: signedAppearance.signedUrl,
-        sceneImageUrl: scenePack.reference_image_url,
+        sceneImageUrl,
         hatReferenceUrls: hatRefUsed,
       });
     } catch (e) {
