@@ -30,7 +30,7 @@ export type GuideStatus =
   | "head_turned"
   | "ok";
 
-export type GuideMode = "identity" | "appearance";
+export type GuideMode = "identity" | "appearance" | "medium";
 
 export type FaceBox = {
   /** Normalized (0..1) relative to preview width/height. */
