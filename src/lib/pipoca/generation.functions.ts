@@ -623,6 +623,8 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
 
     if (gen.status === "completed" && gen.final_image_path) {
       const { publicToken, resultPageUrl } = await ensurePublicResultFields(supabaseAdmin, gen);
+      // Auto-enqueue if not already in the print queue (idempotent retry).
+      await ensurePrintQueueEntry(supabaseAdmin, gen.id);
       const { data: signed, error: sErr } = await supabaseAdmin.storage
         .from(GENERATED_BUCKET)
         .createSignedUrl(gen.final_image_path, SIGNED_DOWNLOAD_TTL);
