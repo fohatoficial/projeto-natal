@@ -1352,11 +1352,19 @@ function Processing({
   onError: (msg: string) => void;
 }) {
   const [phraseIdx, setPhraseIdx] = useState(0);
+  const [iconIdx, setIconIdx] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setPhraseIdx((i) => (i + 1) % LOADING_PHRASES.length);
     }, 1600);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIconIdx((i) => (i + 1) % CINEMA_ICONS.length);
+    }, 1400);
     return () => clearInterval(interval);
   }, []);
 
