@@ -13,16 +13,12 @@ const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/,
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
 
-const ENABLE_HAT_REFERENCE = true;
+// Prop references (e.g. cangaceiro hats) are scene-pack-driven via the
+// `prop_references.hat_reference_images` array in the scene pack `prompt`
+// JSON. There is no global toggle and no film-wide fallback URL — a scene
+// pack without explicit prop references sends exactly 3 base images
+// (identity, appearance, scene).
 
-const FIXED_HAT_REFERENCE_URL =
-  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-em-uso-v2.jpg";
-
-const FIXED_HAT_REFERENCE_FRONT_URL =
-  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-frente-v3.png";
-
-const FIXED_HAT_REFERENCE_SIDE_URL =
-  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-lado-v3.png.png";
 
 
 function isUuid(value: unknown): value is string {
@@ -532,16 +528,18 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
 
     const parsedScenePrompt = parseScenePackPrompt(scenePack.prompt);
-    let hatReferenceUrls: string[] = [];
-    let hatRefUsed: string[] = [];
-    if (ENABLE_HAT_REFERENCE) {
-      hatReferenceUrls = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
-      hatRefUsed = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
-      console.log(`${LOG} referências de chapéu fixas ativas (2 URLs)`);
-    }
-    console.log(`${GEN_LOG} hat reference enabled: ${ENABLE_HAT_REFERENCE}`);
-    console.log(`${GEN_LOG} fixed hat references: ${hatRefUsed.length}`);
+    // Prop references are now strictly scene-pack-driven. No global toggle,
+    // no film_id/slug guess, no fixed fallback URL. A scene pack without
+    // `prop_references.hat_reference_images` (or with an empty array) sends
+    // exactly 3 base images.
+    const hatReferenceUrls: string[] = extractHatReferenceUrls(parsedScenePrompt);
+    const hatRefUsed: string[] = hatReferenceUrls.slice(0, 2);
+    console.log(`${GEN_LOG} prop references resolved from scene pack`, {
+      scene_pack_id: chosenScenePackId,
+      hat_reference_count: hatRefUsed.length,
+    });
     const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
+
 
 
     const { data: generation, error: genErr } = await supabaseAdmin
@@ -575,6 +573,18 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     if (hatRefUsed.length > 0) {
       console.log(`${GEN_LOG} usando chapéu como referência secundária`);
     }
+    console.log(`[PIPOCA_GENERATION_REFERENCES]`, {
+      film_id: session.selected_film_id ?? null,
+      scene_pack_id: chosenScenePackId,
+      base_image_count: 3,
+      prop_reference_count: hatRefUsed.length,
+      total_image_count: 3 + hatRefUsed.length,
+      prop_roles: hatRefUsed.length > 0
+        ? ["hat-front", "hat-side"].slice(0, hatRefUsed.length)
+        : [],
+    });
+
+
 
     let prediction: ReplicatePrediction;
     try {
@@ -615,6 +625,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           hat_reference_url_used: hatRefUsed[0] ?? null,
           hat_reference_front_url: hatRefUsed[0] ?? null,
           hat_reference_side_url: hatRefUsed[1] ?? null,
+
           post_process: "neutral-grayscale",
           post_process_contrast: 8,
         },
