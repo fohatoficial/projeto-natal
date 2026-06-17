@@ -466,10 +466,11 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
     const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;
 
-    // Multiple active scene packs: honour session pick if usable, otherwise
-    // randomly pick among the active packs for the film.
+    // Honour session pick only if usable AND it belongs to the same film.
+    // Otherwise pick among the active packs *for this film*. We NEVER fall
+    // back to a pack from another film.
     let scenePack:
-      | { id: string; prompt: unknown; reference_image_url: string | null }
+      | { id: string; prompt: unknown; reference_image_url: string | null; film_id: string }
       | null = null;
 
     const { data: linkedPack } = await supabaseAdmin
@@ -481,17 +482,19 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     const isUsable = (p: any) =>
       p && p.reference_image_url && p.active === true && p.status === "active";
 
-    if (isUsable(linkedPack)) {
+    if (isUsable(linkedPack) && linkedPack!.film_id === session.selected_film_id) {
       scenePack = linkedPack as any;
-    } else if (session.selected_film_id) {
+    } else {
       const { data: candidates, error: candErr } = await supabaseAdmin
         .from("pipoca_scene_packs")
-        .select("id, prompt, reference_image_url, active, status")
+        .select("id, prompt, reference_image_url, active, status, film_id")
         .eq("film_id", session.selected_film_id)
         .eq("active", true)
         .eq("status", "active");
       if (candErr) throw new Error("Falha ao buscar scene packs");
-      const usable = (candidates ?? []).filter(isUsable);
+      const usable = (candidates ?? []).filter(
+        (p: any) => isUsable(p) && p.film_id === session.selected_film_id,
+      );
       if (usable.length === 0) throw new Error("Nenhum scene pack ativo para o filme");
       const picked = usable[Math.floor(Math.random() * usable.length)];
       scenePack = picked as any;
@@ -499,7 +502,35 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
 
     if (!scenePack) throw new Error("Scene pack não encontrado");
     if (!scenePack.reference_image_url) throw new Error("Cena-base sem reference_image_url");
+
+    // Hard consistency lock — never let a scene pack from a different film
+    // through to Replicate, even if upstream data is inconsistent.
+    if (scenePack.film_id !== session.selected_film_id) {
+      console.warn(`${GEN_LOG} SCENE_PACK_FILM_MISMATCH`, {
+        session_film_id: session.selected_film_id,
+        scene_pack_id: scenePack.id,
+        scene_pack_film_id: scenePack.film_id,
+      });
+      throw new Error("SCENE_PACK_FILM_MISMATCH");
+    }
+
     const chosenScenePackId = scenePack.id;
+
+    // Routing log — safe fields only (no signed URLs, no PII).
+    let referenceImageHost: string | null = null;
+    try {
+      referenceImageHost = new URL(scenePack.reference_image_url).host;
+    } catch {
+      referenceImageHost = null;
+    }
+    console.log(`[PIPOCA_FILM_ROUTING]`, {
+      session_film_id: session.selected_film_id,
+      capture_session_id: session.id,
+      resolved_scene_pack_id: chosenScenePackId,
+      resolved_scene_pack_film_id: scenePack.film_id,
+      reference_image_host: referenceImageHost,
+      routing_match: scenePack.film_id === session.selected_film_id,
+    });
 
     const { data: film } = await supabaseAdmin
       .from("pipoca_films")
