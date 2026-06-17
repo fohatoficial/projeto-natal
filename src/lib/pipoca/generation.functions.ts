@@ -12,6 +12,33 @@ const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/,
 
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
+const CIRCO_SCENE_PACK_ID = "407b5a71-6f4d-4fb0-b14a-e8cccab25001";
+const CIRCO_REFERENCE_IMAGE_URL =
+  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/scenes/o-grande-circo-mistico/backstage-circo-encantado-v1.png";
+const CROSS_FILM_PROMPT_CONTAMINATION = "CROSS_FILM_PROMPT_CONTAMINATION";
+const STYLE_PREP_ERROR_MESSAGE = "Não foi possível preparar o estilo deste filme. Tente novamente.";
+const CIRCO_COLOR_INSTRUCTION =
+  "Full color image. Rich deep reds, warm golds and theatrical lighting. Do not generate monochrome, grayscale or black and white.";
+const CIRCO_NEGATIVE_PROMPT_ADDITIONS = [
+  "monochrome",
+  "grayscale",
+  "black and white",
+  "desaturated image",
+  "Cinema Novo aesthetic",
+  "sertão landscape",
+  "cangaço clothing",
+  "cangaceiro hat",
+  "arid desert scenery",
+];
+const CIRCO_FORBIDDEN_POSITIVE_TERMS = [
+  "Cinema Novo",
+  "sertão",
+  "cangaço",
+  "cangaceiro",
+  "monochrome",
+  "black and white",
+  "Glauber Rocha",
+];
 
 // Prop references (e.g. cangaceiro hats) are scene-pack-driven via the
 // `prop_references.hat_reference_images` array in the scene pack `prompt`
@@ -165,6 +192,36 @@ type ReplicatePrediction = {
   output?: string | string[] | null;
   error?: string | null;
   metrics?: { predict_time?: number } | null;
+};
+
+type ScenePackForGeneration = {
+  id: string;
+  film_id: string;
+  scene_name: string | null;
+  prompt: unknown;
+  negative_prompt: string | null;
+  reference_image_url: string | null;
+  visual_style: string | null;
+  color_mode: string | null;
+  framing: string | null;
+  pose_type: string | null;
+};
+
+type PromptDiagnostics = {
+  contains_monochrome: boolean;
+  contains_sertao: boolean;
+  contains_cangaco: boolean;
+  contains_cinema_novo: boolean;
+  contains_circo: boolean;
+  prompt_contamination_detected: boolean;
+};
+
+type BuiltPrompt = {
+  promptText: string;
+  positivePromptText: string;
+  negativePromptText: string;
+  diagnostics: PromptDiagnostics;
+  shouldApplyNeutralGrayscale: boolean;
 };
 
 function getReplicateToken(): string {
