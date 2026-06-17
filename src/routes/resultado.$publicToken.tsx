@@ -200,7 +200,7 @@ function PublicResultPage() {
 
               <div className="rounded-md border border-gold/40 bg-gold/5 p-3 text-center">
                 <p className="font-display text-sm uppercase tracking-wider text-gold">
-                  Sua foto já foi enviada para produção
+                  Sua foto já foi enviada para impressão
                 </p>
                 <p className="mt-1 text-[11px] text-white/75">
                   Dirija-se ao balcão para retirar sua foto.

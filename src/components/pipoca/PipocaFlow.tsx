@@ -1003,15 +1003,18 @@ function OrientAppearance({
     <Screen aurora>
       <Header subtitle="Segunda foto" />
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-5 sm:gap-6">
-        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-gold/60 grid place-items-center animate-badge-in">
-          <svg viewBox="0 0 24 24" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" stroke="#F8BA32" strokeWidth="2">
-            <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+        <div
+          className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full border-2 border-gold/60 grid place-items-center"
+          style={{ animation: "step-back-pulse 1.4s ease-in-out infinite" }}
+        >
+          <svg viewBox="0 0 24 24" className="w-14 h-14 sm:w-20 sm:h-20" fill="none" stroke="#F8BA32" strokeWidth="2">
+            <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl text-white leading-[0.95] animate-fade-up">
+        <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl text-white leading-[0.95] animate-fade-up text-center">
           Agora, <span className="text-gold">dê um passo para trás</span>
         </h1>
-        <p className="text-base sm:text-lg text-white/80 max-w-md animate-fade-up">
+        <p className="text-base sm:text-lg text-white/80 max-w-md animate-fade-up text-center">
           Vamos registrar seu corpo da cintura para cima.
         </p>
       </div>
@@ -1020,6 +1023,12 @@ function OrientAppearance({
           Preparando câmera…
         </p>
       </div>
+      <style>{`
+        @keyframes step-back-pulse {
+          0%, 100% { transform: translateY(0) scale(1); box-shadow: 0 0 0 0 rgba(248,186,50,0.6); }
+          50% { transform: translateY(-14px) scale(1.06); box-shadow: 0 14px 36px 0 rgba(248,186,50,0.15); }
+        }
+      `}</style>
     </Screen>
   );
 }
@@ -1087,20 +1096,29 @@ function Camera({
             maxWidth: "94vw",
           }}
         >
-          {countingDown ? "FIQUE PARADO" : title}
+          {title}
         </h1>
-        {!countingDown ? (
+        <p
+          className="text-white/80"
+          style={{
+            fontSize: "clamp(18px, 2.4vw, 40px)",
+            fontWeight: 700,
+            lineHeight: 1.15,
+            textAlign: "center",
+            maxWidth: "92vw",
+          }}
+        >
+          {hint}
+        </p>
+        {countingDown ? (
           <p
-            className="text-white/80"
+            className="text-gold font-display animate-pulse-soft"
             style={{
-              fontSize: "clamp(18px, 2.4vw, 40px)",
-              fontWeight: 700,
-              lineHeight: 1.1,
-              textAlign: "center",
-              maxWidth: "92vw",
+              fontSize: "clamp(16px, 2vw, 28px)",
+              letterSpacing: "0.2em",
             }}
           >
-            {hint}
+            FIQUE PARADO
           </p>
         ) : null}
 
@@ -1549,7 +1567,7 @@ function Result({
         {slide === 1 && (
           <div className="flex flex-col items-center gap-4 sm:gap-5 w-full animate-fade-up">
             <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95] text-center">
-              SUA FOTO JÁ FOI ENVIADA PARA <span className="text-gold">PRODUÇÃO</span>
+              SUA FOTO JÁ FOI ENVIADA PARA <span className="text-gold">IMPRESSÃO</span>
             </h1>
             <p className="text-sm sm:text-base text-white/80 text-center">
               Dirija-se ao balcão para retirar sua foto.
