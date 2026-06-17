@@ -5,8 +5,9 @@ const LOG = "[PIPOCA_SERVER]";
 const ORIGINALS_BUCKET = "pipoca-visitor-originals";
 const MIN_VALID_BYTES = 2048;
 
-const IDENTITY_NAME = "identity-close.jpg";
-const APPEARANCE_NAME = "appearance-medium.jpg";
+// Single medium-shot file. Identity and appearance both point to it
+// downstream — see generation.functions.ts.
+const MEDIUM_NAME = "visitor-medium.jpg";
 
 const PrepareInput = z.object({
   filmId: z.string().uuid(),
@@ -40,8 +41,6 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
     if (spError) throw new Error("Falha ao localizar scene pack");
     if (!scenePack) throw new Error("Scene pack indisponível para este filme");
 
-    // If a visitorId was provided, ensure the visitor exists and granted
-    // experience consent before linking it to the session.
     let linkedVisitorId: string | null = null;
     if (data.visitorId) {
       const { data: visitor } = await supabaseAdmin
@@ -77,28 +76,20 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
       .single();
     if (captureError || !capture) throw new Error("Falha ao criar captura");
 
-    const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
-    const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;
+    const mediumPath = `${session.id}/${capture.id}/${MEDIUM_NAME}`;
 
-    // We still record identity-close.jpg in `original_photo_path` for backward
-    // compatibility with the existing schema (no new column was created).
     const { error: updateError } = await supabaseAdmin
       .from("pipoca_captures")
-      .update({ original_photo_path: identityPath })
+      .update({ original_photo_path: mediumPath })
       .eq("id", capture.id);
     if (updateError) throw new Error("Falha ao registrar caminho");
 
-    const { data: signedIdentity, error: sIdErr } = await supabaseAdmin.storage
+    const { data: signedMedium, error: sMedErr } = await supabaseAdmin.storage
       .from(ORIGINALS_BUCKET)
-      .createSignedUploadUrl(identityPath);
-    if (sIdErr || !signedIdentity) throw new Error("Falha ao criar URL de upload (identidade)");
+      .createSignedUploadUrl(mediumPath);
+    if (sMedErr || !signedMedium) throw new Error("Falha ao criar URL de upload");
 
-    const { data: signedAppearance, error: sApErr } = await supabaseAdmin.storage
-      .from(ORIGINALS_BUCKET)
-      .createSignedUploadUrl(appearancePath);
-    if (sApErr || !signedAppearance) throw new Error("Falha ao criar URL de upload (aparência)");
-
-    console.log(`${LOG} dois uploads assinados criados`, {
+    console.log(`${LOG} upload assinado criado (single medium)`, {
       sessionId: session.id,
       captureId: capture.id,
     });
@@ -107,8 +98,7 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
       sessionId: session.id as string,
       captureId: capture.id as string,
       uploads: {
-        identity: { path: identityPath, token: signedIdentity.token },
-        appearance: { path: appearancePath, token: signedAppearance.token },
+        medium: { path: mediumPath, token: signedMedium.token },
       },
     };
   });
@@ -132,27 +122,19 @@ export const confirmPipocaCaptureUpload = createServerFn({ method: "POST" })
     if (!capture) throw new Error("Captura não encontrada");
     if (capture.session_id !== data.sessionId) throw new Error("Sessão inválida");
 
-    // Server-derived paths only — never trust client.
     const folder = `${data.sessionId}/${data.captureId}`;
-    const identityPath = `${folder}/${IDENTITY_NAME}`;
-    const appearancePath = `${folder}/${APPEARANCE_NAME}`;
+    const mediumPath = `${folder}/${MEDIUM_NAME}`;
 
-    // List the capture folder and verify both files exist with minimum size.
     const { data: listing, error: listErr } = await supabaseAdmin.storage
       .from(ORIGINALS_BUCKET)
       .list(folder, { limit: 100 });
     if (listErr) throw new Error("Falha ao listar uploads");
 
-    const idEntry = listing?.find((f) => f.name === IDENTITY_NAME);
-    const apEntry = listing?.find((f) => f.name === APPEARANCE_NAME);
-    const idSize = (idEntry?.metadata as { size?: number } | undefined)?.size ?? 0;
-    const apSize = (apEntry?.metadata as { size?: number } | undefined)?.size ?? 0;
+    const medEntry = listing?.find((f) => f.name === MEDIUM_NAME);
+    const medSize = (medEntry?.metadata as { size?: number } | undefined)?.size ?? 0;
 
-    if (!idEntry || idSize < MIN_VALID_BYTES) {
-      throw new Error("Foto de identidade ausente ou inválida");
-    }
-    if (!apEntry || apSize < MIN_VALID_BYTES) {
-      throw new Error("Foto de aparência ausente ou inválida");
+    if (!medEntry || medSize < MIN_VALID_BYTES) {
+      throw new Error("Foto ausente ou inválida");
     }
 
     const { error: updCapErr } = await supabaseAdmin
@@ -160,7 +142,7 @@ export const confirmPipocaCaptureUpload = createServerFn({ method: "POST" })
       .update({
         validation_status: "uploaded",
         validation_error: null,
-        original_photo_path: identityPath,
+        original_photo_path: mediumPath,
       })
       .eq("id", data.captureId);
     if (updCapErr) throw new Error("Falha ao confirmar captura");
@@ -171,7 +153,7 @@ export const confirmPipocaCaptureUpload = createServerFn({ method: "POST" })
       .eq("id", data.sessionId);
     if (updSesErr) throw new Error("Falha ao confirmar sessão");
 
-    console.log(`${LOG} duas fotos confirmadas`, {
+    console.log(`${LOG} foto única confirmada`, {
       sessionId: data.sessionId,
       captureId: data.captureId,
     });
@@ -180,6 +162,6 @@ export const confirmPipocaCaptureUpload = createServerFn({ method: "POST" })
       success: true as const,
       sessionId: data.sessionId,
       captureId: data.captureId,
-      paths: { identity: identityPath, appearance: appearancePath },
+      paths: { medium: mediumPath },
     };
   });
