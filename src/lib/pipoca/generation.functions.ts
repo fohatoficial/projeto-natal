@@ -466,8 +466,8 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         metadata: {
           model: REPLICATE_MODEL,
           attempt: attemptNumber,
-          identity_photo_path: identityPath,
-          appearance_photo_path: appearancePath,
+          medium_photo_path: mediumPath,
+          single_photo_compat: true,
           input_image_count: inputImageCount,
           scene_pack_id: chosenScenePackId,
           hat_reference_enabled: ENABLE_HAT_REFERENCE,
