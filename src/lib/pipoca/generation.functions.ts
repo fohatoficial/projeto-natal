@@ -553,13 +553,11 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     // Honour session pick only if usable AND it belongs to the same film.
     // Otherwise pick among the active packs *for this film*. We NEVER fall
     // back to a pack from another film.
-    let scenePack:
-      | { id: string; prompt: unknown; reference_image_url: string | null; film_id: string }
-      | null = null;
+    let scenePack: ScenePackForGeneration | null = null;
 
     const { data: linkedPack } = await supabaseAdmin
       .from("pipoca_scene_packs")
-      .select("id, prompt, reference_image_url, active, status, film_id")
+      .select("id, film_id, scene_name, prompt, negative_prompt, reference_image_url, visual_style, color_mode, framing, pose_type, active, status")
       .eq("id", session.scene_pack_id)
       .maybeSingle();
 
@@ -571,7 +569,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     } else {
       const { data: candidates, error: candErr } = await supabaseAdmin
         .from("pipoca_scene_packs")
-        .select("id, prompt, reference_image_url, active, status, film_id")
+        .select("id, film_id, scene_name, prompt, negative_prompt, reference_image_url, visual_style, color_mode, framing, pose_type, active, status")
         .eq("film_id", session.selected_film_id)
         .eq("active", true)
         .eq("status", "active");
