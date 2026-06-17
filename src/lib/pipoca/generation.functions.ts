@@ -537,9 +537,8 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     try {
       prediction = await createReplicatePrediction({
         prompt: promptText,
-        // Single medium-shot URL used for both roles. Temporary mapping.
-        identityUrl: signedMediumUrl,
-        appearanceUrl: signedMediumUrl,
+        identityUrl,
+        appearanceUrl,
         sceneImageUrl: scenePack.reference_image_url,
         hatReferenceUrl,
       });
@@ -564,8 +563,8 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         metadata: {
           model: REPLICATE_MODEL,
           attempt: attemptNumber,
-          medium_photo_path: mediumPath,
-          single_photo_compat: true,
+          identity_photo_path: identityPath,
+          appearance_photo_path: appearancePath,
           input_image_count: inputImageCount,
           scene_pack_id: chosenScenePackId,
           hat_reference_enabled: ENABLE_HAT_REFERENCE,
