@@ -470,7 +470,7 @@ export function PipocaFlow() {
           firstName={firstName}
           onDone={() => {
             console.log(`${UX} stories concluídos, abrindo câmera`);
-            transitionTo(() => setStep("camera_medium"));
+            transitionTo(() => setStep("camera_identity_simple"));
           }}
           onChangeFilm={() => {
             releaseSharedCamera();
@@ -481,14 +481,26 @@ export function PipocaFlow() {
           }}
         />
       )}
-      {step === "camera_medium" && (
+      {step === "camera_identity_simple" && (
         <GuidedCamera
-          mode="medium"
-          confirming={uploadStatus !== "idle" && uploadStatus !== "error"}
-          onConfirm={handleMediumConfirm}
+          shotType="identity"
+          confirming={false}
+          onConfirm={handleIdentityConfirm}
           onBack={() =>
             transitionTo(() => {
               setStep("stories");
+            })
+          }
+        />
+      )}
+      {step === "camera_appearance_simple" && (
+        <GuidedCamera
+          shotType="appearance"
+          confirming={uploadStatus !== "idle" && uploadStatus !== "error"}
+          onConfirm={handleAppearanceConfirm}
+          onBack={() =>
+            transitionTo(() => {
+              setStep("camera_identity_simple");
             })
           }
         />
@@ -535,7 +547,7 @@ export function PipocaFlow() {
         <UploadError
           stage={uploadError}
           onRetry={() => {
-            if (mediumPhoto) void runUpload(mediumPhoto);
+            if (identityPhoto && appearancePhoto) void runUpload(identityPhoto, appearancePhoto);
           }}
           onRetake={retakeAll}
         />
