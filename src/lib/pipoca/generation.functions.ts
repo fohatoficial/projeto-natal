@@ -482,7 +482,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     const isUsable = (p: any) =>
       p && p.reference_image_url && p.active === true && p.status === "active";
 
-    if (isUsable(linkedPack) && linkedPack.film_id === session.selected_film_id) {
+    if (isUsable(linkedPack) && linkedPack!.film_id === session.selected_film_id) {
       scenePack = linkedPack as any;
     } else {
       const { data: candidates, error: candErr } = await supabaseAdmin
