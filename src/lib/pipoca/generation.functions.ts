@@ -407,8 +407,10 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
 
     
+    const hatReferenceUrl = ENABLE_HAT_REFERENCE ? FIXED_HAT_REFERENCE_URL : null;
+    const inputImageCount = hatReferenceUrl ? 4 : 3;
     console.log(`${GEN_LOG} hat reference enabled: ${ENABLE_HAT_REFERENCE}`);
-    const promptText = buildPromptText(scenePack.prompt, film?.title, false);
+    const promptText = buildPromptText(scenePack.prompt, film?.title, Boolean(hatReferenceUrl));
 
 
     const { data: generation, error: genErr } = await supabaseAdmin
@@ -426,10 +428,12 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .single();
     if (genErr || !generation) throw new Error("Falha ao criar registro de geração");
 
-    console.log(`${GEN_LOG} geração com 3 imagens`, {
+    console.log(`${GEN_LOG} geração com ${inputImageCount} imagens`, {
       generationId: generation.id,
       attempt: attemptNumber,
-      order: ["identity-close", "appearance-medium", "scene-base"],
+      order: hatReferenceUrl
+        ? ["identity-close", "appearance-medium", "scene-base", "hat-reference"]
+        : ["identity-close", "appearance-medium", "scene-base"],
     });
 
     let prediction: ReplicatePrediction;
@@ -439,6 +443,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         identityUrl: signedIdentity.signedUrl,
         appearanceUrl: signedAppearance.signedUrl,
         sceneImageUrl: scenePack.reference_image_url,
+        hatReferenceUrl,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "erro desconhecido";
@@ -463,9 +468,10 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           attempt: attemptNumber,
           identity_photo_path: identityPath,
           appearance_photo_path: appearancePath,
-          input_image_count: 3,
+          input_image_count: inputImageCount,
           scene_pack_id: chosenScenePackId,
-          hat_reference_enabled: false,
+          hat_reference_enabled: ENABLE_HAT_REFERENCE,
+          hat_reference_url_used: hatReferenceUrl,
           post_process: "neutral-grayscale",
           post_process_contrast: 8,
         },
