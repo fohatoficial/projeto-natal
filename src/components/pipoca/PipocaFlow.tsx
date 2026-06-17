@@ -1552,29 +1552,39 @@ function Result({
               Leve sua <span className="text-gold">cena</span>
             </h1>
 
-            <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-3 sm:p-4 w-full max-w-sm">
-              <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center">
-                {resultPageUrl ? (
+            <div className="flex flex-col items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-4 sm:p-5 w-full max-w-md">
+              <div className="bg-white p-3 rounded-lg grid place-items-center">
+                {tokenReady && resultPageUrl ? (
                   <QRCodeSVG
                     value={resultPageUrl}
-                    size={110}
+                    size={280}
                     level="M"
-                    marginSize={2}
+                    marginSize={4}
                     bgColor="#FFFFFF"
                     fgColor="#000000"
                   />
                 ) : (
-                  <div className="w-28 h-28 bg-white/40 animate-pulse rounded" />
+                  <div
+                    className="grid place-items-center text-[#000C20] font-display uppercase tracking-wider text-center px-4"
+                    style={{ width: 280, height: 280 }}
+                  >
+                    PREPARANDO SEU QR CODE...
+                  </div>
                 )}
               </div>
-              <div className="text-left min-w-0">
-                <p className="text-[10px] uppercase tracking-[0.25em] text-gold">
-                  Escaneie para baixar
-                </p>
-                <p className="text-sm text-white/85 leading-snug">
-                  Salve e compartilhe sua imagem cinematográfica.
-                </p>
-              </div>
+              <p className="text-sm sm:text-base text-white/85 leading-snug text-center uppercase tracking-wider font-semibold">
+                Aponte a câmera do celular para baixar sua foto
+              </p>
+              {tokenReady && resultPageUrl ? (
+                <a
+                  href={resultPageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="pointer-events-auto inline-block px-5 py-2.5 rounded-md border border-gold/60 text-gold font-semibold tracking-wider uppercase text-xs hover:bg-gold/10 transition"
+                >
+                  Abrir resultado
+                </a>
+              ) : null}
             </div>
           </div>
         )}
