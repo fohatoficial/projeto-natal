@@ -257,7 +257,7 @@
     text-shadow: 0 2px 14px rgba(0,0,0,0.6);
     max-width: 94vw;
     transition: color 180ms ease;
-    font-size: clamp(2.2rem, 4.2dvh, 3.8rem);
+    font-size: clamp(2.6rem, 4.8dvh, 4.4rem);
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -274,7 +274,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(20px, 3dvh, 36px);
+    gap: clamp(26px, 3.6dvh, 44px);
   }
   .pipoca-camera-frame {
     position: relative;
@@ -303,7 +303,7 @@
     line-height: 0.9;
     color: var(--gold);
     text-shadow: 0 4px 28px rgba(248,186,50,0.55);
-    font-size: clamp(5.2rem, 8.5dvh, 8.5rem);
+    font-size: clamp(6rem, 9.5dvh, 9.5rem);
     transform-origin: center;
     will-change: transform, opacity;
     animation: pipoca-count-pop 320ms cubic-bezier(.34,1.56,.64,1) both;
@@ -343,7 +343,7 @@
   /* Tablet/totem portrait — bigger text, kept right above the preview. */
   @media (orientation: portrait) and (min-height: 1100px) {
     .pipoca-camera-preview-wrap {
-      gap: clamp(30px, 4.2dvh, 52px);
+      gap: clamp(38px, 5.2dvh, 62px);
     }
     .pipoca-camera-hint {
       font-size: clamp(3.6rem, 5.6dvh, 6rem);
