@@ -1716,15 +1716,19 @@ function GuidedCamera({
   }, [videoRef, mode]);
 
   const performCapture = useCallback(async () => {
-    if (captureRef.current) return;
+    if (captureRef.current || captureCompletedRef.current) return;
     captureRef.current = true;
+    captureInProgressRef.current = true;
     const result = await capture4x5();
     if (!result) {
       captureRef.current = false;
+      captureInProgressRef.current = false;
       setCountdown(null);
       setUiState("error");
       return;
     }
+    captureCompletedRef.current = true;
+    captureInProgressRef.current = false;
     setFlashKey((k) => k + 1);
     setCaptured(result);
     setCountdown(null);
@@ -1732,7 +1736,9 @@ function GuidedCamera({
   }, [capture4x5]);
 
   const startCountdown = useCallback(() => {
-    if (uiState !== "ready" || !ready || captureRef.current) return;
+    if (countdownStartedRef.current) return;
+    if (!ready || captureRef.current || captureCompletedRef.current) return;
+    countdownStartedRef.current = true;
     setUiState("counting");
     setCountdown(3);
     logUi("countdown_start");
@@ -1741,7 +1747,7 @@ function GuidedCamera({
       if (next < 0) {
         timerRef.current = window.setTimeout(() => {
           void performCapture();
-        }, 850);
+        }, 800);
         return;
       }
       timerRef.current = window.setTimeout(() => {
@@ -1750,12 +1756,34 @@ function GuidedCamera({
       }, 1000);
     };
     schedule(2);
-  }, [uiState, ready, logUi, performCapture]);
+  }, [ready, logUi, performCapture]);
+
+  // Auto-start the 3-2-1 countdown ~1.2s after camera becomes ready, with
+  // refs guarding against rerenders / Strict Mode double-invokes.
+  useEffect(() => {
+    if (!ready) return;
+    if (captured) return;
+    if (countdownStartedRef.current) return;
+    if (captureCompletedRef.current) return;
+    const v = videoRef.current;
+    if (!v || !v.videoWidth || !v.videoHeight) return;
+    clearAutostartTimer();
+    autostartTimerRef.current = window.setTimeout(() => {
+      startCountdown();
+    }, 1200);
+    return () => {
+      clearAutostartTimer();
+    };
+  }, [ready, captured, videoRef, startCountdown]);
 
   const handleRetake = useCallback(() => {
     clearTimer();
+    clearAutostartTimer();
     captureRef.current = false;
     confirmRef.current = false;
+    countdownStartedRef.current = false;
+    captureInProgressRef.current = false;
+    captureCompletedRef.current = false;
     if (captured) URL.revokeObjectURL(captured.url);
     setCaptured(null);
     setCountdown(null);
@@ -1772,16 +1800,13 @@ function GuidedCamera({
 
   let hint = "ABRINDO A CÂMERA";
   if (uiState === "captured") {
-    hint = "FOTO CAPTURADA";
+    hint = confirming ? "PREPARANDO..." : "FOTO CAPTURADA";
   } else if (uiState === "counting") {
     hint = "FIQUE PARADO";
   } else if (uiState === "error") {
     hint = "TENTE NOVAMENTE";
   } else if (ready) {
-    hint =
-      hintToggle % 2 === 0
-        ? "APAREÇA DA CABEÇA ATÉ A CINTURA"
-        : "FIQUE DE FRENTE PARA A CÂMERA";
+    hint = "PREPARE-SE PARA A FOTO";
   }
   const hintClass = `pipoca-camera-hint ${
     uiState === "captured"
@@ -1838,33 +1863,24 @@ function GuidedCamera({
       </div>
 
       <div className="pipoca-camera-footer">
-        {uiState === "ready" || uiState === "error" ? (
-          <>
-            <button
-              type="button"
-              onClick={startCountdown}
-              disabled={!ready}
-              className="pipoca-cta-primary"
-              style={{ touchAction: "manipulation" }}
-            >
-              TIRAR FOTO
-            </button>
-            <GhostBtn onClick={onBack}>Voltar</GhostBtn>
-          </>
+        {uiState === "ready" || uiState === "counting" || uiState === "error" ? (
+          <GhostBtn onClick={onBack}>Voltar</GhostBtn>
         ) : null}
         {uiState === "captured" ? (
           <>
             <button
               type="button"
               onClick={handleUse}
+              disabled={confirming || confirmRef.current}
               className="pipoca-cta-primary"
               style={{ touchAction: "manipulation" }}
             >
-              USAR ESTA FOTO
+              {confirming ? "PREPARANDO..." : "USAR ESTA FOTO"}
             </button>
             <button
               type="button"
               onClick={handleRetake}
+              disabled={confirming}
               className="pipoca-cta-secondary"
               style={{ touchAction: "manipulation" }}
             >
