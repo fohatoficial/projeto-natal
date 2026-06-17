@@ -121,6 +121,16 @@ const THRESHOLDS: Record<GuideMode, Thresholds> = {
     cyMax: 0.44,
     stableMs: 1400,
   },
+  // Medium = appearance alias (kept for compat; capture is manual now).
+  medium: {
+    wMin: 0.12,
+    wMax: 0.24,
+    cxMin: 0.4,
+    cxMax: 0.6,
+    cyMin: 0.26,
+    cyMax: 0.44,
+    stableMs: 1400,
+  },
 };
 
 export function getStableMs(mode: GuideMode): number {
