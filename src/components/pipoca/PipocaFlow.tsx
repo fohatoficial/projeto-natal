@@ -1548,9 +1548,12 @@ function Result({
 
         {slide === 1 && (
           <div className="flex flex-col items-center gap-4 sm:gap-5 w-full animate-fade-up">
-            <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95]">
-              Leve sua <span className="text-gold">cena</span>
+            <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95] text-center">
+              SUA FOTO JÁ FOI ENVIADA PARA <span className="text-gold">PRODUÇÃO</span>
             </h1>
+            <p className="text-sm sm:text-base text-white/80 text-center">
+              Dirija-se ao balcão para retirar sua foto.
+            </p>
 
             <div className="flex flex-col items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-4 sm:p-5 w-full max-w-md">
               <div className="bg-white p-3 rounded-lg grid place-items-center">
