@@ -1593,6 +1593,10 @@ function GuidedCamera({
   });
   const captureRef = useRef(false);
   const confirmRef = useRef(false);
+  const countdownStartedRef = useRef(false);
+  const captureInProgressRef = useRef(false);
+  const captureCompletedRef = useRef(false);
+  const autostartTimerRef = useRef<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const loggedMountRef = useRef(false);
   const hintRef = useRef<HTMLParagraphElement | null>(null);
