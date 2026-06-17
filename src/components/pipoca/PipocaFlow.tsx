@@ -1082,47 +1082,6 @@ function StoryPrepare({ cameraStatus, firstName }: { cameraStatus: ReturnType<ty
 }
 
 
-/* ---------- Step 2b: Orient appearance (between identity and appearance captures) ---------- */
-
-function OrientAppearance({
-  onNext,
-}: {
-  onNext: () => void;
-}) {
-  const firedRef = useRef(false);
-  useEffect(() => {
-    if (firedRef.current) return;
-    const t = window.setTimeout(() => {
-      firedRef.current = true;
-      onNext();
-    }, 2000);
-    return () => window.clearTimeout(t);
-  }, [onNext]);
-
-  return (
-    <Screen aurora>
-      <Header subtitle="Segunda foto" />
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-5 sm:gap-6">
-        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-gold/60 grid place-items-center animate-badge-in">
-          <svg viewBox="0 0 24 24" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" stroke="#F8BA32" strokeWidth="2">
-            <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl text-white leading-[0.95] animate-fade-up">
-          Agora, <span className="text-gold">dê um passo para trás</span>
-        </h1>
-        <p className="text-base sm:text-lg text-white/80 max-w-md animate-fade-up">
-          Vamos registrar seu corpo da cintura para cima.
-        </p>
-      </div>
-      <div className="relative z-10 shrink-0">
-        <p className="text-[10px] uppercase tracking-[0.3em] text-white/50">
-          Preparando câmera…
-        </p>
-      </div>
-    </Screen>
-  );
-}
 
 /* ---------- (Legacy Camera with fixed mask removed — both captures now use GuidedCamera) ---------- */
 
@@ -1182,86 +1141,6 @@ function CameraError({
   );
 }
 
-/* ---------- Step 4: Confirm ---------- */
-
-function Confirm({
-  identityUrl,
-  appearanceUrl,
-  onRetake,
-  onUse,
-}: {
-  identityUrl: string;
-  appearanceUrl: string;
-  onRetake: () => void;
-  onUse: () => void;
-}) {
-  const [remaining, setRemaining] = useState(5);
-  const firedRef = useRef(false);
-
-  useEffect(() => {
-    if (firedRef.current) return;
-    if (remaining <= 0) {
-      firedRef.current = true;
-      onUse();
-      return;
-    }
-    const t = window.setTimeout(() => setRemaining((r) => r - 1), 1000);
-    return () => window.clearTimeout(t);
-  }, [remaining, onUse]);
-
-  return (
-    <Screen aurora>
-      <Header subtitle="Pré-visualização" />
-
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-3 gap-3 sm:gap-4">
-        <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
-          Confira suas <span className="text-gold">fotos</span>
-        </h1>
-
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-[520px]">
-          <div className="flex flex-col items-center gap-1.5 animate-pop-in">
-            <ConfirmThumb url={identityUrl} alt="Foto de rosto" mirror logTag="confirm-identity" />
-            <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
-              Foto de rosto
-            </span>
-          </div>
-          <div className="flex flex-col items-center gap-1.5 animate-pop-in">
-            <ConfirmThumb url={appearanceUrl} alt="Foto de corpo" mirror logTag="confirm-appearance" />
-            <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
-              Foto de corpo
-            </span>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-2 pt-1">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full border-2 border-gold grid place-items-center">
-              <span className="font-display text-2xl text-gold leading-none">
-                {Math.max(remaining, 0)}
-              </span>
-            </div>
-            <p className="text-sm sm:text-base text-white/80 max-w-[18rem] text-left">
-              Se estiver tudo certo, vamos continuar automaticamente.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 shrink-0">
-        <button
-          type="button"
-          onClick={() => {
-            firedRef.current = true;
-            onRetake();
-          }}
-          className="text-xs uppercase tracking-[0.3em] text-white/55 hover:text-white/85 underline underline-offset-4 py-2 px-3"
-        >
-          Tirar fotos novamente
-        </button>
-      </div>
-    </Screen>
-  );
-}
 
 
 /* ---------- Step 5: Processing ---------- */
@@ -1661,31 +1540,6 @@ function VisitorRegistration({
 }
 
 
-/* ---------- Confirm thumbnail (no black bars: blurred bg + contain) ---------- */
-
-function ConfirmThumb({
-  url,
-  alt,
-  mirror,
-  logTag,
-}: {
-  url: string;
-  alt: string;
-  mirror?: boolean;
-  logTag: string;
-}) {
-  return (
-    <div className="relative w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10 bg-black">
-      <PipocaImage
-        src={url}
-        alt={alt}
-        fit="cover"
-        logTag={logTag}
-        style={mirror ? { transform: "scaleX(-1)" } : undefined}
-      />
-    </div>
-  );
-}
 
 /* ---------- Guided camera (manual capture: button + 3-2-1 countdown) ---------- */
 

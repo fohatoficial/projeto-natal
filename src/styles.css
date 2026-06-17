@@ -249,15 +249,15 @@
   }
   .pipoca-camera-hint {
     font-family: var(--font-display);
-    font-weight: 800;
-    line-height: 1.04;
+    font-weight: 900;
+    line-height: 1;
     letter-spacing: 0.02em;
     text-align: center;
     color: #ffffff;
     text-shadow: 0 2px 14px rgba(0,0,0,0.6);
     max-width: 94vw;
     transition: color 180ms ease;
-    font-size: clamp(2.6rem, 4.8dvh, 4.4rem);
+    font-size: clamp(48px, 6.2vw, 104px) !important;
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -274,13 +274,13 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(26px, 3.6dvh, 44px);
+    gap: clamp(12px, 2vh, 32px);
   }
   .pipoca-camera-frame {
     position: relative;
     aspect-ratio: 4 / 5;
-    width: min(78vw, 520px);
-    max-height: 62dvh;
+    width: min(82vw, 760px);
+    max-height: 60dvh;
     border-radius: 18px;
     overflow: hidden;
     border: 1px solid rgba(255,255,255,0.15);
@@ -300,10 +300,11 @@
   .pipoca-camera-countdown {
     font-family: var(--font-display);
     font-weight: 900;
-    line-height: 0.9;
+    line-height: 0.8;
     color: var(--gold);
     text-shadow: 0 4px 28px rgba(248,186,50,0.55);
-    font-size: clamp(6rem, 9.5dvh, 9.5rem);
+    font-size: clamp(120px, 16vw, 280px) !important;
+    text-align: center;
     transform-origin: center;
     will-change: transform, opacity;
     animation: pipoca-count-pop 320ms cubic-bezier(.34,1.56,.64,1) both;
@@ -315,8 +316,9 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(8px, 1dvh, 16px);
+    gap: clamp(10px, 1.4dvh, 20px);
     min-height: 72px;
+    padding-bottom: clamp(8px, 1.2dvh, 20px);
   }
   .pipoca-camera-flash {
     position: absolute;
@@ -340,43 +342,53 @@
     .pipoca-camera-flash { animation: none !important; }
   }
 
-  /* Tablet/totem portrait — bigger text, kept right above the preview. */
-  @media (orientation: portrait) and (min-height: 1100px) {
-    .pipoca-camera-preview-wrap {
-      gap: clamp(38px, 5.2dvh, 62px);
-    }
+  /* Mobile / narrow viewports — keep things legible without overflowing. */
+  @media (max-width: 600px) {
     .pipoca-camera-hint {
-      font-size: clamp(4.2rem, 6.4dvh, 6.8rem);
-      font-weight: 900;
-      line-height: 0.98;
+      font-size: clamp(30px, 8vw, 44px) !important;
     }
     .pipoca-camera-countdown {
-      font-size: clamp(8.5rem, 11.5dvh, 12.5rem);
-      font-weight: 900;
-      line-height: 0.85;
-    }
-    .pipoca-camera-frame {
-      width: min(82vw, 760px);
-      max-height: 60dvh;
+      font-size: clamp(80px, 24vw, 140px) !important;
     }
   }
 
-  /* Real 43" totem (1080x1920+). Same model, larger scale. */
-  @media screen and (min-height: 1400px) and (min-width: 700px) {
-    .pipoca-camera-preview-wrap {
-      gap: clamp(52px, 6svh, 84px);
-    }
-    .pipoca-camera-hint {
-      font-size: clamp(5.2rem, 7.2dvh, 8.4rem) !important;
-    }
-    .pipoca-camera-countdown {
-      font-size: clamp(10.2rem, 13.5dvh, 15.5rem) !important;
-    }
-    .pipoca-camera-frame {
-      width: min(82vw, 820px) !important;
-      max-height: 62svh !important;
-    }
+  /* Manual capture CTAs — standalone styling so totem .max-w/.bg-gold
+     overrides don't shrink them. */
+  .pipoca-cta-primary {
+    min-height: 88px;
+    width: min(80vw, 620px);
+    font-size: clamp(28px, 3vw, 42px);
+    font-weight: 800;
+    font-family: var(--font-display);
+    letter-spacing: 0.04em;
+    background: var(--gold);
+    color: var(--cinema);
+    border: 0;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: transform 120ms ease, opacity 120ms ease;
+    box-shadow: 0 12px 30px rgba(248,186,50,0.25);
   }
+  .pipoca-cta-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pipoca-cta-primary:active:not(:disabled) { transform: scale(0.98); }
+  .pipoca-cta-secondary {
+    min-height: 72px;
+    width: min(80vw, 620px);
+    font-size: clamp(20px, 2.2vw, 30px);
+    font-weight: 700;
+    font-family: var(--font-display);
+    letter-spacing: 0.04em;
+    background: transparent;
+    color: rgba(255,255,255,0.85);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 14px;
+    cursor: pointer;
+  }
+  .pipoca-cta-secondary:active { background: rgba(255,255,255,0.06); }
+  @media (min-width: 1024px) {
+    .pipoca-cta-primary { min-height: 110px; }
+  }
+
 
 
 
