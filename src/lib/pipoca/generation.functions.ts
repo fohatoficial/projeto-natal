@@ -345,8 +345,8 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
 
     // Server-derived paths only.
-    const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
-    const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;
+    // Single medium-shot file — used as identity AND appearance below.
+    const mediumPath = `${session.id}/${capture.id}/${MEDIUM_NAME}`;
 
     // Multiple active scene packs: honour session pick if usable, otherwise
     // randomly pick among the active packs for the film.
