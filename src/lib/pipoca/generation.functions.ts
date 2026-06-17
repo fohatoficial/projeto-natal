@@ -146,31 +146,36 @@ function extractHatUsage(parsedPrompt: unknown): string | null {
 function buildPromptText(
   rawPrompt: unknown,
   filmTitle?: string | null,
-  _hasHatRef = false,
+  hasHatRef = false,
 ): string {
   const parsed = parseScenePackPrompt(rawPrompt);
   const parts: string[] = [];
 
-  // 1. Reference roles — only three images
+  // 1. Reference roles
   parts.push(
     "Image 1 is the EXCLUSIVE FACIAL IDENTITY REFERENCE. It is a close, guided portrait of the visitor and is the only source for face, identity, face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair, eyebrows, glasses, and apparent age.",
   );
   parts.push(
-    "Image 2 is the APPEARANCE REFERENCE. Use it for body, proportions, posture, shoulders, torso and base clothing of the same visitor. Do not take facial features from Image 2.",
+    "Image 2 is the APPEARANCE REFERENCE. Use it for body proportions, posture, shoulders, torso, general appearance and base clothing of the same visitor. Do not take facial features from Image 2.",
   );
   parts.push(
     "Image 3 is the SCENE REFERENCE. Use it for environment, sertão landscape, composition, lighting direction and cinematic atmosphere. Do not take facial features from Image 3.",
   );
-  parts.push(
-    "Do not blend facial features from Images 2 or 3 into the visitor's face. Image 1 is the only facial identity reference.",
-  );
+  if (hasHatRef) {
+    parts.push(
+      "Image 4 is a HAT DESIGN CUE only. Use it as visual reference for the cangaceiro hat shape, scale and natural fit on the head. Do not take facial features, body, clothing, pose or environment from Image 4. Image 4 must never override or distort the visitor's identity, face, hairstyle, clothing, pose or the environment.",
+    );
+  }
 
-  // 2. Identity rule
+  // 2. Identity protection
   parts.push(
-    "Exactly one person in the final image, clearly recognizable as the visitor from Image 1. Wardrobe and environment adapt to the visitor; the visitor's face is never altered to fit the style.",
+    "The generated person must be clearly recognizable as the visitor from Image 1. Preserve face shape, eye spacing, nose shape, mouth shape, jawline, hairline, hairstyle, skin tone and facial characteristics. Do not create a different person.",
   );
   parts.push(
-    "The visitor is naturally integrated into the environment from Image 3: matching scale, posture, skin light, contact shadows and depth of field.",
+    `Do not blend facial features from Images 2, 3${hasHatRef ? " or 4" : ""} into the visitor's face. Image 1 is the only facial identity reference.`,
+  );
+  parts.push(
+    "Exactly one person in the final image. The visitor is naturally integrated into the environment from Image 3: matching scale, posture, skin light, contact shadows and depth of field.",
   );
 
   // 3. Style
@@ -181,14 +186,20 @@ function buildPromptText(
     "Austere Brazilian Cinema Novo mood in the spirit of Glauber Rocha — serious, iconic, mythic. Expression neutral or mildly serious, never smiling.",
   );
 
-  // 4. Wardrobe
+  // 4. Wardrobe / clothing
   parts.push(
-    "WARDROBE: rustic, timeless, northeastern Brazilian sertão. No modern t-shirts, jeans, sneakers or streetwear. Clothing complete, coherent and clearly visible.",
+    "WARDROBE: historically inspired by Brazilian cangaço and northeastern sertão. Rustic, natural, dusty, believable and non-theatrical. Leather details are welcome. No modern clothing, no t-shirt, no jeans, no sneakers, no streetwear, no costume-party look, no fantasy exaggeration. Clothing must remain visible and coherent with the framing.",
+  );
+  parts.push(
+    "The wardrobe must look authentic, restrained and cinematic, not caricatured.",
   );
 
-  // 5. Hat — text-only costume cue
+  // 5. Hat
   parts.push(
-    "HAT: the visitor may wear a traditional Brazilian cangaceiro leather hat, historically appropriate, worn naturally, proportional to the head, never oversized or theatrical, never a cowboy or western wide-brim hat. Hat is figurino only and must not influence facial identity.",
+    "HAT: traditional Brazilian cangaceiro leather hat, historically appropriate, worn naturally, proportional to the head and visually integrated with the outfit. May include subtle front ornamentation. Must not be oversized, must not be theatrical, must not dominate the image, must not cover the face, must not reduce facial recognizability. Never a cowboy or western wide-brim hat.",
+  );
+  parts.push(
+    "The hat is important, but it is secondary to identity, clothing and scene.",
   );
 
   const hatUsage = extractHatUsage(parsed);
@@ -199,15 +210,23 @@ function buildPromptText(
     "A small wooden cross may appear in the composition — visible but secondary.",
   );
 
-  // 7. Composition
+  // 7. Framing
   parts.push(
-    "Vertical 4:5 framing, cinematic composition, shallow depth of field. Medium or medium-full shot showing the visitor from head to waist or just above the knees. The environment must remain visible and the rustic clothing fully visible.",
-  );
-  parts.push(
-    "HIERARCHY: Image 1 (face) = highest priority. Image 2 (appearance/body) = second. Image 3 (environment) = third.",
+    "Vertical 4:5 framing, cinematic composition, shallow depth of field. Medium or medium-full shot showing the visitor from head to waist or just above the knees — enough room to see the face clearly, the clothing clearly and to understand the scene. Do not crop too tightly on the face, and do not hide the wardrobe.",
   );
 
-  // 8. Film context
+  // 8. Hierarchy
+  if (hasHatRef) {
+    parts.push(
+      "HIERARCHY: Image 1 (face) = highest priority. Image 2 (body, appearance, base clothing) = second. Image 3 (scene, atmosphere) = third. Image 4 (cangaceiro hat design cue) = lowest priority, used only for hat shape and fit.",
+    );
+  } else {
+    parts.push(
+      "HIERARCHY: Image 1 (face) = highest priority. Image 2 (appearance/body) = second. Image 3 (environment) = third.",
+    );
+  }
+
+  // 9. Film context
   parts.push(
     `Cinematic scene from the arid Brazilian sertão, in the spirit of "Deus e o Diabo na Terra do Sol"${
       filmTitle ? ` and the film "${filmTitle}"` : ""
