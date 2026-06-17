@@ -281,63 +281,88 @@ export function PipocaFlow() {
     [createGenFn],
   );
 
-  const runUpload = useCallback(async () => {
-    if (!mediumPhoto || !selected) return;
-    setUploadError(null);
-    let current = prepared;
-    try {
-      if (!current) {
-        setUploadStatus("preparing");
-        const res = await prepareFn({
+  const confirmingRef = useRef(false);
+
+  const runUpload = useCallback(
+    async (photo: { blob: Blob; url: string }) => {
+      if (!selected) return;
+      setUploadError(null);
+      let current = prepared;
+      console.log("[PIPOCA_MEDIUM_CONFIRM]", {
+        step: "upload_started",
+        blob_available: Boolean(photo.blob),
+      });
+      try {
+        if (!current) {
+          setUploadStatus("preparing");
+          const res = await prepareFn({
+            data: {
+              filmId: selected.id,
+              deviceId: getDeviceId(),
+              contentType: "image/jpeg",
+              visitorId: visitorId ?? null,
+            },
+          });
+          current = res as Prepared;
+          setPrepared(current);
+        }
+
+        setUploadStatus("uploading");
+
+        if (!mediumUploadedRef.current) {
+          const { error: upErr } = await supabase.storage
+            .from("pipoca-visitor-originals")
+            .uploadToSignedUrl(
+              current.uploads.medium.path,
+              current.uploads.medium.token,
+              photo.blob,
+              { contentType: "image/jpeg" },
+            );
+          if (upErr) throw upErr;
+          mediumUploadedRef.current = true;
+          console.log(`${UPLOAD_LOG} foto única enviada`);
+        }
+
+        setUploadStatus("confirming");
+        await confirmFn({
           data: {
-            filmId: selected.id,
-            deviceId: getDeviceId(),
-            contentType: "image/jpeg",
-            visitorId: visitorId ?? null,
+            sessionId: current.sessionId,
+            captureId: current.captureId,
           },
         });
-        current = res as Prepared;
-        setPrepared(current);
+        setUploadStatus("idle");
+        console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "upload_completed" });
+        releaseSharedCamera();
+        console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "next_step" });
+        transitionTo(() => setStep("processing"));
+        void startGeneration(current.sessionId, current.captureId);
+      } catch (err) {
+        const stage = !current
+          ? "prepare"
+          : !mediumUploadedRef.current
+            ? "upload"
+            : "confirm";
+        console.warn(`${UPLOAD_LOG} falhou`, { stage });
+        console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "error_code", error_code: stage });
+        setUploadStatus("error");
+        setUploadError(stage);
+      } finally {
+        confirmingRef.current = false;
       }
+    },
+    [selected, prepared, prepareFn, confirmFn, startGeneration, visitorId],
+  );
 
-      setUploadStatus("uploading");
-
-      if (!mediumUploadedRef.current) {
-        const { error: upErr } = await supabase.storage
-          .from("pipoca-visitor-originals")
-          .uploadToSignedUrl(
-            current.uploads.medium.path,
-            current.uploads.medium.token,
-            mediumPhoto.blob,
-            { contentType: "image/jpeg" },
-          );
-        if (upErr) throw upErr;
-        mediumUploadedRef.current = true;
-        console.log(`${UPLOAD_LOG} foto única enviada`);
-      }
-
-      setUploadStatus("confirming");
-      await confirmFn({
-        data: {
-          sessionId: current.sessionId,
-          captureId: current.captureId,
-        },
-      });
-      setUploadStatus("idle");
-      releaseSharedCamera();
-      transitionTo(() => setStep("processing"));
-      void startGeneration(current.sessionId, current.captureId);
-    } catch (err) {
-      const stage = !current
-        ? "prepare"
-        : !mediumUploadedRef.current
-          ? "upload"
-          : "confirm";
-      console.warn(`${UPLOAD_LOG} falhou`, { stage });
-      setUploadStatus("error");
-      setUploadError(stage);
-    }
-  }, [mediumPhoto, selected, prepared, prepareFn, confirmFn, startGeneration, visitorId]);
+  const handleMediumConfirm = useCallback(
+    (photo: { blob: Blob; url: string }) => {
+      if (confirmingRef.current) return;
+      confirmingRef.current = true;
+      console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "confirm_clicked" });
+      setMediumPhoto(photo);
+      void runUpload(photo);
+    },
+    [runUpload],
+  );
 
   const retryGeneration = useCallback(() => {
     if (!prepared) return;
@@ -421,11 +446,8 @@ export function PipocaFlow() {
       {step === "camera_medium" && (
         <GuidedCamera
           mode="medium"
-          onConfirm={(p) => {
-            console.log(`${CAPTURE_LOG} foto média confirmada`);
-            setMediumPhoto(p);
-            void runUpload();
-          }}
+          confirming={uploadStatus !== "idle" && uploadStatus !== "error"}
+          onConfirm={handleMediumConfirm}
           onBack={() =>
             transitionTo(() => {
               setStep("stories");
@@ -474,7 +496,9 @@ export function PipocaFlow() {
       {uploadStatus === "error" && (
         <UploadError
           stage={uploadError}
-          onRetry={() => void runUpload()}
+          onRetry={() => {
+            if (mediumPhoto) void runUpload(mediumPhoto);
+          }}
           onRetake={retakeAll}
         />
       )}
@@ -1407,20 +1431,25 @@ function VisitorRegistration({
 }) {
   const [fullName, setFullName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
-  const [consent, setConsent] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const nameOk = fullName.replace(/\s+/g, " ").trim().length >= 2 && !/^\d+$/.test(fullName.trim());
   const phoneOk = isValidBrWhatsapp(whatsapp);
-  const canSubmit = nameOk && phoneOk && consent && !loading;
+  const fieldsOk = nameOk && phoneOk;
+  const canSubmit = fieldsOk && !loading;
 
   async function submit() {
     if (!canSubmit) return;
     setLoading(true);
     setError(null);
     try {
+      const acceptedAt = new Date().toISOString();
+      console.log("[PIPOCA_CONSENT] aceite registrado", {
+        accepted_at: acceptedAt,
+        version: PRIVACY_NOTICE_VERSION,
+      });
       const res = await createVisitorFn({
         data: {
           fullName: fullName.replace(/\s+/g, " ").trim(),
@@ -1469,30 +1498,17 @@ function VisitorRegistration({
             className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base disabled:opacity-60"
           />
         </label>
-        <label className="flex items-start gap-2 text-left text-sm text-white/85">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-            disabled={loading}
-            className="mt-1 w-4 h-4 accent-gold flex-shrink-0"
-          />
-          <span>
-            Li o{" "}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowNotice(true);
-              }}
-              className="text-gold underline underline-offset-2 hover:text-gold/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-gold rounded-sm"
-            >
-              Aviso de Privacidade
-            </button>{" "}
-            e autorizo o tratamento do meu nome, WhatsApp e imagens para criar e disponibilizar minha cena personalizada e, caso eu solicite, identificar e imprimir minha foto.
-          </span>
-        </label>
+        <p className="text-left text-sm text-white/85 leading-snug">
+          Li o{" "}
+          <button
+            type="button"
+            onClick={() => setShowNotice(true)}
+            className="text-gold underline underline-offset-2 hover:text-gold/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-gold rounded-sm"
+          >
+            Aviso de Privacidade
+          </button>{" "}
+          e autorizo o tratamento do meu nome, WhatsApp e imagem para criar, disponibilizar e produzir minha foto personalizada.
+        </p>
         {error && (
           <div className="rounded-md border border-red-400/40 bg-red-950/30 p-3 text-center">
             <p className="text-sm font-semibold text-red-200 uppercase tracking-wide">
@@ -1506,11 +1522,12 @@ function VisitorRegistration({
         )}
         <div className="flex flex-col items-center gap-2 pt-2">
           <PrimaryCta onClick={submit} disabled={!canSubmit}>
-            {loading ? "Cadastrando…" : error ? "Tentar novamente" : "Continuar"}
+            {loading ? "Registrando…" : error ? "Tentar novamente" : "Li e autorizo. Continuar"}
           </PrimaryCta>
           <GhostBtn onClick={onBack} disabled={loading}>Voltar</GhostBtn>
         </div>
       </div>
+
 
       {showNotice && (
         <div
@@ -1549,17 +1566,19 @@ function GuidedCamera({
   mode,
   onConfirm,
   onBack,
+  confirming = false,
 }: {
   mode: GuideMode;
   onConfirm: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
+  confirming?: boolean;
 }) {
   const { videoRef, ready, errorKind, retry } = useCamera(true);
   const [captured, setCaptured] = useState<{ blob: Blob; url: string } | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [uiState, setUiState] = useState<CaptureUiState>("ready");
   const [flashKey, setFlashKey] = useState(0);
-  const [hintToggle, setHintToggle] = useState(0);
+  
   const { guide } = useFaceGuide({
     videoRef,
     enabled: ready && !captured,
@@ -1567,6 +1586,10 @@ function GuidedCamera({
   });
   const captureRef = useRef(false);
   const confirmRef = useRef(false);
+  const countdownStartedRef = useRef(false);
+  const captureInProgressRef = useRef(false);
+  const captureCompletedRef = useRef(false);
+  const autostartTimerRef = useRef<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const loggedMountRef = useRef(false);
   const hintRef = useRef<HTMLParagraphElement | null>(null);
@@ -1579,20 +1602,21 @@ function GuidedCamera({
       timerRef.current = null;
     }
   };
+  const clearAutostartTimer = () => {
+    if (autostartTimerRef.current !== null) {
+      window.clearTimeout(autostartTimerRef.current);
+      autostartTimerRef.current = null;
+    }
+  };
 
-  // Cleanup all timers + revoke blob URL on unmount.
+  // Cleanup all timers on unmount.
   useEffect(() => {
     return () => {
       clearTimer();
+      clearAutostartTimer();
     };
   }, []);
 
-  // Slow alternation of the "ready" hint, never during countdown / capture.
-  useEffect(() => {
-    if (uiState !== "ready") return;
-    const t = window.setInterval(() => setHintToggle((n) => n + 1), 4500);
-    return () => window.clearInterval(t);
-  }, [uiState]);
 
   const logUi = useCallback((tag: string) => {
     if (typeof window === "undefined") return;
@@ -1679,15 +1703,19 @@ function GuidedCamera({
   }, [videoRef, mode]);
 
   const performCapture = useCallback(async () => {
-    if (captureRef.current) return;
+    if (captureRef.current || captureCompletedRef.current) return;
     captureRef.current = true;
+    captureInProgressRef.current = true;
     const result = await capture4x5();
     if (!result) {
       captureRef.current = false;
+      captureInProgressRef.current = false;
       setCountdown(null);
       setUiState("error");
       return;
     }
+    captureCompletedRef.current = true;
+    captureInProgressRef.current = false;
     setFlashKey((k) => k + 1);
     setCaptured(result);
     setCountdown(null);
@@ -1695,7 +1723,9 @@ function GuidedCamera({
   }, [capture4x5]);
 
   const startCountdown = useCallback(() => {
-    if (uiState !== "ready" || !ready || captureRef.current) return;
+    if (countdownStartedRef.current) return;
+    if (!ready || captureRef.current || captureCompletedRef.current) return;
+    countdownStartedRef.current = true;
     setUiState("counting");
     setCountdown(3);
     logUi("countdown_start");
@@ -1704,7 +1734,7 @@ function GuidedCamera({
       if (next < 0) {
         timerRef.current = window.setTimeout(() => {
           void performCapture();
-        }, 850);
+        }, 800);
         return;
       }
       timerRef.current = window.setTimeout(() => {
@@ -1713,12 +1743,34 @@ function GuidedCamera({
       }, 1000);
     };
     schedule(2);
-  }, [uiState, ready, logUi, performCapture]);
+  }, [ready, logUi, performCapture]);
+
+  // Auto-start the 3-2-1 countdown ~1.2s after camera becomes ready, with
+  // refs guarding against rerenders / Strict Mode double-invokes.
+  useEffect(() => {
+    if (!ready) return;
+    if (captured) return;
+    if (countdownStartedRef.current) return;
+    if (captureCompletedRef.current) return;
+    const v = videoRef.current;
+    if (!v || !v.videoWidth || !v.videoHeight) return;
+    clearAutostartTimer();
+    autostartTimerRef.current = window.setTimeout(() => {
+      startCountdown();
+    }, 1200);
+    return () => {
+      clearAutostartTimer();
+    };
+  }, [ready, captured, videoRef, startCountdown]);
 
   const handleRetake = useCallback(() => {
     clearTimer();
+    clearAutostartTimer();
     captureRef.current = false;
     confirmRef.current = false;
+    countdownStartedRef.current = false;
+    captureInProgressRef.current = false;
+    captureCompletedRef.current = false;
     if (captured) URL.revokeObjectURL(captured.url);
     setCaptured(null);
     setCountdown(null);
@@ -1735,16 +1787,13 @@ function GuidedCamera({
 
   let hint = "ABRINDO A CÂMERA";
   if (uiState === "captured") {
-    hint = "FOTO CAPTURADA";
+    hint = confirming ? "PREPARANDO..." : "FOTO CAPTURADA";
   } else if (uiState === "counting") {
     hint = "FIQUE PARADO";
   } else if (uiState === "error") {
     hint = "TENTE NOVAMENTE";
   } else if (ready) {
-    hint =
-      hintToggle % 2 === 0
-        ? "APAREÇA DA CABEÇA ATÉ A CINTURA"
-        : "FIQUE DE FRENTE PARA A CÂMERA";
+    hint = "PREPARE-SE PARA A FOTO";
   }
   const hintClass = `pipoca-camera-hint ${
     uiState === "captured"
@@ -1801,33 +1850,24 @@ function GuidedCamera({
       </div>
 
       <div className="pipoca-camera-footer">
-        {uiState === "ready" || uiState === "error" ? (
-          <>
-            <button
-              type="button"
-              onClick={startCountdown}
-              disabled={!ready}
-              className="pipoca-cta-primary"
-              style={{ touchAction: "manipulation" }}
-            >
-              TIRAR FOTO
-            </button>
-            <GhostBtn onClick={onBack}>Voltar</GhostBtn>
-          </>
+        {uiState === "ready" || uiState === "counting" || uiState === "error" ? (
+          <GhostBtn onClick={onBack}>Voltar</GhostBtn>
         ) : null}
         {uiState === "captured" ? (
           <>
             <button
               type="button"
               onClick={handleUse}
+              disabled={confirming || confirmRef.current}
               className="pipoca-cta-primary"
               style={{ touchAction: "manipulation" }}
             >
-              USAR ESTA FOTO
+              {confirming ? "PREPARANDO..." : "USAR ESTA FOTO"}
             </button>
             <button
               type="button"
               onClick={handleRetake}
+              disabled={confirming}
               className="pipoca-cta-secondary"
               style={{ touchAction: "manipulation" }}
             >
