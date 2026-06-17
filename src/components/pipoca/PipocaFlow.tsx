@@ -1811,11 +1811,14 @@ function GuidedCamera({
     );
     if (!blob) return null;
     const url = URL.createObjectURL(blob);
-    console.log("[PIPOCA_CAMERA] capture-4x5", {
+    console.log("[PIPOCA_CAPTURE_RESOLUTION]", {
+      mode,
       videoWidth: vw,
       videoHeight: vh,
       cropWidth: cropW,
       cropHeight: cropH,
+      outputWidth: cropW,
+      outputHeight: cropH,
     });
     return { blob, url };
   }, [videoRef]);
