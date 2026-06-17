@@ -36,14 +36,9 @@ type Step =
   | "choose"
   | "visitor_registration"
   | "stories"
-  | "camera_identity"
-  | "orient_appearance"
-  | "camera_appearance"
-  | "confirm"
+  | "camera_medium"
   | "processing"
   | "result";
-
-// (CameraVariant removed — both captures now use GuidedCamera with GuideMode)
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
@@ -70,8 +65,7 @@ type Prepared = {
   sessionId: string;
   captureId: string;
   uploads: {
-    identity: { path: string; token: string };
-    appearance: { path: string; token: string };
+    medium: { path: string; token: string };
   };
 };
 type UploadStatus = "idle" | "preparing" | "uploading" | "confirming" | "error";
