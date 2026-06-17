@@ -446,11 +446,8 @@ export function PipocaFlow() {
       {step === "camera_medium" && (
         <GuidedCamera
           mode="medium"
-          onConfirm={(p) => {
-            console.log(`${CAPTURE_LOG} foto média confirmada`);
-            setMediumPhoto(p);
-            void runUpload();
-          }}
+          confirming={uploadStatus !== "idle" && uploadStatus !== "error"}
+          onConfirm={handleMediumConfirm}
           onBack={() =>
             transitionTo(() => {
               setStep("stories");
