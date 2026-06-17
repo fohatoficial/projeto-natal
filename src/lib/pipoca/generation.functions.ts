@@ -391,7 +391,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       throw new Error("Falha ao gerar URL da foto de aparência");
     }
 
-    void parseScenePackPrompt(scenePack.prompt);
+    
     console.log(`${GEN_LOG} hat reference enabled: ${ENABLE_HAT_REFERENCE}`);
     const promptText = buildPromptText(scenePack.prompt, film?.title, false);
 
