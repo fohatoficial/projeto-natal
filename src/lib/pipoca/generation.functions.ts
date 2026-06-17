@@ -459,6 +459,13 @@ function buildPromptText(
   };
 }
 
+export function __buildPipocaPromptInputForTests(
+  scenePack: ScenePackForGeneration,
+  hasHatRef = false,
+): BuiltPrompt {
+  return buildPromptText(scenePack, hasHatRef);
+}
+
 /* ---------- Replicate helpers ---------- */
 
 async function createReplicatePrediction(input: {
