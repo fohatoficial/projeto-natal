@@ -64,6 +64,99 @@ async function ensurePublicResultFields(
   return { publicToken, resultPageUrl };
 }
 
+/**
+ * Idempotently create a print-queue entry for a completed generation.
+ * Safe to call multiple times — uses generation_id as the dedupe key.
+ * Never throws: any failure is logged and surfaced via the return value so
+ * the visitor flow is never blocked.
+ */
+async function ensurePrintQueueEntry(
+  supabaseAdmin: any,
+  generationId: string,
+): Promise<{ created: boolean; alreadyExists: boolean }> {
+  const LOG_AUTO = "[PIPOCA_PRINT_QUEUE_AUTO]";
+  try {
+    const { data: gen, error: gErr } = await supabaseAdmin
+      .from("pipoca_generations")
+      .select("id, session_id, status, final_image_path")
+      .eq("id", generationId)
+      .maybeSingle();
+    if (gErr || !gen) {
+      console.warn(LOG_AUTO, { generationId, errorCode: gErr?.code ?? "not_found", created: false });
+      return { created: false, alreadyExists: false };
+    }
+    if (gen.status !== "completed" || !gen.final_image_path || !gen.session_id) {
+      return { created: false, alreadyExists: false };
+    }
+    const { data: existing } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .select("id, status")
+      .eq("generation_id", generationId)
+      .maybeSingle();
+    if (existing) {
+      console.log(LOG_AUTO, {
+        generationId,
+        status: existing.status,
+        created: false,
+        alreadyExists: true,
+        retry: false,
+      });
+      return { created: false, alreadyExists: true };
+    }
+    const { data: session } = await supabaseAdmin
+      .from("pipoca_sessions")
+      .select("visitor_id")
+      .eq("id", gen.session_id)
+      .maybeSingle();
+    if (!session?.visitor_id) {
+      console.warn(LOG_AUTO, { generationId, errorCode: "no_visitor", created: false });
+      return { created: false, alreadyExists: false };
+    }
+    const { error: iErr } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .insert({
+        visitor_id: session.visitor_id,
+        generation_id: generationId,
+        status: "pending",
+      });
+    if (iErr) {
+      if (iErr.code === "23505") {
+        console.log(LOG_AUTO, {
+          generationId,
+          status: "pending",
+          created: false,
+          alreadyExists: true,
+          retry: false,
+        });
+        return { created: false, alreadyExists: true };
+      }
+      console.warn(LOG_AUTO, {
+        generationId,
+        errorCode: iErr.code,
+        created: false,
+        retry: true,
+      });
+      return { created: false, alreadyExists: false };
+    }
+    console.log(LOG_AUTO, {
+      generationId,
+      status: "pending",
+      created: true,
+      alreadyExists: false,
+      retry: false,
+    });
+    return { created: true, alreadyExists: false };
+  } catch (e) {
+    console.warn(LOG_AUTO, {
+      generationId,
+      errorCode: e instanceof Error ? e.message.slice(0, 60) : "unknown",
+      created: false,
+      retry: true,
+    });
+    return { created: false, alreadyExists: false };
+  }
+}
+
 type ReplicatePrediction = {
   id: string;
   status: "starting" | "processing" | "succeeded" | "failed" | "canceled";
