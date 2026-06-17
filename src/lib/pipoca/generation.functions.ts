@@ -35,7 +35,7 @@ function isUuid(value: unknown): value is string {
 }
 
 function buildResultPageUrl(publicToken: string): string {
-  return `${PUBLIC_RESULT_BASE_URL}/resultado/${publicToken}`;
+  return `${PUBLIC_RESULT_BASE_URL}/resultado/${encodeURIComponent(publicToken)}`;
 }
 
 async function ensurePublicResultFields(
