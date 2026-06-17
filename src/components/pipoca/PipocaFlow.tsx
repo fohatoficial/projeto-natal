@@ -10,7 +10,7 @@ import {
   getSharedStatus,
   subscribeSharedCamera,
 } from "@/lib/pipoca/sharedCamera";
-import { useFaceGuide, getGuideHint, getStableMs, type GuideMode, type GuideState } from "@/lib/pipoca/useFaceGuide";
+import { useFaceGuide, type GuideMode, type GuideState } from "@/lib/pipoca/useFaceGuide";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createPipocaCaptureUpload,
