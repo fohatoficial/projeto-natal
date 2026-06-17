@@ -572,7 +572,18 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     });
     if (hatRefUsed.length > 0) {
       console.log(`${GEN_LOG} usando chapéu como referência secundária`);
-    }
+    console.log(`[PIPOCA_GENERATION_REFERENCES]`, {
+      film_id: session.selected_film_id ?? null,
+      scene_pack_id: chosenScenePackId,
+      base_image_count: 3,
+      prop_reference_count: hatRefUsed.length,
+      total_image_count: 3 + hatRefUsed.length,
+      prop_roles: hatRefUsed.length > 0
+        ? ["hat-front", "hat-side"].slice(0, hatRefUsed.length)
+        : [],
+    });
+
+
 
     let prediction: ReplicatePrediction;
     try {
