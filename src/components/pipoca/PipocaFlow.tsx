@@ -1411,8 +1411,32 @@ function Processing({
         <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full border border-gold/20 grid place-items-center relative animate-badge-in">
           <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-gold animate-spin [animation-duration:1.8s]" />
           <div className="absolute inset-2 rounded-full border border-transparent border-t-brand-blue animate-spin [animation-duration:2.6s] [animation-direction:reverse]" />
-          <span className="font-display text-2xl sm:text-3xl lg:text-4xl text-gold">P&amp;C</span>
-        </div>
+          {/* Orbiting dots around the ring */}
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <span
+              key={i}
+              className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full bg-gold/80"
+              style={{
+                transform: `rotate(${i * 60}deg) translateY(-3.6rem)`,
+                animation: `orbit-pulse 1.6s ease-in-out ${i * 0.18}s infinite`,
+              }}
+            />
+          ))}
+          {/* Rotating cinema icon */}
+          <div className="relative w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 grid place-items-center">
+            {CINEMA_ICONS.map((Icon, i) => (
+              <div
+                key={i}
+                className={`absolute inset-0 grid place-items-center text-gold transition-all duration-500 ${
+                  i === iconIdx
+                    ? "opacity-100 scale-100 rotate-0"
+                    : "opacity-0 scale-50 -rotate-12"
+                }`}
+              >
+                <Icon />
+              </div>
+            ))}
+          </div>
 
         <div className="space-y-2">
           <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-none">
