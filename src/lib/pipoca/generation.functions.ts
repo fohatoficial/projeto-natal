@@ -152,106 +152,66 @@ function extractHatUsage(parsedPrompt: unknown): string | null {
 function buildPromptText(
   rawPrompt: unknown,
   filmTitle?: string | null,
-  hasHatRef = false,
+  _hasHatRef = false,
 ): string {
   const parsed = parseScenePackPrompt(rawPrompt);
   const parts: string[] = [];
 
-  // 1. Reference role declaration — strict visual priority
+  // 1. Reference roles — only three images
   parts.push(
-    "Image 1 is the PRIMARY FACE IDENTITY REFERENCE and has the highest priority. It is a close, guided portrait of the visitor and is the absolute source of truth for facial identity.",
+    "Image 1 is the EXCLUSIVE FACIAL IDENTITY REFERENCE. It is a close, guided portrait of the visitor and is the only source for face, identity, face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair, eyebrows, glasses, and apparent age.",
   );
   parts.push(
-    "Use Image 1 for face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair (beard/stubble), eyebrows, glasses if present, apparent age, and overall recognizable identity.",
+    "Image 2 is the APPEARANCE REFERENCE. Use it for body, proportions, posture, shoulders, torso and base clothing of the same visitor. Do not take facial features from Image 2.",
   );
   parts.push(
-    "Image 2 is the FULL APPEARANCE, CLOTHING AND BODY PROPORTION REFERENCE. It shows the same visitor framed from the waist up.",
+    "Image 3 is the SCENE REFERENCE. Use it for environment, sertão landscape, composition, lighting direction and cinematic atmosphere. Do not take facial features from Image 3.",
   );
   parts.push(
-    "Use Image 2 for posture, body proportions, full hair shape, shoulders, torso, clothing texture, and general appearance — but always defer to Image 1 for the face itself.",
-  );
-  parts.push(
-    "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it ONLY for the sertão landscape, scenery, composition, the wooden cross, lighting direction and cinematographic atmosphere.",
+    "Do not blend facial features from Images 2 or 3 into the visitor's face. Image 1 is the only facial identity reference.",
   );
 
-  if (hasHatRef) {
-    parts.push(
-      "Images 4 and 5 are low-priority hat design and fit references only.",
-    );
-    parts.push(
-      "Image 4 is the front hat reference. Image 5 is the side hat reference. Use them only to guide the authentic shape, scale, side profile and natural fit of a northeastern Brazilian cangaceiro leather hat.",
-    );
-    parts.push(
-      "The hat must remain proportional to the visitor's head and naturally integrated into the costume.",
-    );
-    parts.push(
-      "Images 4 and 5 must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
-    );
-    parts.push(
-      "The hat must not dominate the image, become oversized, become too small, cover the face or cause close-up framing.",
-    );
-  }
-
-
-  // 2. Hard identity rules
+  // 2. Identity rule
   parts.push(
-    "HARD RULES (highest priority): facial identity has absolute priority. The visitor's facial identity from Image 1 must remain the highest priority and must not be altered by any other reference. Do NOT redraw the face. Do NOT blend the face with another person. Do NOT stylize the face to match the scene.",
+    "Exactly one person in the final image, clearly recognizable as the visitor from Image 1. Wardrobe and environment adapt to the visitor; the visitor's face is never altered to fit the style.",
   );
   parts.push(
-    "Exactly one person in the final image, and that person must be clearly recognizable as the visitor from Image 1 — not a similar person.",
-  );
-  parts.push(
-    "Wardrobe and environment must adapt to fit the visitor. The visitor's face must NOT be altered to fit the style.",
-  );
-  parts.push(
-    "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
+    "The visitor is naturally integrated into the environment from Image 3: matching scale, posture, skin light, contact shadows and depth of field.",
   );
 
   // 3. Style
   parts.push(
-    "STYLE: strictly black and white, neutral grayscale. No sepia. No brown, yellow, beige or golden tint. No earthy toning.",
+    "STYLE: strictly black and white, neutral grayscale. No sepia, no brown, yellow, beige or golden tint. Strong contrast, deep shadows, luminous highlights, visible film grain.",
   );
   parts.push(
-    "Strong contrast, deep shadows, luminous highlights, visible film grain, slightly desaturated.",
-  );
-  parts.push(
-    "Austere Brazilian Cinema Novo mood in the spirit of Glauber Rocha — serious, iconic, mythic. Not casual, not touristic, not editorial fashion. Expression: neutral or mildly serious. Never smiling.",
+    "Austere Brazilian Cinema Novo mood in the spirit of Glauber Rocha — serious, iconic, mythic. Expression neutral or mildly serious, never smiling.",
   );
 
   // 4. Wardrobe
   parts.push(
-    "WARDROBE: rustic, timeless, non-modern, rooted in the northeastern Brazilian sertão. Avoid modern t-shirts, modern jeans, sneakers, streetwear or bright casual clothing. Clothing must remain complete, coherent and clearly visible — never cropped or obscured.",
+    "WARDROBE: rustic, timeless, northeastern Brazilian sertão. No modern t-shirts, jeans, sneakers or streetwear. Clothing complete, coherent and clearly visible.",
   );
 
-  // 5. Hat — cangaceiro (strictly subordinate, no visual reference)
+  // 5. Hat — text-only costume cue
   parts.push(
-    "HAT: only a subtle textual costume cue. The visitor may wear an authentic northeastern Brazilian cangaceiro leather hat, also known as a traditional cangaço hat. It has a characteristic silhouette with curved side flaps and subtle front ornamentation typical of cangaço leatherwork. The hat must be proportional to the head, never oversized, never theatrical, never ceremonial, never fantasy, never a cowboy or western wide-brim hat. The hat is a lower priority than the clothing and the environment.",
+    "HAT: the visitor may wear a traditional Brazilian cangaceiro leather hat, historically appropriate, worn naturally, proportional to the head, never oversized or theatrical, never a cowboy or western wide-brim hat. Hat is figurino only and must not influence facial identity.",
   );
-  if (hasHatRef) {
-    parts.push(
-      "When Images 4 and 5 are used, apply them only as restrained secondary cues for the hat's authentic shape, scale, side profile and natural fit. The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT change the pose. The hat must NOT replace or distort the environment. The hat must NOT become oversized, theatrical, ceremonial, fantastical, a cowboy hat, a western wide-brim hat or the main subject.",
-    );
-  }
 
   const hatUsage = extractHatUsage(parsed);
   if (hatUsage) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
 
   // 6. Cross
   parts.push(
-    "A small wooden cross may appear in the composition — visible but visually secondary, never the focal point. The cross and the sertão landscape must remain part of the composition.",
+    "A small wooden cross may appear in the composition — visible but secondary.",
   );
 
   // 7. Composition
   parts.push(
-    "Vertical 4:5 framing, cinematic composition, shallow depth of field. The visitor anchored in the environment as if captured in a film still.",
+    "Vertical 4:5 framing, cinematic composition, shallow depth of field. Medium or medium-full shot showing the visitor from head to waist or just above the knees. The environment must remain visible and the rustic clothing fully visible.",
   );
   parts.push(
-    "FRAMING: prefer a medium shot or medium-full shot, showing the visitor from the head down to the waist or just above the knees. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment. The environment must remain visible and legible, and the rustic clothing must remain fully visible and important.",
+    "HIERARCHY: Image 1 (face) = highest priority. Image 2 (appearance/body) = second. Image 3 (environment) = third.",
   );
-  parts.push(
-    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Images 4 and 5, when present, are the lowest priority and must only guide the shape, scale, side profile and natural fit of the cangaceiro hat. Images 4 and 5 must never replace or weaken Images 1, 2 or 3.",
-  );
-
 
   // 8. Film context
   parts.push(
