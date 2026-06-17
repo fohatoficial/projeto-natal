@@ -301,24 +301,26 @@ function extractHatUsage(parsedPrompt: unknown): string | null {
 function extractPromptFields(parsedPrompt: unknown): string[] {
   if (typeof parsedPrompt === "string") return parsedPrompt.trim() ? [parsedPrompt.trim()] : [];
   if (!parsedPrompt || typeof parsedPrompt !== "object" || Array.isArray(parsedPrompt)) return [];
-  const obj = parsedPrompt as Record<string, unknown>;
-  const fields = [
-    "scene",
-    "setting",
-    "environment",
-    "mood",
-    "atmosphere",
-    "style",
-    "look",
-    "wardrobe",
-    "costume",
-    "description",
-    "prompt",
-  ];
-  return fields
-    .map((key) => obj[key])
-    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
-    .map((value) => value.trim());
+  const out: string[] = [];
+  const visit = (value: unknown, key = "") => {
+    if (key === "hat_reference_images") return;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed && !/^https?:\/\//i.test(trimmed)) out.push(trimmed);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, key);
+      return;
+    }
+    if (value && typeof value === "object") {
+      for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
+        visit(childValue, childKey);
+      }
+    }
+  };
+  visit(parsedPrompt);
+  return Array.from(new Set(out));
 }
 
 function safeFilenameFromUrl(url: string | null | undefined): string | null {
