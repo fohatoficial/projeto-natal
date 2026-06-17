@@ -1613,12 +1613,12 @@ function VisitorRegistration({
 type CaptureUiState = "opening" | "counting" | "captured" | "error" | "timeout";
 
 function GuidedCamera({
-  mode,
+  shotType,
   onConfirm,
   onBack,
   confirming = false,
 }: {
-  mode: GuideMode;
+  shotType: ShotType;
   onConfirm: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
   confirming?: boolean;
@@ -1663,6 +1663,7 @@ function GuidedCamera({
     const v = videoRef.current;
     console.log("[PIPOCA_CAMERA_SIMPLE]", {
       tag,
+      shotType,
       readyState: v?.readyState ?? null,
       videoWidth: v?.videoWidth ?? null,
       videoHeight: v?.videoHeight ?? null,
@@ -1671,7 +1672,7 @@ function GuidedCamera({
       hasSrcObject: Boolean(v?.srcObject),
       ...extra,
     });
-  }, [videoRef]);
+  }, [videoRef, shotType]);
 
   // --- Local videoReady detection (events + polling fallback for kiosk) ---
   useEffect(() => {
@@ -1768,7 +1769,7 @@ function GuidedCamera({
     if (!blob) return null;
     const url = URL.createObjectURL(blob);
     console.log("[PIPOCA_CAPTURE_RESOLUTION]", {
-      mode,
+      mode: shotType,
       videoWidth: vw,
       videoHeight: vh,
       cropWidth: cropW,
@@ -1777,7 +1778,7 @@ function GuidedCamera({
       outputHeight: cropH,
     });
     return { blob, url };
-  }, [videoRef, mode]);
+  }, [videoRef, shotType]);
 
   const performCapture = useCallback(async () => {
     if (captureRef.current || captureCompletedRef.current) return;
@@ -1864,7 +1865,14 @@ function GuidedCamera({
 
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
-  let hint = "POSICIONE-SE PARA A FOTO";
+  const stepLabel = shotType === "identity" ? "FOTO 1 DE 2" : "FOTO 2 DE 2";
+  const defaultHint =
+    shotType === "identity" ? "APROXIME-SE DA CÂMERA" : "AFASTE-SE UM POUCO";
+  const subHint =
+    shotType === "identity"
+      ? "ENQUADRE O ROSTO, O CABELO E OS OMBROS"
+      : "APAREÇA DA CABEÇA ATÉ A CINTURA";
+  let hint = defaultHint;
   if (uiState === "captured") {
     hint = confirming ? "PREPARANDO..." : "FOTO CAPTURADA";
   } else if (uiState === "counting") {
@@ -1878,21 +1886,24 @@ function GuidedCamera({
     uiState === "captured" ? "pipoca-camera-hint--success" : ""
   }`;
   const showCountdown = uiState === "counting" && countdown !== null && countdown > 0;
+  const showSubHint = uiState === "opening" || uiState === "counting";
 
   return (
     <div
       className="pipoca-camera-screen bg-cinema relative"
-      data-pipoca-camera={mode}
+      data-pipoca-camera={shotType}
       data-pipoca-state={uiState}
     >
       <div className="pipoca-camera-preview-wrap">
         <div className="pipoca-camera-top">
+          <p className="pipoca-camera-step-label">{stepLabel}</p>
           {showCountdown ? (
             <span key={countdown} ref={countdownRef} className="pipoca-camera-countdown">
               {countdown}
             </span>
           ) : null}
           <p className={hintClass}>{hint}</p>
+          {showSubHint ? <p className="pipoca-camera-subhint">{subHint}</p> : null}
         </div>
         <div className="pipoca-camera-frame">
           {captured ? (
