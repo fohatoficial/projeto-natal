@@ -195,8 +195,7 @@ export function PipocaFlow() {
   const [selected, setSelected] = useState<Movie | null>(null);
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [firstName, setFirstName] = useState<string>("");
-  const [identityPhoto, setIdentityPhoto] = useState<{ blob: Blob; url: string } | null>(null);
-  const [appearancePhoto, setAppearancePhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [mediumPhoto, setMediumPhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [prepared, setPrepared] = useState<Prepared | null>(null);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
@@ -206,8 +205,7 @@ export function PipocaFlow() {
   const [publicToken, setPublicToken] = useState<string | null>(null);
   const [resultPageUrl, setResultPageUrl] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
-  const identityUploadedRef = useRef(false);
-  const appearanceUploadedRef = useRef(false);
+  const mediumUploadedRef = useRef(false);
   const generationStartedRef = useRef(false);
   const { films, loading, error } = usePipocaFilms();
 
@@ -217,22 +215,14 @@ export function PipocaFlow() {
   const statusGenFn = useServerFn(getPipocaGenerationStatus);
   const createVisitorFn = useServerFn(createPipocaVisitor);
 
-  // Keep refs in sync so the unmount cleanup can revoke without re-running
-  // the effect (and prematurely revoking) whenever a photo state changes.
-  const identityRef = useRef<{ blob: Blob; url: string } | null>(null);
-  const appearanceRef = useRef<{ blob: Blob; url: string } | null>(null);
+  const mediumRef = useRef<{ blob: Blob; url: string } | null>(null);
   useEffect(() => {
-    identityRef.current = identityPhoto;
-  }, [identityPhoto]);
-  useEffect(() => {
-    appearanceRef.current = appearancePhoto;
-  }, [appearancePhoto]);
+    mediumRef.current = mediumPhoto;
+  }, [mediumPhoto]);
   useViewportHeightVar(step);
   useEffect(() => {
     return () => {
-      if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
-      if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
-      // Encerra a câmera ao desmontar o fluxo principal.
+      if (mediumRef.current) URL.revokeObjectURL(mediumRef.current.url);
       releaseSharedCamera();
     };
   }, []);
@@ -248,12 +238,9 @@ export function PipocaFlow() {
   }
 
   const clearPhotos = () => {
-    if (identityPhoto) URL.revokeObjectURL(identityPhoto.url);
-    if (appearancePhoto) URL.revokeObjectURL(appearancePhoto.url);
-    setIdentityPhoto(null);
-    setAppearancePhoto(null);
-    identityUploadedRef.current = false;
-    appearanceUploadedRef.current = false;
+    if (mediumPhoto) URL.revokeObjectURL(mediumPhoto.url);
+    setMediumPhoto(null);
+    mediumUploadedRef.current = false;
   };
 
   const reset = () =>
@@ -280,7 +267,7 @@ export function PipocaFlow() {
     async (sessionId: string, captureId: string) => {
       if (generationStartedRef.current) return;
       generationStartedRef.current = true;
-      console.log(`${GEN_LOG} usando identidade, aparência e cenário`);
+      console.log(`${GEN_LOG} usando foto média única (identity=appearance)`);
       try {
         const res = await createGenFn({ data: { sessionId, captureId } });
         setGenerationId(res.generationId);
@@ -295,7 +282,7 @@ export function PipocaFlow() {
   );
 
   const runUpload = useCallback(async () => {
-    if (!identityPhoto || !appearancePhoto || !selected) return;
+    if (!mediumPhoto || !selected) return;
     setUploadError(null);
     let current = prepared;
     try {
@@ -315,32 +302,18 @@ export function PipocaFlow() {
 
       setUploadStatus("uploading");
 
-      if (!identityUploadedRef.current) {
+      if (!mediumUploadedRef.current) {
         const { error: upErr } = await supabase.storage
           .from("pipoca-visitor-originals")
           .uploadToSignedUrl(
-            current.uploads.identity.path,
-            current.uploads.identity.token,
-            identityPhoto.blob,
+            current.uploads.medium.path,
+            current.uploads.medium.token,
+            mediumPhoto.blob,
             { contentType: "image/jpeg" },
           );
         if (upErr) throw upErr;
-        identityUploadedRef.current = true;
-        console.log(`${UPLOAD_LOG} identidade enviada`);
-      }
-
-      if (!appearanceUploadedRef.current) {
-        const { error: upErr } = await supabase.storage
-          .from("pipoca-visitor-originals")
-          .uploadToSignedUrl(
-            current.uploads.appearance.path,
-            current.uploads.appearance.token,
-            appearancePhoto.blob,
-            { contentType: "image/jpeg" },
-          );
-        if (upErr) throw upErr;
-        appearanceUploadedRef.current = true;
-        console.log(`${UPLOAD_LOG} aparência enviada`);
+        mediumUploadedRef.current = true;
+        console.log(`${UPLOAD_LOG} foto única enviada`);
       }
 
       setUploadStatus("confirming");
@@ -357,16 +330,14 @@ export function PipocaFlow() {
     } catch (err) {
       const stage = !current
         ? "prepare"
-        : !identityUploadedRef.current
-          ? "upload-identidade"
-          : !appearanceUploadedRef.current
-            ? "upload-aparencia"
-            : "confirm";
+        : !mediumUploadedRef.current
+          ? "upload"
+          : "confirm";
       console.warn(`${UPLOAD_LOG} falhou`, { stage });
       setUploadStatus("error");
       setUploadError(stage);
     }
-  }, [identityPhoto, appearancePhoto, selected, prepared, prepareFn, confirmFn, startGeneration, visitorId]);
+  }, [mediumPhoto, selected, prepared, prepareFn, confirmFn, startGeneration, visitorId]);
 
   const retryGeneration = useCallback(() => {
     if (!prepared) return;
@@ -381,9 +352,8 @@ export function PipocaFlow() {
 
   const retakeAll = () =>
     transitionTo(() => {
-      console.log(`${UX} fotos descartadas`);
+      console.log(`${UX} foto descartada`);
       clearPhotos();
-      // New attempt = new session for cleanliness.
       setPrepared(null);
       generationStartedRef.current = false;
       setGenerationId(null);
@@ -393,7 +363,7 @@ export function PipocaFlow() {
       setGenError(null);
       setUploadStatus("idle");
       setUploadError(null);
-      setStep("camera_identity");
+      setStep("camera_medium");
     });
 
   return (
@@ -437,7 +407,7 @@ export function PipocaFlow() {
           firstName={firstName}
           onDone={() => {
             console.log(`${UX} stories concluídos, abrindo câmera`);
-            transitionTo(() => setStep("camera_identity"));
+            transitionTo(() => setStep("camera_medium"));
           }}
           onChangeFilm={() => {
             releaseSharedCamera();
@@ -448,52 +418,19 @@ export function PipocaFlow() {
           }}
         />
       )}
-      {step === "camera_identity" && (
+      {step === "camera_medium" && (
         <GuidedCamera
-          mode="identity"
-          onCaptured={(p) => {
-            console.log(`${CAPTURE_LOG} foto de identidade capturada`);
-            setIdentityPhoto(p);
-            transitionTo(() => setStep("orient_appearance"));
+          mode="medium"
+          onConfirm={(p) => {
+            console.log(`${CAPTURE_LOG} foto média confirmada`);
+            setMediumPhoto(p);
+            void runUpload();
           }}
           onBack={() =>
             transitionTo(() => {
               setStep("stories");
             })
           }
-        />
-      )}
-      {step === "orient_appearance" && (
-        <OrientAppearance
-          onNext={() => {
-            transitionTo(() => setStep("camera_appearance"));
-          }}
-        />
-      )}
-      {step === "camera_appearance" && (
-        <GuidedCamera
-          mode="appearance"
-          onCaptured={(p) => {
-            console.log(`${CAPTURE_LOG} foto de aparência capturada`);
-            setAppearancePhoto(p);
-            transitionTo(() => setStep("confirm"));
-          }}
-          onBack={() =>
-            transitionTo(() => {
-              setStep("orient_appearance");
-            })
-          }
-        />
-      )}
-      {step === "confirm" && identityPhoto && appearancePhoto && (
-        <Confirm
-          identityUrl={identityPhoto.url}
-          appearanceUrl={appearancePhoto.url}
-          onRetake={retakeAll}
-          onUse={() => {
-            console.log(`${UX} fotos confirmadas`);
-            void runUpload();
-          }}
         />
       )}
       {step === "processing" && selected && (
