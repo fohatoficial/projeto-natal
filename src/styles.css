@@ -346,12 +346,12 @@
       gap: clamp(38px, 5.2dvh, 62px);
     }
     .pipoca-camera-hint {
-      font-size: clamp(3.6rem, 5.6dvh, 6rem);
+      font-size: clamp(4.2rem, 6.4dvh, 6.8rem);
       font-weight: 900;
       line-height: 0.98;
     }
     .pipoca-camera-countdown {
-      font-size: clamp(7.5rem, 10.5dvh, 11.5rem);
+      font-size: clamp(8.5rem, 11.5dvh, 12.5rem);
       font-weight: 900;
       line-height: 0.85;
     }
@@ -364,13 +364,13 @@
   /* Real 43" totem (1080x1920+). Same model, larger scale. */
   @media screen and (min-height: 1400px) and (min-width: 700px) {
     .pipoca-camera-preview-wrap {
-      gap: clamp(40px, 4.8svh, 68px);
+      gap: clamp(52px, 6svh, 84px);
     }
     .pipoca-camera-hint {
-      font-size: clamp(4.4rem, 6.2dvh, 7.2rem) !important;
+      font-size: clamp(5.2rem, 7.2dvh, 8.4rem) !important;
     }
     .pipoca-camera-countdown {
-      font-size: clamp(8.8rem, 12dvh, 14rem) !important;
+      font-size: clamp(10.2rem, 13.5dvh, 15.5rem) !important;
     }
     .pipoca-camera-frame {
       width: min(82vw, 820px) !important;
