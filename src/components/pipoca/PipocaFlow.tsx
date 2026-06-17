@@ -1609,11 +1609,18 @@ function GuidedCamera({
       timerRef.current = null;
     }
   };
+  const clearAutostartTimer = () => {
+    if (autostartTimerRef.current !== null) {
+      window.clearTimeout(autostartTimerRef.current);
+      autostartTimerRef.current = null;
+    }
+  };
 
-  // Cleanup all timers + revoke blob URL on unmount.
+  // Cleanup all timers on unmount.
   useEffect(() => {
     return () => {
       clearTimer();
+      clearAutostartTimer();
     };
   }, []);
 
