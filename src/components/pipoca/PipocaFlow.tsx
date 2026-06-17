@@ -1585,7 +1585,7 @@ function GuidedCamera({
   const [countdown, setCountdown] = useState<number | null>(null);
   const [uiState, setUiState] = useState<CaptureUiState>("ready");
   const [flashKey, setFlashKey] = useState(0);
-  const [hintToggle, setHintToggle] = useState(0);
+  
   const { guide } = useFaceGuide({
     videoRef,
     enabled: ready && !captured,
