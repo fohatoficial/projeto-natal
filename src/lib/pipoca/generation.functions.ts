@@ -614,12 +614,6 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       routing_match: scenePack.film_id === session.selected_film_id,
     });
 
-    const { data: film } = await supabaseAdmin
-      .from("pipoca_films")
-      .select("id, title")
-      .eq("id", session.selected_film_id)
-      .maybeSingle();
-
     const { count: priorCount } = await supabaseAdmin
       .from("pipoca_generations")
       .select("id", { count: "exact", head: true })
@@ -651,7 +645,50 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       scene_pack_id: chosenScenePackId,
       hat_reference_count: hatRefUsed.length,
     });
-    const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
+    const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0);
+    const referenceImageFilename = safeFilenameFromUrl(scenePack.reference_image_url);
+    const image3MatchesScenePack = scenePack.reference_image_url === scenePack.reference_image_url;
+    const circoReferenceMismatch =
+      scenePack.id === CIRCO_SCENE_PACK_ID && scenePack.reference_image_url !== CIRCO_REFERENCE_IMAGE_URL;
+    const promptPreparedFromResolvedScenePack = chosenScenePackId === scenePack.id;
+
+    console.log(`[PIPOCA_FINAL_GENERATION_INPUT]`, {
+      film_id: session.selected_film_id,
+      scene_pack_id: chosenScenePackId,
+      scene_name: scenePack.scene_name,
+      visual_style: scenePack.visual_style,
+      color_mode: scenePack.color_mode,
+      reference_image_filename: referenceImageFilename,
+      base_image_count: 3,
+      prop_reference_count: hatRefUsed.length,
+      final_prompt_length: builtPrompt.promptText.length,
+      contains_monochrome: builtPrompt.diagnostics.contains_monochrome,
+      contains_sertao: builtPrompt.diagnostics.contains_sertao,
+      contains_cangaco: builtPrompt.diagnostics.contains_cangaco,
+      contains_cinema_novo: builtPrompt.diagnostics.contains_cinema_novo,
+      contains_circo: builtPrompt.diagnostics.contains_circo,
+      routing_match: scenePack.film_id === session.selected_film_id,
+      prompt_contamination_detected:
+        builtPrompt.diagnostics.prompt_contamination_detected || circoReferenceMismatch,
+    });
+
+    if (
+      scenePack.film_id !== session.selected_film_id ||
+      scenePack.id !== chosenScenePackId ||
+      !image3MatchesScenePack ||
+      !promptPreparedFromResolvedScenePack ||
+      circoReferenceMismatch ||
+      builtPrompt.diagnostics.prompt_contamination_detected
+    ) {
+      console.warn(`${GEN_LOG} ${CROSS_FILM_PROMPT_CONTAMINATION}`, {
+        film_id: session.selected_film_id,
+        scene_pack_id: chosenScenePackId,
+        scene_pack_film_id: scenePack.film_id,
+        reference_image_filename: referenceImageFilename,
+        circo_reference_mismatch: circoReferenceMismatch,
+      });
+      throw new Error(CROSS_FILM_PROMPT_CONTAMINATION);
+    }
 
 
 
@@ -702,7 +739,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     let prediction: ReplicatePrediction;
     try {
       prediction = await createReplicatePrediction({
-        prompt: promptText,
+        prompt: builtPrompt.promptText,
         identityUrl: signedIdentity.signedUrl,
         appearanceUrl: signedAppearance.signedUrl,
         sceneImageUrl: scenePack.reference_image_url,
