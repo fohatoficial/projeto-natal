@@ -1567,7 +1567,7 @@ function Result({
         {slide === 1 && (
           <div className="flex flex-col items-center gap-4 sm:gap-5 w-full animate-fade-up">
             <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95] text-center">
-              SUA FOTO JÁ FOI ENVIADA PARA <span className="text-gold">PRODUÇÃO</span>
+              SUA FOTO JÁ FOI ENVIADA PARA <span className="text-gold">IMPRESSÃO</span>
             </h1>
             <p className="text-sm sm:text-base text-white/80 text-center">
               Dirija-se ao balcão para retirar sua foto.
