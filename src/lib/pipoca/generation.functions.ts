@@ -12,8 +12,11 @@ const SIGNED_REF_TTL = 60 * 30;
 // window.location.origin. Result QR code MUST always point here.
 const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/, "");
 
-const IDENTITY_NAME = "identity-close.jpg";
-const APPEARANCE_NAME = "appearance-medium.jpg";
+// Single medium-shot file. Used as BOTH identity and appearance until the
+// generation pipeline is revised.
+// Temporary single-photo compatibility mapping. Identity and appearance use
+// the same medium-shot image until generation pipeline revision.
+const MEDIUM_NAME = "visitor-medium.jpg";
 
 const ENABLE_HAT_REFERENCE = true;
 
