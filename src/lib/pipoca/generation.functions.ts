@@ -572,6 +572,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     });
     if (hatRefUsed.length > 0) {
       console.log(`${GEN_LOG} usando chapéu como referência secundária`);
+    }
     console.log(`[PIPOCA_GENERATION_REFERENCES]`, {
       film_id: session.selected_film_id ?? null,
       scene_pack_id: chosenScenePackId,
