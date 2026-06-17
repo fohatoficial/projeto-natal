@@ -908,20 +908,27 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     if (!imgRes.ok) throw new Error(`Falha ao baixar imagem: ${imgRes.status}`);
     const rawBuf = new Uint8Array(await imgRes.arrayBuffer());
 
-    // Deterministic neutral B&W finish.
+    const metadata = typeof gen.metadata === "object" && gen.metadata !== null
+      ? (gen.metadata as Record<string, unknown>)
+      : {};
+    const shouldApplyNeutralGrayscale = metadata.post_process === "neutral-grayscale";
     let finalBuf: Uint8Array = rawBuf;
-    let postProcess: "neutral-grayscale" | "raw-fallback" = "neutral-grayscale";
+    let postProcess: "neutral-grayscale" | "raw-fallback" | "none" = shouldApplyNeutralGrayscale
+      ? "neutral-grayscale"
+      : "none";
     let postProcessError: string | null = null;
-    try {
-      const processed = await applyNeutralGrayscale(rawBuf);
-      if (!processed || processed.byteLength < 1024) {
-        throw new Error("pós-processamento devolveu JPEG vazio");
+    if (shouldApplyNeutralGrayscale) {
+      try {
+        const processed = await applyNeutralGrayscale(rawBuf);
+        if (!processed || processed.byteLength < 1024) {
+          throw new Error("pós-processamento devolveu JPEG vazio");
+        }
+        finalBuf = new Uint8Array(processed);
+      } catch (e) {
+        postProcess = "raw-fallback";
+        postProcessError = e instanceof Error ? e.message : "erro desconhecido";
+        finalBuf = rawBuf;
       }
-      finalBuf = new Uint8Array(processed);
-    } catch (e) {
-      postProcess = "raw-fallback";
-      postProcessError = e instanceof Error ? e.message : "erro desconhecido";
-      finalBuf = rawBuf;
     }
 
     const finalPath = `${gen.session_id}/${gen.id}/final.jpg`;
