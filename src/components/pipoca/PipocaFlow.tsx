@@ -1455,6 +1455,7 @@ function Result({
   onRestart: () => void;
 }) {
   const SLIDE_0_MS = 10000;
+  const SLIDE_1_MS = 20000;
   const [slide, setSlide] = useState(0);
   const [progress, setProgress] = useState(0);
 
@@ -1486,27 +1487,41 @@ function Result({
     });
   }, [publicToken, resultPageUrl, tokenReady, slide]);
 
-  // Auto-advance slide 0 -> slide 1 over 10s with progress bar
+  // Auto-advance slide 0 -> slide 1 over 10s with progress bar,
+  // then return to the start after 30s total on the result screen.
   useEffect(() => {
-    if (slide !== 0) {
-      setProgress(1);
-      return;
+    if (typeof window === "undefined") return;
+    let advanceTimer: number | undefined;
+    let restartTimer: number | undefined;
+
+    if (slide === 0) {
+      setProgress(0);
+      const start = performance.now();
+      let raf = 0;
+      const tick = (now: number) => {
+        const pct = Math.min(1, (now - start) / SLIDE_0_MS);
+        setProgress(pct);
+        if (pct < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+      advanceTimer = window.setTimeout(() => setSlide(1), SLIDE_0_MS);
+      return () => {
+        window.clearTimeout(advanceTimer);
+        cancelAnimationFrame(raf);
+      };
     }
-    setProgress(0);
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const pct = Math.min(1, (now - start) / SLIDE_0_MS);
-      setProgress(pct);
-      if (pct < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    const t = window.setTimeout(() => setSlide(1), SLIDE_0_MS);
-    return () => {
-      window.clearTimeout(t);
-      cancelAnimationFrame(raf);
-    };
-  }, [slide]);
+
+    if (slide === 1) {
+      setProgress(1);
+      restartTimer = window.setTimeout(() => {
+        console.log("[PIPOCA_RESULT] tempo esgotado (30s), reiniciando fluxo");
+        onRestart();
+      }, SLIDE_1_MS);
+      return () => {
+        window.clearTimeout(restartTimer);
+      };
+    }
+  }, [slide, onRestart]);
 
   const bgUrl = imageUrl ?? movie.posterUrl;
 
@@ -1596,16 +1611,6 @@ function Result({
               <p className="text-sm sm:text-base text-white/85 leading-snug text-center uppercase tracking-wider font-semibold">
                 Aponte a câmera do celular para baixar sua foto
               </p>
-              {tokenReady && resultPageUrl ? (
-                <a
-                  href={resultPageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="pointer-events-auto inline-block px-5 py-2.5 rounded-md border border-gold/60 text-gold font-semibold tracking-wider uppercase text-xs hover:bg-gold/10 transition"
-                >
-                  Abrir resultado
-                </a>
-              ) : null}
             </div>
           </div>
         )}
