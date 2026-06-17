@@ -9,9 +9,11 @@ type State = {
 };
 
 export function usePipocaFilms(): State {
+  // Inicia com fallback e loading=false para que o totem renderize o pôster
+  // imediatamente — a query do Supabase apenas atualiza se houver dados novos.
   const [state, setState] = useState<State>({
     films: FALLBACK_MOVIES,
-    loading: true,
+    loading: false,
     error: null,
   });
 
