@@ -219,37 +219,14 @@ function PublicResultPage() {
                 {copied ? "Link copiado!" : "Compartilhar"}
               </button>
 
-              <button
-                type="button"
-                onClick={handleRequestPrint}
-                disabled={print.kind === "loading" || print.kind === "ok"}
-                className="w-full border border-gold/60 text-gold font-semibold tracking-wider uppercase rounded-md py-3.5 text-sm hover:bg-gold/10 active:scale-[0.99] transition disabled:opacity-70"
-              >
-                {print.kind === "loading"
-                  ? "Solicitando…"
-                  : print.kind === "ok"
-                    ? print.alreadyQueued
-                      ? "Sua impressão já está na fila"
-                      : "Impressão solicitada"
-                    : "Solicitar impressão"}
-              </button>
-
-              {print.kind === "ok" && (
-                <p className="text-xs text-white/70 text-center">
-                  Informe seu nome à recepcionista para retirar sua foto.
+              <div className="rounded-md border border-gold/40 bg-gold/5 p-3 text-center">
+                <p className="font-display text-sm uppercase tracking-wider text-gold">
+                  Sua foto já foi enviada para produção
                 </p>
-              )}
-              {print.kind === "error" && (
-                <div className="rounded-md border border-red-400/40 bg-red-500/10 p-3 text-center">
-                  <p className="font-display text-sm uppercase tracking-wider text-red-200">
-                    Não conseguimos solicitar a impressão
-                  </p>
-                  <p className="mt-1 text-[11px] text-red-100/80">
-                    Tente novamente ou procure a recepção.
-                  </p>
-                  <p className="mt-1 text-[10px] text-red-100/60">{print.message}</p>
-                </div>
-              )}
+                <p className="mt-1 text-[11px] text-white/75">
+                  Dirija-se ao balcão para retirar sua foto.
+                </p>
+              </div>
             </div>
 
             <p className="mt-6 text-[10px] uppercase tracking-[0.3em] text-white/40 text-center">
