@@ -17,7 +17,10 @@ export function MovieCard({ movie, onChoose, ctaLabel = "Escolher este filme" }:
         />
         <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-5">
-          <h3 className="font-display text-3xl leading-none text-white">
+          <span className="text-[10px] uppercase tracking-[0.3em] text-gold">
+            Catálogo Tela Brasil
+          </span>
+          <h3 className="font-display text-3xl leading-none mt-2 text-white">
             {movie.title}
           </h3>
         </div>
