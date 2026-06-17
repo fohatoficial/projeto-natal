@@ -613,6 +613,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           hat_reference_url_used: hatRefUsed[0] ?? null,
           hat_reference_front_url: hatRefUsed[0] ?? null,
           hat_reference_side_url: hatRefUsed[1] ?? null,
+
           post_process: "neutral-grayscale",
           post_process_contrast: 8,
         },
