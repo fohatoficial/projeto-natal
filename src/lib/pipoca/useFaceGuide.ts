@@ -30,7 +30,7 @@ export type GuideStatus =
   | "head_turned"
   | "ok";
 
-export type GuideMode = "identity" | "appearance";
+export type GuideMode = "identity" | "appearance" | "medium";
 
 export type FaceBox = {
   /** Normalized (0..1) relative to preview width/height. */
@@ -60,16 +60,28 @@ const HINTS: Record<GuideMode, Record<GuideStatus, string>> = {
     ok: "PERFEITO, FIQUE PARADO",
   },
   appearance: {
-    no_face: "POSICIONE-SE DIANTE DA CÂMERA",
-    multi_face: "DEIXE APENAS UMA PESSOA NA ÁREA DA FOTO",
-    too_far: "APROXIME-SE UM POUCO",
-    too_close: "AFASTE-SE UM POUCO",
-    off_left: "CENTRALIZE-SE",
-    off_right: "CENTRALIZE-SE",
-    off_high: "ABAIXE UM POUCO",
-    off_low: "SUBA UM POUCO",
-    head_turned: "OLHE DIRETAMENTE PARA A CÂMERA",
-    ok: "PERFEITO, FIQUE PARADO",
+    no_face: "FIQUE DE FRENTE PARA A CÂMERA",
+    multi_face: "FIQUE DE FRENTE PARA A CÂMERA",
+    too_far: "APAREÇA DA CABEÇA ATÉ A CINTURA",
+    too_close: "APAREÇA DA CABEÇA ATÉ A CINTURA",
+    off_left: "FIQUE DE FRENTE PARA A CÂMERA",
+    off_right: "FIQUE DE FRENTE PARA A CÂMERA",
+    off_high: "FIQUE DE FRENTE PARA A CÂMERA",
+    off_low: "FIQUE DE FRENTE PARA A CÂMERA",
+    head_turned: "FIQUE DE FRENTE PARA A CÂMERA",
+    ok: "PRONTO PARA A FOTO",
+  },
+  medium: {
+    no_face: "FIQUE DE FRENTE PARA A CÂMERA",
+    multi_face: "FIQUE DE FRENTE PARA A CÂMERA",
+    too_far: "APAREÇA DA CABEÇA ATÉ A CINTURA",
+    too_close: "APAREÇA DA CABEÇA ATÉ A CINTURA",
+    off_left: "FIQUE DE FRENTE PARA A CÂMERA",
+    off_right: "FIQUE DE FRENTE PARA A CÂMERA",
+    off_high: "FIQUE DE FRENTE PARA A CÂMERA",
+    off_low: "FIQUE DE FRENTE PARA A CÂMERA",
+    head_turned: "FIQUE DE FRENTE PARA A CÂMERA",
+    ok: "PRONTO PARA A FOTO",
   },
 };
 
@@ -101,6 +113,16 @@ const THRESHOLDS: Record<GuideMode, Thresholds> = {
   // Medium shot: head + shoulders + torso to waist.
   // Face is smaller and sits higher in the frame.
   appearance: {
+    wMin: 0.12,
+    wMax: 0.24,
+    cxMin: 0.4,
+    cxMax: 0.6,
+    cyMin: 0.26,
+    cyMax: 0.44,
+    stableMs: 1400,
+  },
+  // Medium = appearance alias (kept for compat; capture is manual now).
+  medium: {
     wMin: 0.12,
     wMax: 0.24,
     cxMin: 0.4,

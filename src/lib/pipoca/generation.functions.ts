@@ -12,8 +12,11 @@ const SIGNED_REF_TTL = 60 * 30;
 // window.location.origin. Result QR code MUST always point here.
 const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/, "");
 
-const IDENTITY_NAME = "identity-close.jpg";
-const APPEARANCE_NAME = "appearance-medium.jpg";
+// Single medium-shot file. Used as BOTH identity and appearance until the
+// generation pipeline is revised.
+// Temporary single-photo compatibility mapping. Identity and appearance use
+// the same medium-shot image until generation pipeline revision.
+const MEDIUM_NAME = "visitor-medium.jpg";
 
 const ENABLE_HAT_REFERENCE = true;
 
@@ -59,6 +62,99 @@ async function ensurePublicResultFields(
   }
 
   return { publicToken, resultPageUrl };
+}
+
+/**
+ * Idempotently create a print-queue entry for a completed generation.
+ * Safe to call multiple times — uses generation_id as the dedupe key.
+ * Never throws: any failure is logged and surfaced via the return value so
+ * the visitor flow is never blocked.
+ */
+async function ensurePrintQueueEntry(
+  supabaseAdmin: any,
+  generationId: string,
+): Promise<{ created: boolean; alreadyExists: boolean }> {
+  const LOG_AUTO = "[PIPOCA_PRINT_QUEUE_AUTO]";
+  try {
+    const { data: gen, error: gErr } = await supabaseAdmin
+      .from("pipoca_generations")
+      .select("id, session_id, status, final_image_path")
+      .eq("id", generationId)
+      .maybeSingle();
+    if (gErr || !gen) {
+      console.warn(LOG_AUTO, { generationId, errorCode: gErr?.code ?? "not_found", created: false });
+      return { created: false, alreadyExists: false };
+    }
+    if (gen.status !== "completed" || !gen.final_image_path || !gen.session_id) {
+      return { created: false, alreadyExists: false };
+    }
+    const { data: existing } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .select("id, status")
+      .eq("generation_id", generationId)
+      .maybeSingle();
+    if (existing) {
+      console.log(LOG_AUTO, {
+        generationId,
+        status: existing.status,
+        created: false,
+        alreadyExists: true,
+        retry: false,
+      });
+      return { created: false, alreadyExists: true };
+    }
+    const { data: session } = await supabaseAdmin
+      .from("pipoca_sessions")
+      .select("visitor_id")
+      .eq("id", gen.session_id)
+      .maybeSingle();
+    if (!session?.visitor_id) {
+      console.warn(LOG_AUTO, { generationId, errorCode: "no_visitor", created: false });
+      return { created: false, alreadyExists: false };
+    }
+    const { error: iErr } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .insert({
+        visitor_id: session.visitor_id,
+        generation_id: generationId,
+        status: "pending",
+      });
+    if (iErr) {
+      if (iErr.code === "23505") {
+        console.log(LOG_AUTO, {
+          generationId,
+          status: "pending",
+          created: false,
+          alreadyExists: true,
+          retry: false,
+        });
+        return { created: false, alreadyExists: true };
+      }
+      console.warn(LOG_AUTO, {
+        generationId,
+        errorCode: iErr.code,
+        created: false,
+        retry: true,
+      });
+      return { created: false, alreadyExists: false };
+    }
+    console.log(LOG_AUTO, {
+      generationId,
+      status: "pending",
+      created: true,
+      alreadyExists: false,
+      retry: false,
+    });
+    return { created: true, alreadyExists: false };
+  } catch (e) {
+    console.warn(LOG_AUTO, {
+      generationId,
+      errorCode: e instanceof Error ? e.message.slice(0, 60) : "unknown",
+      created: false,
+      retry: true,
+    });
+    return { created: false, alreadyExists: false };
+  }
 }
 
 type ReplicatePrediction = {
@@ -342,8 +438,8 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
 
     // Server-derived paths only.
-    const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
-    const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;
+    // Single medium-shot file — used as identity AND appearance below.
+    const mediumPath = `${session.id}/${capture.id}/${MEDIUM_NAME}`;
 
     // Multiple active scene packs: honour session pick if usable, otherwise
     // randomly pick among the active packs for the film.
@@ -392,19 +488,15 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .eq("capture_id", capture.id);
     const attemptNumber = (priorCount ?? 0) + 1;
 
-    // Signed URLs for the two visitor photos.
-    const { data: signedIdentity, error: signIdErr } = await supabaseAdmin.storage
+    // Single signed URL for the medium-shot photo. Reused as identity AND
+    // appearance below (temporary single-photo compatibility mapping).
+    const { data: signedMedium, error: signMedErr } = await supabaseAdmin.storage
       .from(ORIGINALS_BUCKET)
-      .createSignedUrl(identityPath, SIGNED_REF_TTL);
-    if (signIdErr || !signedIdentity?.signedUrl) {
-      throw new Error("Falha ao gerar URL da foto de identidade");
+      .createSignedUrl(mediumPath, SIGNED_REF_TTL);
+    if (signMedErr || !signedMedium?.signedUrl) {
+      throw new Error("Falha ao gerar URL da foto");
     }
-    const { data: signedAppearance, error: signApErr } = await supabaseAdmin.storage
-      .from(ORIGINALS_BUCKET)
-      .createSignedUrl(appearancePath, SIGNED_REF_TTL);
-    if (signApErr || !signedAppearance?.signedUrl) {
-      throw new Error("Falha ao gerar URL da foto de aparência");
-    }
+    const signedMediumUrl = signedMedium.signedUrl;
 
     
     const hatReferenceUrl = ENABLE_HAT_REFERENCE ? FIXED_HAT_REFERENCE_URL : null;
@@ -440,8 +532,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     try {
       prediction = await createReplicatePrediction({
         prompt: promptText,
-        identityUrl: signedIdentity.signedUrl,
-        appearanceUrl: signedAppearance.signedUrl,
+        // Single medium-shot URL used for both roles. Temporary mapping.
+        identityUrl: signedMediumUrl,
+        appearanceUrl: signedMediumUrl,
         sceneImageUrl: scenePack.reference_image_url,
         hatReferenceUrl,
       });
@@ -466,8 +559,8 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         metadata: {
           model: REPLICATE_MODEL,
           attempt: attemptNumber,
-          identity_photo_path: identityPath,
-          appearance_photo_path: appearancePath,
+          medium_photo_path: mediumPath,
+          single_photo_compat: true,
           input_image_count: inputImageCount,
           scene_pack_id: chosenScenePackId,
           hat_reference_enabled: ENABLE_HAT_REFERENCE,
@@ -530,6 +623,8 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
 
     if (gen.status === "completed" && gen.final_image_path) {
       const { publicToken, resultPageUrl } = await ensurePublicResultFields(supabaseAdmin, gen);
+      // Auto-enqueue if not already in the print queue (idempotent retry).
+      await ensurePrintQueueEntry(supabaseAdmin, gen.id);
       const { data: signed, error: sErr } = await supabaseAdmin.storage
         .from(GENERATED_BUCKET)
         .createSignedUrl(gen.final_image_path, SIGNED_DOWNLOAD_TTL);
@@ -651,6 +746,10 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
       .from("pipoca_sessions")
       .update({ status: "completed", completed_at: new Date().toISOString() })
       .eq("id", gen.session_id);
+
+    // Auto-enqueue this generation for production. Idempotent by generation_id.
+    await ensurePrintQueueEntry(supabaseAdmin, gen.id);
+
 
     const { data: signed, error: sErr } = await supabaseAdmin.storage
       .from(GENERATED_BUCKET)
