@@ -395,19 +395,15 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .eq("capture_id", capture.id);
     const attemptNumber = (priorCount ?? 0) + 1;
 
-    // Signed URLs for the two visitor photos.
-    const { data: signedIdentity, error: signIdErr } = await supabaseAdmin.storage
+    // Single signed URL for the medium-shot photo. Reused as identity AND
+    // appearance below (temporary single-photo compatibility mapping).
+    const { data: signedMedium, error: signMedErr } = await supabaseAdmin.storage
       .from(ORIGINALS_BUCKET)
-      .createSignedUrl(identityPath, SIGNED_REF_TTL);
-    if (signIdErr || !signedIdentity?.signedUrl) {
-      throw new Error("Falha ao gerar URL da foto de identidade");
+      .createSignedUrl(mediumPath, SIGNED_REF_TTL);
+    if (signMedErr || !signedMedium?.signedUrl) {
+      throw new Error("Falha ao gerar URL da foto");
     }
-    const { data: signedAppearance, error: signApErr } = await supabaseAdmin.storage
-      .from(ORIGINALS_BUCKET)
-      .createSignedUrl(appearancePath, SIGNED_REF_TTL);
-    if (signApErr || !signedAppearance?.signedUrl) {
-      throw new Error("Falha ao gerar URL da foto de aparência");
-    }
+    const signedMediumUrl = signedMedium.signedUrl;
 
     
     const hatReferenceUrl = ENABLE_HAT_REFERENCE ? FIXED_HAT_REFERENCE_URL : null;
