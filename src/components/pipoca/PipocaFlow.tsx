@@ -1611,16 +1611,6 @@ function Result({
               <p className="text-sm sm:text-base text-white/85 leading-snug text-center uppercase tracking-wider font-semibold">
                 Aponte a câmera do celular para baixar sua foto
               </p>
-              {tokenReady && resultPageUrl ? (
-                <a
-                  href={resultPageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="pointer-events-auto inline-block px-5 py-2.5 rounded-md border border-gold/60 text-gold font-semibold tracking-wider uppercase text-xs hover:bg-gold/10 transition"
-                >
-                  Abrir resultado
-                </a>
-              ) : null}
             </div>
           </div>
         )}
