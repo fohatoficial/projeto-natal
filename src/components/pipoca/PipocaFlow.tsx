@@ -53,6 +53,51 @@ const LOADING_PHRASES = [
   "Finalizando sua imagem cinematográfica...",
 ];
 
+const CinemaIconClapper = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+    <path d="M3 9.5 21 7l-.5-2.5L2.5 7 3 9.5Z" />
+    <path d="M3 9.5V20a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9.5" />
+    <path d="m7 8 1.5-3M12 7.5 13.5 4.5M17 7l1.5-3" />
+  </svg>
+);
+const CinemaIconPopcorn = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+    <path d="M18 8a2 2 0 0 0-2-2 3 3 0 0 0-5.66-1A3 3 0 0 0 6 8a2 2 0 0 0-2 2v1l2 10h12l2-10V10a2 2 0 0 0-2-2Z" />
+    <path d="M10 11v9M14 11v9M8 21h8" />
+  </svg>
+);
+const CinemaIconFilm = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M7 3v18M17 3v18M3 8h4M3 12h4M3 16h4M17 8h4M17 12h4M17 16h4" />
+  </svg>
+);
+const CinemaIconStar = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
+    <path d="m12 2 2.9 6.9L22 10l-5.5 4.6L18.2 22 12 18.3 5.8 22l1.7-7.4L2 10l7.1-1.1L12 2Z" />
+  </svg>
+);
+const CinemaIconCamera = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+    <path d="M3 7h3l2-2h8l2 2h3v12H3z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </svg>
+);
+const CinemaIconSparkles = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />
+    <circle cx="12" cy="12" r="2" fill="currentColor" />
+  </svg>
+);
+const CINEMA_ICONS = [
+  CinemaIconClapper,
+  CinemaIconPopcorn,
+  CinemaIconFilm,
+  CinemaIconCamera,
+  CinemaIconStar,
+  CinemaIconSparkles,
+];
+
 const PAGE_SIZE = 4;
 const COUNTDOWN_SECONDS = 10;
 
