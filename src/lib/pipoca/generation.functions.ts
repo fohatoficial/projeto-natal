@@ -532,16 +532,18 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
 
     const parsedScenePrompt = parseScenePackPrompt(scenePack.prompt);
-    let hatReferenceUrls: string[] = [];
-    let hatRefUsed: string[] = [];
-    if (ENABLE_HAT_REFERENCE) {
-      hatReferenceUrls = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
-      hatRefUsed = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
-      console.log(`${LOG} referências de chapéu fixas ativas (2 URLs)`);
-    }
-    console.log(`${GEN_LOG} hat reference enabled: ${ENABLE_HAT_REFERENCE}`);
-    console.log(`${GEN_LOG} fixed hat references: ${hatRefUsed.length}`);
+    // Prop references are now strictly scene-pack-driven. No global toggle,
+    // no film_id/slug guess, no fixed fallback URL. A scene pack without
+    // `prop_references.hat_reference_images` (or with an empty array) sends
+    // exactly 3 base images.
+    const hatReferenceUrls: string[] = extractHatReferenceUrls(parsedScenePrompt);
+    const hatRefUsed: string[] = hatReferenceUrls.slice(0, 2);
+    console.log(`${GEN_LOG} prop references resolved from scene pack`, {
+      scene_pack_id: chosenScenePackId,
+      hat_reference_count: hatRefUsed.length,
+    });
     const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
+
 
 
     const { data: generation, error: genErr } = await supabaseAdmin
