@@ -281,63 +281,88 @@ export function PipocaFlow() {
     [createGenFn],
   );
 
-  const runUpload = useCallback(async () => {
-    if (!mediumPhoto || !selected) return;
-    setUploadError(null);
-    let current = prepared;
-    try {
-      if (!current) {
-        setUploadStatus("preparing");
-        const res = await prepareFn({
+  const confirmingRef = useRef(false);
+
+  const runUpload = useCallback(
+    async (photo: { blob: Blob; url: string }) => {
+      if (!selected) return;
+      setUploadError(null);
+      let current = prepared;
+      console.log("[PIPOCA_MEDIUM_CONFIRM]", {
+        step: "upload_started",
+        blob_available: Boolean(photo.blob),
+      });
+      try {
+        if (!current) {
+          setUploadStatus("preparing");
+          const res = await prepareFn({
+            data: {
+              filmId: selected.id,
+              deviceId: getDeviceId(),
+              contentType: "image/jpeg",
+              visitorId: visitorId ?? null,
+            },
+          });
+          current = res as Prepared;
+          setPrepared(current);
+        }
+
+        setUploadStatus("uploading");
+
+        if (!mediumUploadedRef.current) {
+          const { error: upErr } = await supabase.storage
+            .from("pipoca-visitor-originals")
+            .uploadToSignedUrl(
+              current.uploads.medium.path,
+              current.uploads.medium.token,
+              photo.blob,
+              { contentType: "image/jpeg" },
+            );
+          if (upErr) throw upErr;
+          mediumUploadedRef.current = true;
+          console.log(`${UPLOAD_LOG} foto única enviada`);
+        }
+
+        setUploadStatus("confirming");
+        await confirmFn({
           data: {
-            filmId: selected.id,
-            deviceId: getDeviceId(),
-            contentType: "image/jpeg",
-            visitorId: visitorId ?? null,
+            sessionId: current.sessionId,
+            captureId: current.captureId,
           },
         });
-        current = res as Prepared;
-        setPrepared(current);
+        setUploadStatus("idle");
+        console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "upload_completed" });
+        releaseSharedCamera();
+        console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "next_step" });
+        transitionTo(() => setStep("processing"));
+        void startGeneration(current.sessionId, current.captureId);
+      } catch (err) {
+        const stage = !current
+          ? "prepare"
+          : !mediumUploadedRef.current
+            ? "upload"
+            : "confirm";
+        console.warn(`${UPLOAD_LOG} falhou`, { stage });
+        console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "error_code", error_code: stage });
+        setUploadStatus("error");
+        setUploadError(stage);
+      } finally {
+        confirmingRef.current = false;
       }
+    },
+    [selected, prepared, prepareFn, confirmFn, startGeneration, visitorId],
+  );
 
-      setUploadStatus("uploading");
-
-      if (!mediumUploadedRef.current) {
-        const { error: upErr } = await supabase.storage
-          .from("pipoca-visitor-originals")
-          .uploadToSignedUrl(
-            current.uploads.medium.path,
-            current.uploads.medium.token,
-            mediumPhoto.blob,
-            { contentType: "image/jpeg" },
-          );
-        if (upErr) throw upErr;
-        mediumUploadedRef.current = true;
-        console.log(`${UPLOAD_LOG} foto única enviada`);
-      }
-
-      setUploadStatus("confirming");
-      await confirmFn({
-        data: {
-          sessionId: current.sessionId,
-          captureId: current.captureId,
-        },
-      });
-      setUploadStatus("idle");
-      releaseSharedCamera();
-      transitionTo(() => setStep("processing"));
-      void startGeneration(current.sessionId, current.captureId);
-    } catch (err) {
-      const stage = !current
-        ? "prepare"
-        : !mediumUploadedRef.current
-          ? "upload"
-          : "confirm";
-      console.warn(`${UPLOAD_LOG} falhou`, { stage });
-      setUploadStatus("error");
-      setUploadError(stage);
-    }
-  }, [mediumPhoto, selected, prepared, prepareFn, confirmFn, startGeneration, visitorId]);
+  const handleMediumConfirm = useCallback(
+    (photo: { blob: Blob; url: string }) => {
+      if (confirmingRef.current) return;
+      confirmingRef.current = true;
+      console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "confirm_clicked" });
+      setMediumPhoto(photo);
+      void runUpload(photo);
+    },
+    [runUpload],
+  );
 
   const retryGeneration = useCallback(() => {
     if (!prepared) return;
