@@ -1502,8 +1502,8 @@ function Processing({
           ))}
         </div>
 
-        <div className="w-full max-w-xs h-1.5 rounded-full bg-white/10 overflow-hidden relative">
-          <div className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-gold to-transparent rounded-full animate-[shimmer-slide_1.8s_ease-in-out_infinite]" />
+        <div className="w-full max-w-xs h-1.5 rounded-full bg-white/10 overflow-hidden shimmer-bar">
+          <div className="h-full w-1/3 bg-gradient-to-r from-gold/40 via-gold to-gold/40 rounded-full" />
         </div>
       </div>
     </Screen>
