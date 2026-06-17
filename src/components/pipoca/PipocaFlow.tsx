@@ -10,7 +10,7 @@ import {
   getSharedStatus,
   subscribeSharedCamera,
 } from "@/lib/pipoca/sharedCamera";
-import { useFaceGuide, type GuideMode, type GuideState } from "@/lib/pipoca/useFaceGuide";
+import { type GuideState } from "@/lib/pipoca/useFaceGuide";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createPipocaCaptureUpload,
@@ -36,9 +36,12 @@ type Step =
   | "choose"
   | "visitor_registration"
   | "stories"
-  | "camera_medium"
+  | "camera_identity_simple"
+  | "camera_appearance_simple"
   | "processing"
   | "result";
+
+type ShotType = "identity" | "appearance";
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
@@ -65,7 +68,8 @@ type Prepared = {
   sessionId: string;
   captureId: string;
   uploads: {
-    medium: { path: string; token: string };
+    identity: { path: string; token: string };
+    appearance: { path: string; token: string };
   };
 };
 type UploadStatus = "idle" | "preparing" | "uploading" | "confirming" | "error";
@@ -195,7 +199,8 @@ export function PipocaFlow() {
   const [selected, setSelected] = useState<Movie | null>(null);
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [firstName, setFirstName] = useState<string>("");
-  const [mediumPhoto, setMediumPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [identityPhoto, setIdentityPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [appearancePhoto, setAppearancePhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [prepared, setPrepared] = useState<Prepared | null>(null);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
@@ -205,7 +210,8 @@ export function PipocaFlow() {
   const [publicToken, setPublicToken] = useState<string | null>(null);
   const [resultPageUrl, setResultPageUrl] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
-  const mediumUploadedRef = useRef(false);
+  const identityUploadedRef = useRef(false);
+  const appearanceUploadedRef = useRef(false);
   const generationStartedRef = useRef(false);
   const { films, loading, error } = usePipocaFilms();
 
@@ -215,14 +221,15 @@ export function PipocaFlow() {
   const statusGenFn = useServerFn(getPipocaGenerationStatus);
   const createVisitorFn = useServerFn(createPipocaVisitor);
 
-  const mediumRef = useRef<{ blob: Blob; url: string } | null>(null);
-  useEffect(() => {
-    mediumRef.current = mediumPhoto;
-  }, [mediumPhoto]);
+  const identityRef = useRef<{ blob: Blob; url: string } | null>(null);
+  const appearanceRef = useRef<{ blob: Blob; url: string } | null>(null);
+  useEffect(() => { identityRef.current = identityPhoto; }, [identityPhoto]);
+  useEffect(() => { appearanceRef.current = appearancePhoto; }, [appearancePhoto]);
   useViewportHeightVar(step);
   useEffect(() => {
     return () => {
-      if (mediumRef.current) URL.revokeObjectURL(mediumRef.current.url);
+      if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
+      if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
       releaseSharedCamera();
     };
   }, []);
@@ -238,9 +245,12 @@ export function PipocaFlow() {
   }
 
   const clearPhotos = () => {
-    if (mediumPhoto) URL.revokeObjectURL(mediumPhoto.url);
-    setMediumPhoto(null);
-    mediumUploadedRef.current = false;
+    if (identityPhoto) URL.revokeObjectURL(identityPhoto.url);
+    if (appearancePhoto) URL.revokeObjectURL(appearancePhoto.url);
+    setIdentityPhoto(null);
+    setAppearancePhoto(null);
+    identityUploadedRef.current = false;
+    appearanceUploadedRef.current = false;
   };
 
   const reset = () =>
@@ -267,7 +277,7 @@ export function PipocaFlow() {
     async (sessionId: string, captureId: string) => {
       if (generationStartedRef.current) return;
       generationStartedRef.current = true;
-      console.log(`${GEN_LOG} usando foto média única (identity=appearance)`);
+      console.log(`${GEN_LOG} iniciando geração com duas fotos (identity + appearance)`);
       try {
         const res = await createGenFn({ data: { sessionId, captureId } });
         setGenerationId(res.generationId);
@@ -284,14 +294,14 @@ export function PipocaFlow() {
   const confirmingRef = useRef(false);
 
   const runUpload = useCallback(
-    async (photo: { blob: Blob; url: string }) => {
+    async (
+      identity: { blob: Blob; url: string },
+      appearance: { blob: Blob; url: string },
+    ) => {
       if (!selected) return;
       setUploadError(null);
       let current = prepared;
-      console.log("[PIPOCA_MEDIUM_CONFIRM]", {
-        step: "upload_started",
-        blob_available: Boolean(photo.blob),
-      });
+      console.log("[PIPOCA_UPLOAD_FLOW]", { step: "upload_started" });
       try {
         if (!current) {
           setUploadStatus("preparing");
@@ -309,18 +319,32 @@ export function PipocaFlow() {
 
         setUploadStatus("uploading");
 
-        if (!mediumUploadedRef.current) {
+        if (!identityUploadedRef.current) {
           const { error: upErr } = await supabase.storage
             .from("pipoca-visitor-originals")
             .uploadToSignedUrl(
-              current.uploads.medium.path,
-              current.uploads.medium.token,
-              photo.blob,
+              current.uploads.identity.path,
+              current.uploads.identity.token,
+              identity.blob,
               { contentType: "image/jpeg" },
             );
           if (upErr) throw upErr;
-          mediumUploadedRef.current = true;
-          console.log(`${UPLOAD_LOG} foto única enviada`);
+          identityUploadedRef.current = true;
+          console.log(`${UPLOAD_LOG} identity enviada`);
+        }
+
+        if (!appearanceUploadedRef.current) {
+          const { error: upErr } = await supabase.storage
+            .from("pipoca-visitor-originals")
+            .uploadToSignedUrl(
+              current.uploads.appearance.path,
+              current.uploads.appearance.token,
+              appearance.blob,
+              { contentType: "image/jpeg" },
+            );
+          if (upErr) throw upErr;
+          appearanceUploadedRef.current = true;
+          console.log(`${UPLOAD_LOG} appearance enviada`);
         }
 
         setUploadStatus("confirming");
@@ -331,19 +355,19 @@ export function PipocaFlow() {
           },
         });
         setUploadStatus("idle");
-        console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "upload_completed" });
+        console.log("[PIPOCA_UPLOAD_FLOW]", { step: "upload_completed" });
         releaseSharedCamera();
-        console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "next_step" });
         transitionTo(() => setStep("processing"));
         void startGeneration(current.sessionId, current.captureId);
       } catch (err) {
         const stage = !current
           ? "prepare"
-          : !mediumUploadedRef.current
-            ? "upload"
-            : "confirm";
+          : !identityUploadedRef.current
+            ? "upload_identity"
+            : !appearanceUploadedRef.current
+              ? "upload_appearance"
+              : "confirm";
         console.warn(`${UPLOAD_LOG} falhou`, { stage });
-        console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "error_code", error_code: stage });
         setUploadStatus("error");
         setUploadError(stage);
       } finally {
@@ -353,13 +377,27 @@ export function PipocaFlow() {
     [selected, prepared, prepareFn, confirmFn, startGeneration, visitorId],
   );
 
-  const handleMediumConfirm = useCallback(
+  const handleIdentityConfirm = useCallback(
+    (photo: { blob: Blob; url: string }) => {
+      console.log("[PIPOCA_SHOT_CONFIRM]", { shotType: "identity" });
+      setIdentityPhoto(photo);
+      transitionTo(() => setStep("camera_appearance_simple"));
+    },
+    [],
+  );
+
+  const handleAppearanceConfirm = useCallback(
     (photo: { blob: Blob; url: string }) => {
       if (confirmingRef.current) return;
+      const identity = identityRef.current;
+      if (!identity) {
+        console.warn("[PIPOCA_SHOT_CONFIRM] appearance sem identity prévia");
+        return;
+      }
       confirmingRef.current = true;
-      console.log("[PIPOCA_MEDIUM_CONFIRM]", { step: "confirm_clicked" });
-      setMediumPhoto(photo);
-      void runUpload(photo);
+      console.log("[PIPOCA_SHOT_CONFIRM]", { shotType: "appearance" });
+      setAppearancePhoto(photo);
+      void runUpload(identity, photo);
     },
     [runUpload],
   );
@@ -377,7 +415,7 @@ export function PipocaFlow() {
 
   const retakeAll = () =>
     transitionTo(() => {
-      console.log(`${UX} foto descartada`);
+      console.log(`${UX} fotos descartadas`);
       clearPhotos();
       setPrepared(null);
       generationStartedRef.current = false;
@@ -388,7 +426,7 @@ export function PipocaFlow() {
       setGenError(null);
       setUploadStatus("idle");
       setUploadError(null);
-      setStep("camera_medium");
+      setStep("camera_identity_simple");
     });
 
   return (
@@ -432,7 +470,7 @@ export function PipocaFlow() {
           firstName={firstName}
           onDone={() => {
             console.log(`${UX} stories concluídos, abrindo câmera`);
-            transitionTo(() => setStep("camera_medium"));
+            transitionTo(() => setStep("camera_identity_simple"));
           }}
           onChangeFilm={() => {
             releaseSharedCamera();
@@ -443,14 +481,26 @@ export function PipocaFlow() {
           }}
         />
       )}
-      {step === "camera_medium" && (
+      {step === "camera_identity_simple" && (
         <GuidedCamera
-          mode="medium"
-          confirming={uploadStatus !== "idle" && uploadStatus !== "error"}
-          onConfirm={handleMediumConfirm}
+          shotType="identity"
+          confirming={false}
+          onConfirm={handleIdentityConfirm}
           onBack={() =>
             transitionTo(() => {
               setStep("stories");
+            })
+          }
+        />
+      )}
+      {step === "camera_appearance_simple" && (
+        <GuidedCamera
+          shotType="appearance"
+          confirming={uploadStatus !== "idle" && uploadStatus !== "error"}
+          onConfirm={handleAppearanceConfirm}
+          onBack={() =>
+            transitionTo(() => {
+              setStep("camera_identity_simple");
             })
           }
         />
@@ -497,7 +547,7 @@ export function PipocaFlow() {
         <UploadError
           stage={uploadError}
           onRetry={() => {
-            if (mediumPhoto) void runUpload(mediumPhoto);
+            if (identityPhoto && appearancePhoto) void runUpload(identityPhoto, appearancePhoto);
           }}
           onRetake={retakeAll}
         />
@@ -1563,12 +1613,12 @@ function VisitorRegistration({
 type CaptureUiState = "opening" | "counting" | "captured" | "error" | "timeout";
 
 function GuidedCamera({
-  mode,
+  shotType,
   onConfirm,
   onBack,
   confirming = false,
 }: {
-  mode: GuideMode;
+  shotType: ShotType;
   onConfirm: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
   confirming?: boolean;
@@ -1613,6 +1663,7 @@ function GuidedCamera({
     const v = videoRef.current;
     console.log("[PIPOCA_CAMERA_SIMPLE]", {
       tag,
+      shotType,
       readyState: v?.readyState ?? null,
       videoWidth: v?.videoWidth ?? null,
       videoHeight: v?.videoHeight ?? null,
@@ -1621,7 +1672,7 @@ function GuidedCamera({
       hasSrcObject: Boolean(v?.srcObject),
       ...extra,
     });
-  }, [videoRef]);
+  }, [videoRef, shotType]);
 
   // --- Local videoReady detection (events + polling fallback for kiosk) ---
   useEffect(() => {
@@ -1718,7 +1769,7 @@ function GuidedCamera({
     if (!blob) return null;
     const url = URL.createObjectURL(blob);
     console.log("[PIPOCA_CAPTURE_RESOLUTION]", {
-      mode,
+      mode: shotType,
       videoWidth: vw,
       videoHeight: vh,
       cropWidth: cropW,
@@ -1727,7 +1778,7 @@ function GuidedCamera({
       outputHeight: cropH,
     });
     return { blob, url };
-  }, [videoRef, mode]);
+  }, [videoRef, shotType]);
 
   const performCapture = useCallback(async () => {
     if (captureRef.current || captureCompletedRef.current) return;
@@ -1814,7 +1865,14 @@ function GuidedCamera({
 
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
-  let hint = "POSICIONE-SE PARA A FOTO";
+  const stepLabel = shotType === "identity" ? "FOTO 1 DE 2" : "FOTO 2 DE 2";
+  const defaultHint =
+    shotType === "identity" ? "APROXIME-SE DA CÂMERA" : "AFASTE-SE UM POUCO";
+  const subHint =
+    shotType === "identity"
+      ? "ENQUADRE O ROSTO, O CABELO E OS OMBROS"
+      : "APAREÇA DA CABEÇA ATÉ A CINTURA";
+  let hint = defaultHint;
   if (uiState === "captured") {
     hint = confirming ? "PREPARANDO..." : "FOTO CAPTURADA";
   } else if (uiState === "counting") {
@@ -1828,21 +1886,24 @@ function GuidedCamera({
     uiState === "captured" ? "pipoca-camera-hint--success" : ""
   }`;
   const showCountdown = uiState === "counting" && countdown !== null && countdown > 0;
+  const showSubHint = uiState === "opening" || uiState === "counting";
 
   return (
     <div
       className="pipoca-camera-screen bg-cinema relative"
-      data-pipoca-camera={mode}
+      data-pipoca-camera={shotType}
       data-pipoca-state={uiState}
     >
       <div className="pipoca-camera-preview-wrap">
         <div className="pipoca-camera-top">
+          <p className="pipoca-camera-step-label">{stepLabel}</p>
           {showCountdown ? (
             <span key={countdown} ref={countdownRef} className="pipoca-camera-countdown">
               {countdown}
             </span>
           ) : null}
           <p className={hintClass}>{hint}</p>
+          {showSubHint ? <p className="pipoca-camera-subhint">{subHint}</p> : null}
         </div>
         <div className="pipoca-camera-frame">
           {captured ? (
