@@ -360,6 +360,7 @@ export function useFaceGuide(opts: {
       cancelled = true;
       cancelAnimationFrame(raf);
       lastOkSinceRef.current = null;
+      ambiguousSinceRef.current = null;
       setGuide({ status: "no_face", box: null, stableMs: 0 });
     };
   }, [enabled, detectorReady, videoRef, onTick, th]);
