@@ -38,6 +38,104 @@ function buildResultPageUrl(publicToken: string): string {
   return `${PUBLIC_RESULT_BASE_URL}/resultado/${encodeURIComponent(publicToken)}`;
 }
 
+const PQ_LOG = "[PIPOCA_PRINT_QUEUE_AUTO]";
+
+async function ensurePrintQueueEntry(
+  supabaseAdmin: any,
+  generationId: string,
+  sessionId: string | null,
+): Promise<{ queueId: string | null; alreadyExists: boolean; error?: string }> {
+  try {
+    const { data: existing } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .select("id, status")
+      .eq("generation_id", generationId)
+      .in("status", ["pending", "printing"])
+      .maybeSingle();
+    if (existing) {
+      console.log(PQ_LOG, {
+        generationId,
+        outputAvailable: true,
+        queueCreated: false,
+        alreadyExists: true,
+      });
+      return { queueId: existing.id, alreadyExists: true };
+    }
+
+    let visitorId: string | null = null;
+    if (sessionId) {
+      const { data: session } = await supabaseAdmin
+        .from("pipoca_sessions")
+        .select("visitor_id")
+        .eq("id", sessionId)
+        .maybeSingle();
+      visitorId = session?.visitor_id ?? null;
+    }
+    if (!visitorId) {
+      console.warn(PQ_LOG, {
+        generationId,
+        outputAvailable: true,
+        queueCreated: false,
+        alreadyExists: false,
+        errorCode: "no_visitor",
+      });
+      return { queueId: null, alreadyExists: false, error: "no_visitor" };
+    }
+
+    const { data: inserted, error: iErr } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .insert({
+        visitor_id: visitorId,
+        generation_id: generationId,
+        status: "pending",
+      })
+      .select("id")
+      .single();
+    if (iErr) {
+      if (iErr.code === "23505") {
+        const { data: again } = await supabaseAdmin
+          .from("pipoca_print_queue")
+          .select("id")
+          .eq("generation_id", generationId)
+          .in("status", ["pending", "printing"])
+          .maybeSingle();
+        console.log(PQ_LOG, {
+          generationId,
+          outputAvailable: true,
+          queueCreated: false,
+          alreadyExists: true,
+          retry: true,
+        });
+        return { queueId: again?.id ?? null, alreadyExists: true };
+      }
+      console.warn(PQ_LOG, {
+        generationId,
+        outputAvailable: true,
+        queueCreated: false,
+        alreadyExists: false,
+        errorCode: iErr.code ?? "insert_failed",
+      });
+      return { queueId: null, alreadyExists: false, error: iErr.code ?? "insert_failed" };
+    }
+    console.log(PQ_LOG, {
+      generationId,
+      outputAvailable: true,
+      queueCreated: true,
+      alreadyExists: false,
+    });
+    return { queueId: inserted.id, alreadyExists: false };
+  } catch (e) {
+    console.warn(PQ_LOG, {
+      generationId,
+      outputAvailable: true,
+      queueCreated: false,
+      alreadyExists: false,
+      errorCode: "exception",
+    });
+    return { queueId: null, alreadyExists: false, error: "exception" };
+  }
+}
+
 async function ensurePublicResultFields(
   supabaseAdmin: any,
   gen: {
@@ -575,6 +673,7 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
 
     if (gen.status === "completed" && gen.final_image_path) {
       const { publicToken, resultPageUrl } = await ensurePublicResultFields(supabaseAdmin, gen);
+      await ensurePrintQueueEntry(supabaseAdmin, gen.id, gen.session_id);
       const { data: signed, error: sErr } = await supabaseAdmin.storage
         .from(GENERATED_BUCKET)
         .createSignedUrl(gen.final_image_path, SIGNED_DOWNLOAD_TTL);
@@ -696,6 +795,8 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
       .from("pipoca_sessions")
       .update({ status: "completed", completed_at: new Date().toISOString() })
       .eq("id", gen.session_id);
+
+    await ensurePrintQueueEntry(supabaseAdmin, gen.id, gen.session_id);
 
     const { data: signed, error: sErr } = await supabaseAdmin.storage
       .from(GENERATED_BUCKET)

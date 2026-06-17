@@ -2,7 +2,6 @@ import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { getPublicPipocaResult, type PublicResult } from "@/lib/pipoca/public-result.functions";
-import { requestPipocaPrint } from "@/lib/pipoca/print-queue.functions";
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
@@ -29,22 +28,15 @@ type Status =
   | { kind: "imageUnavailable" }
   | { kind: "error"; message: string };
 
-type PrintState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "ok"; alreadyQueued: boolean }
-  | { kind: "error"; message: string };
-
 function PublicResultPage() {
   const { publicToken } = useParams({ from: "/resultado/$publicToken" });
   const normalizedPublicToken = publicToken.trim();
   const fetchPublic = useServerFn(getPublicPipocaResult);
-  const requestPrint = useServerFn(requestPipocaPrint);
   const [status, setStatus] = useState<Status>({ kind: "loading" });
-  const [print, setPrint] = useState<PrintState>({ kind: "idle" });
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
   const fetchedTokenRef = useRef<string | null>(null);
+
 
   // Release any kiosk scroll-lock that may be inherited and ensure mobile
   // scroll works on this public page. Restore prior styles on unmount.
@@ -128,19 +120,6 @@ function PublicResultPage() {
     } catch {/* noop */}
   }
 
-  async function handleRequestPrint() {
-    if (print.kind === "loading" || print.kind === "ok") return;
-    console.log("[PIPOCA_PRINT] solicitação enviada");
-    setPrint({ kind: "loading" });
-    try {
-      const res = await requestPrint({ data: { publicToken: normalizedPublicToken } });
-      setPrint({ kind: "ok", alreadyQueued: res.alreadyQueued });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Não foi possível solicitar a impressão";
-      console.warn("[PIPOCA_PRINT] solicitação falhou");
-      setPrint({ kind: "error", message });
-    }
-  }
 
   return (
     <div
@@ -219,37 +198,14 @@ function PublicResultPage() {
                 {copied ? "Link copiado!" : "Compartilhar"}
               </button>
 
-              <button
-                type="button"
-                onClick={handleRequestPrint}
-                disabled={print.kind === "loading" || print.kind === "ok"}
-                className="w-full border border-gold/60 text-gold font-semibold tracking-wider uppercase rounded-md py-3.5 text-sm hover:bg-gold/10 active:scale-[0.99] transition disabled:opacity-70"
-              >
-                {print.kind === "loading"
-                  ? "Solicitando…"
-                  : print.kind === "ok"
-                    ? print.alreadyQueued
-                      ? "Sua impressão já está na fila"
-                      : "Impressão solicitada"
-                    : "Solicitar impressão"}
-              </button>
-
-              {print.kind === "ok" && (
-                <p className="text-xs text-white/70 text-center">
-                  Informe seu nome à recepcionista para retirar sua foto.
+              <div className="rounded-md border border-gold/40 bg-gold/5 p-3 text-center">
+                <p className="font-display text-sm uppercase tracking-wider text-gold">
+                  Sua foto já foi enviada para produção
                 </p>
-              )}
-              {print.kind === "error" && (
-                <div className="rounded-md border border-red-400/40 bg-red-500/10 p-3 text-center">
-                  <p className="font-display text-sm uppercase tracking-wider text-red-200">
-                    Não conseguimos solicitar a impressão
-                  </p>
-                  <p className="mt-1 text-[11px] text-red-100/80">
-                    Tente novamente ou procure a recepção.
-                  </p>
-                  <p className="mt-1 text-[10px] text-red-100/60">{print.message}</p>
-                </div>
-              )}
+                <p className="mt-1 text-[11px] text-white/75">
+                  Dirija-se ao balcão para retirar sua foto.
+                </p>
+              </div>
             </div>
 
             <p className="mt-6 text-[10px] uppercase tracking-[0.3em] text-white/40 text-center">

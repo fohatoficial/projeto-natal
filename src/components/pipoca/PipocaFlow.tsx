@@ -643,7 +643,7 @@ function Choose({
 
   return (
     <Screen aurora>
-      <Header subtitle="Pipoca & Cena" />
+      <Header />
 
       {/* CENTER */}
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-5xl py-3">
@@ -1548,9 +1548,12 @@ function Result({
 
         {slide === 1 && (
           <div className="flex flex-col items-center gap-4 sm:gap-5 w-full animate-fade-up">
-            <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95]">
-              Leve sua <span className="text-gold">cena</span>
+            <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95] text-center">
+              SUA FOTO JÁ FOI ENVIADA PARA <span className="text-gold">PRODUÇÃO</span>
             </h1>
+            <p className="text-sm sm:text-base text-white/80 text-center">
+              Dirija-se ao balcão para retirar sua foto.
+            </p>
 
             <div className="flex flex-col items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-4 sm:p-5 w-full max-w-md">
               <div className="bg-white p-3 rounded-lg grid place-items-center">
@@ -1612,17 +1615,22 @@ function VisitorRegistration({
 }) {
   const [fullName, setFullName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
-  const [consent, setConsent] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const nameOk = fullName.replace(/\s+/g, " ").trim().length >= 2 && !/^\d+$/.test(fullName.trim());
   const phoneOk = isValidBrWhatsapp(whatsapp);
-  const canSubmit = nameOk && phoneOk && consent && !loading;
+  const canSubmit = nameOk && phoneOk && !loading;
 
   async function submit() {
     if (!canSubmit) return;
+    console.log("[PIPOCA_CONSENT]", {
+      consentClicked: true,
+      acceptedAtAvailable: true,
+      privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
+      visitorCreationStarted: true,
+    });
     setLoading(true);
     setError(null);
     try {
@@ -1637,8 +1645,16 @@ function VisitorRegistration({
       if (!res?.visitorId || !res?.firstName) {
         throw new Error("Resposta inválida do servidor");
       }
+      console.log("[PIPOCA_CONSENT]", {
+        visitorCreationCompleted: true,
+        privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
+      });
       onDone(res.visitorId, res.firstName);
     } catch (e) {
+      console.warn("[PIPOCA_CONSENT]", {
+        visitorCreationCompleted: false,
+        errorCode: e instanceof Error ? e.message.slice(0, 80) : "unknown",
+      });
       setError(e instanceof Error ? e.message : "Falha ao cadastrar");
     } finally {
       setLoading(false);
@@ -1647,7 +1663,7 @@ function VisitorRegistration({
 
   return (
     <Screen aurora>
-      <Header subtitle="Cadastro" />
+      <Header />
       <div className="relative z-10 flex-1 min-h-0 w-full max-w-md mx-auto flex flex-col items-stretch justify-center gap-4 py-3">
         <h1 className="font-display text-3xl sm:text-4xl text-white text-center leading-[0.95]">
           Antes de entrar em <span className="text-gold">cena</span>
@@ -1674,44 +1690,35 @@ function VisitorRegistration({
             className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base disabled:opacity-60"
           />
         </label>
-        <label className="flex items-start gap-2 text-left text-sm text-white/85">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-            disabled={loading}
-            className="mt-1 w-4 h-4 accent-gold flex-shrink-0"
-          />
-          <span>
-            Li o{" "}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowNotice(true);
-              }}
-              className="text-gold underline underline-offset-2 hover:text-gold/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-gold rounded-sm"
-            >
-              Aviso de Privacidade
-            </button>{" "}
-            e autorizo o tratamento do meu nome, WhatsApp e imagens para criar e disponibilizar minha cena personalizada e, caso eu solicite, identificar e imprimir minha foto.
-          </span>
-        </label>
+        <p className="text-left text-sm text-white/85 leading-snug">
+          Li o{" "}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowNotice(true);
+            }}
+            className="text-gold underline underline-offset-2 hover:text-gold/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-gold rounded-sm"
+          >
+            Aviso de Privacidade
+          </button>{" "}
+          e autorizo o tratamento do meu nome, WhatsApp e imagens para criar, disponibilizar e produzir minha foto personalizada.
+        </p>
         {error && (
           <div className="rounded-md border border-red-400/40 bg-red-950/30 p-3 text-center">
             <p className="text-sm font-semibold text-red-200 uppercase tracking-wide">
               Não conseguimos registrar seus dados
             </p>
             <p className="text-xs text-red-200/80 mt-1">
-              Confira as informações e tente novamente.
+              Seu nome e WhatsApp continuam preenchidos. Tente novamente.
             </p>
             <p className="text-[10px] text-red-200/50 mt-2 break-words">{error}</p>
           </div>
         )}
         <div className="flex flex-col items-center gap-2 pt-2">
           <PrimaryCta onClick={submit} disabled={!canSubmit}>
-            {loading ? "Cadastrando…" : error ? "Tentar novamente" : "Continuar"}
+            {loading ? "Cadastrando…" : error ? "Tentar novamente" : "Li e autorizo. Continuar"}
           </PrimaryCta>
           <GhostBtn onClick={onBack} disabled={loading}>Voltar</GhostBtn>
         </div>
