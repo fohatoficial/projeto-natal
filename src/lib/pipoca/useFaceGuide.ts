@@ -215,47 +215,120 @@ export function useFaceGuide(opts: {
         let nextStatus: GuideStatus = "no_face";
         let nextBox: FaceBox | null = null;
         const result = det.detectForVideo(v, now);
-        const dets = result?.detections ?? [];
-        if (dets.length > 1) {
-          nextStatus = "multi_face";
-        } else if (dets.length === 1) {
-          const d = dets[0];
+        const rawDets = result?.detections ?? [];
+        const vw = v.videoWidth;
+        const vh = v.videoHeight;
+
+        // Normalize detections into mirrored-preview space with area/center/score.
+        type Cand = {
+          x: number; y: number; w: number; h: number;
+          cx: number; cy: number; area: number; score: number;
+          keypoints: Array<{ x: number; y: number }>;
+        };
+        const cands: Cand[] = [];
+        for (const d of rawDets) {
           const bb = d.boundingBox;
-          if (bb) {
-            const vw = v.videoWidth;
-            const vh = v.videoHeight;
-            const x = bb.originX / vw;
-            const y = bb.originY / vh;
-            const w = bb.width / vw;
-            const h = bb.height / vh;
-            // Mirror X to match scaleX(-1) preview.
-            const mx = 1 - (x + w);
-            nextBox = { x: mx, y, w, h };
-            const cx = mx + w / 2;
-            const cy = y + h / 2;
+          if (!bb) continue;
+          const x = bb.originX / vw;
+          const y = bb.originY / vh;
+          const w = bb.width / vw;
+          const h = bb.height / vh;
+          const mx = 1 - (x + w);
+          const cx = mx + w / 2;
+          const cy = y + h / 2;
+          const score =
+            (d as unknown as { categories?: Array<{ score?: number }> })
+              .categories?.[0]?.score ?? 1;
+          cands.push({
+            x: mx, y, w, h, cx, cy, area: w * h, score,
+            keypoints: d.keypoints ?? [],
+          });
+        }
 
-            const kp = d.keypoints ?? [];
-            let turned = false;
-            if (kp.length >= 3) {
-              const lex = 1 - kp[0].x;
-              const rex = 1 - kp[1].x;
-              const nx = 1 - kp[2].x;
-              const eyeCx = (lex + rex) / 2;
-              if (Math.abs(nx - eyeCx) > 0.05) turned = true;
-            }
+        // Deduplicate overlapping boxes (IoU > 0.35) — keep higher confidence.
+        const iou = (a: Cand, b: Cand) => {
+          const ix1 = Math.max(a.x, b.x);
+          const iy1 = Math.max(a.y, b.y);
+          const ix2 = Math.min(a.x + a.w, b.x + b.w);
+          const iy2 = Math.min(a.y + a.h, b.y + b.h);
+          const iw = Math.max(0, ix2 - ix1);
+          const ih = Math.max(0, iy2 - iy1);
+          const inter = iw * ih;
+          const uni = a.area + b.area - inter;
+          return uni > 0 ? inter / uni : 0;
+        };
+        const deduped: Cand[] = [];
+        const sortedByScore = [...cands].sort((a, b) => b.score - a.score);
+        for (const c of sortedByScore) {
+          if (deduped.some((k) => iou(c, k) > 0.35)) continue;
+          deduped.push(c);
+        }
 
-            if (w < th.wMin) nextStatus = "too_far";
-            else if (w > th.wMax) nextStatus = "too_close";
-            else if (cx < th.cxMin) nextStatus = "off_left";
-            else if (cx > th.cxMax) nextStatus = "off_right";
-            else if (cy < th.cyMin) nextStatus = "off_high";
-            else if (cy > th.cyMax) nextStatus = "off_low";
-            else if (turned) nextStatus = "head_turned";
-            else nextStatus = "ok";
+        // Select primary face: area (0.70) + center proximity (0.25) + confidence (0.05).
+        let primary: Cand | null = null;
+        let secondaryAreaRatio = 0;
+        let ambiguousForeground = 0;
+        if (deduped.length > 0) {
+          const maxArea = Math.max(...deduped.map((c) => c.area));
+          const scored = deduped.map((c) => {
+            const areaScore = c.area / maxArea;
+            const dist = Math.hypot(c.cx - 0.5, c.cy - 0.5);
+            const centerScore = Math.max(0, 1 - dist / 0.7071);
+            const confidenceScore = Math.min(1, Math.max(0, c.score));
+            return {
+              c,
+              primaryScore: areaScore * 0.7 + centerScore * 0.25 + confidenceScore * 0.05,
+            };
+          });
+          scored.sort((a, b) => b.primaryScore - a.primaryScore);
+          primary = scored[0].c;
+
+          // Count foreground faces that could be ambiguous with primary.
+          for (const c of deduped) {
+            if (c === primary) continue;
+            const ratio = c.area / primary.area;
+            const inCenter =
+              c.cx >= 0.25 && c.cx <= 0.75 && c.cy >= 0.2 && c.cy <= 0.8;
+            if (ratio >= 0.7 && inCenter) ambiguousForeground++;
+            if (c === scored[1]?.c) secondaryAreaRatio = ratio;
           }
         }
 
-        const t = performance.now();
+        // Ambiguity requires sustained presence (>=600ms).
+        const tNow = performance.now();
+        let ambiguous = false;
+        if (ambiguousForeground > 0) {
+          if (ambiguousSinceRef.current === null) ambiguousSinceRef.current = tNow;
+          if (tNow - ambiguousSinceRef.current >= 600) ambiguous = true;
+        } else {
+          ambiguousSinceRef.current = null;
+        }
+
+        if (ambiguous) {
+          nextStatus = "multi_face";
+          if (primary) nextBox = { x: primary.x, y: primary.y, w: primary.w, h: primary.h };
+        } else if (primary) {
+          const { w, cx, cy, keypoints: kp } = primary;
+          nextBox = { x: primary.x, y: primary.y, w, h: primary.h };
+          let turned = false;
+          if (kp.length >= 3) {
+            const lex = 1 - kp[0].x;
+            const rex = 1 - kp[1].x;
+            const nx = 1 - kp[2].x;
+            const eyeCx = (lex + rex) / 2;
+            if (Math.abs(nx - eyeCx) > 0.05) turned = true;
+          }
+          if (w < th.wMin) nextStatus = "too_far";
+          else if (w > th.wMax) nextStatus = "too_close";
+          else if (cx < th.cxMin) nextStatus = "off_left";
+          else if (cx > th.cxMax) nextStatus = "off_right";
+          else if (cy < th.cyMin) nextStatus = "off_high";
+          else if (cy > th.cyMax) nextStatus = "off_low";
+          else if (turned) nextStatus = "head_turned";
+          else nextStatus = "ok";
+        }
+
+        const t = tNow;
         if (nextStatus === "ok") {
           if (lastOkSinceRef.current === null) lastOkSinceRef.current = t;
         } else {
@@ -272,7 +345,7 @@ export function useFaceGuide(opts: {
 
         if (++logCounter % 20 === 0) {
           console.log(
-            `[PIPOCA_FACE_DEBUG] face-count=${dets.length} status=${nextStatus} video=${v.videoWidth}x${v.videoHeight}`,
+            `[PIPOCA_FACE_PRIMARY] rawFaceCount=${rawDets.length} dedupedFaceCount=${deduped.length} primaryArea=${primary ? primary.area.toFixed(3) : "0"} secondaryAreaRatio=${secondaryAreaRatio.toFixed(2)} primarySelected=${primary ? "yes" : "no"} ambiguousForegroundFaces=${ambiguousForeground} status=${nextStatus}`,
           );
         }
       } catch (err) {
