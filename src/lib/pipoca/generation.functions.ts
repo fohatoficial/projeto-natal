@@ -553,9 +553,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
     const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;
 
-    // Honour session pick only if usable AND it belongs to the same film.
-    // Otherwise pick among the active packs *for this film*. We NEVER fall
-    // back to a pack from another film.
+    // Honour only the exact scene pack stored in the session. No global or
+    // first-active fallback is allowed here, because prompt style must come
+    // exclusively from the resolved session scene pack.
     let scenePack: ScenePackForGeneration | null = null;
 
     const { data: linkedPack } = await supabaseAdmin
@@ -570,19 +570,12 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     if (isUsable(linkedPack) && linkedPack!.film_id === session.selected_film_id) {
       scenePack = linkedPack as any;
     } else {
-      const { data: candidates, error: candErr } = await supabaseAdmin
-        .from("pipoca_scene_packs")
-        .select("id, film_id, scene_name, prompt, negative_prompt, reference_image_url, visual_style, color_mode, framing, pose_type, active, status")
-        .eq("film_id", session.selected_film_id)
-        .eq("active", true)
-        .eq("status", "active");
-      if (candErr) throw new Error("Falha ao buscar scene packs");
-      const usable = (candidates ?? []).filter(
-        (p: any) => isUsable(p) && p.film_id === session.selected_film_id,
-      );
-      if (usable.length === 0) throw new Error("Nenhum scene pack ativo para o filme");
-      const picked = usable[Math.floor(Math.random() * usable.length)];
-      scenePack = picked as any;
+      console.warn(`${GEN_LOG} SCENE_PACK_SESSION_INVALID`, {
+        session_film_id: session.selected_film_id,
+        session_scene_pack_id: session.scene_pack_id,
+        linked_scene_pack_film_id: linkedPack?.film_id ?? null,
+      });
+      throw new Error("SCENE_PACK_SESSION_INVALID");
     }
 
     if (!scenePack) throw new Error("Scene pack não encontrado");
