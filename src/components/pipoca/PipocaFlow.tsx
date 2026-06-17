@@ -229,7 +229,12 @@ export function PipocaFlow() {
       } catch (e) {
         console.warn(`${GEN_LOG} falhou`, e);
         generationStartedRef.current = false;
-        setGenError("Não conseguimos iniciar sua cena.");
+        const message = e instanceof Error ? e.message : String(e ?? "");
+        setGenError(
+          message.includes("CROSS_FILM_PROMPT_CONTAMINATION")
+            ? "Não foi possível preparar o estilo deste filme. Tente novamente."
+            : "Não conseguimos iniciar sua cena.",
+        );
       }
     },
     [createGenFn],
@@ -465,6 +470,7 @@ export function PipocaFlow() {
 
       {step === "processing" && genError && (
         <GenerationError
+          message={genError}
           onRetry={retryGeneration}
           onRestart={reset}
         />
@@ -494,9 +500,11 @@ export function PipocaFlow() {
 
 
 function GenerationError({
+  message,
   onRetry,
   onRestart,
 }: {
+  message: string;
   onRetry: () => void;
   onRestart: () => void;
 }) {
@@ -512,7 +520,7 @@ function GenerationError({
           NÃO CONSEGUIMOS CRIAR SUA CENA
         </h2>
         <p className="text-white/75 text-sm sm:text-base">
-          Tivemos um problema ao gerar sua imagem. Você pode tentar novamente.
+          {message}
         </p>
         <div className="flex flex-col items-center gap-2 pt-2">
           <PrimaryCta onClick={onRetry}>Tentar novamente</PrimaryCta>
