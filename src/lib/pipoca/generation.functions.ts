@@ -747,6 +747,10 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
       .update({ status: "completed", completed_at: new Date().toISOString() })
       .eq("id", gen.session_id);
 
+    // Auto-enqueue this generation for production. Idempotent by generation_id.
+    await ensurePrintQueueEntry(supabaseAdmin, gen.id);
+
+
     const { data: signed, error: sErr } = await supabaseAdmin.storage
       .from(GENERATED_BUCKET)
       .createSignedUrl(finalPath, SIGNED_DOWNLOAD_TTL);
