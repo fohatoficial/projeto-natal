@@ -10,7 +10,7 @@ import {
   getSharedStatus,
   subscribeSharedCamera,
 } from "@/lib/pipoca/sharedCamera";
-import { useFaceGuide, type GuideMode, type GuideState } from "@/lib/pipoca/useFaceGuide";
+import { type GuideState } from "@/lib/pipoca/useFaceGuide";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createPipocaCaptureUpload,
@@ -36,9 +36,12 @@ type Step =
   | "choose"
   | "visitor_registration"
   | "stories"
-  | "camera_medium"
+  | "camera_identity_simple"
+  | "camera_appearance_simple"
   | "processing"
   | "result";
+
+type ShotType = "identity" | "appearance";
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
@@ -65,7 +68,8 @@ type Prepared = {
   sessionId: string;
   captureId: string;
   uploads: {
-    medium: { path: string; token: string };
+    identity: { path: string; token: string };
+    appearance: { path: string; token: string };
   };
 };
 type UploadStatus = "idle" | "preparing" | "uploading" | "confirming" | "error";
