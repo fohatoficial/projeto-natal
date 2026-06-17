@@ -199,7 +199,8 @@ export function PipocaFlow() {
   const [selected, setSelected] = useState<Movie | null>(null);
   const [visitorId, setVisitorId] = useState<string | null>(null);
   const [firstName, setFirstName] = useState<string>("");
-  const [mediumPhoto, setMediumPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [identityPhoto, setIdentityPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  const [appearancePhoto, setAppearancePhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
   const [prepared, setPrepared] = useState<Prepared | null>(null);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
@@ -209,7 +210,8 @@ export function PipocaFlow() {
   const [publicToken, setPublicToken] = useState<string | null>(null);
   const [resultPageUrl, setResultPageUrl] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
-  const mediumUploadedRef = useRef(false);
+  const identityUploadedRef = useRef(false);
+  const appearanceUploadedRef = useRef(false);
   const generationStartedRef = useRef(false);
   const { films, loading, error } = usePipocaFilms();
 
@@ -219,14 +221,15 @@ export function PipocaFlow() {
   const statusGenFn = useServerFn(getPipocaGenerationStatus);
   const createVisitorFn = useServerFn(createPipocaVisitor);
 
-  const mediumRef = useRef<{ blob: Blob; url: string } | null>(null);
-  useEffect(() => {
-    mediumRef.current = mediumPhoto;
-  }, [mediumPhoto]);
+  const identityRef = useRef<{ blob: Blob; url: string } | null>(null);
+  const appearanceRef = useRef<{ blob: Blob; url: string } | null>(null);
+  useEffect(() => { identityRef.current = identityPhoto; }, [identityPhoto]);
+  useEffect(() => { appearanceRef.current = appearancePhoto; }, [appearancePhoto]);
   useViewportHeightVar(step);
   useEffect(() => {
     return () => {
-      if (mediumRef.current) URL.revokeObjectURL(mediumRef.current.url);
+      if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
+      if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
       releaseSharedCamera();
     };
   }, []);
