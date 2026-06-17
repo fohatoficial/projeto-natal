@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { QRCodeSVG } from "qrcode.react";
 import type { Movie } from "@/lib/pipoca/movies";
@@ -10,7 +10,6 @@ import {
   getSharedStatus,
   subscribeSharedCamera,
 } from "@/lib/pipoca/sharedCamera";
-import { type GuideState } from "@/lib/pipoca/useFaceGuide";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createPipocaCaptureUpload,
@@ -28,7 +27,6 @@ import {
   PRIVACY_CHECKBOX_LABEL,
 } from "@/lib/pipoca/privacy-notice";
 import { formatWhatsappMask, isValidBrWhatsapp } from "@/lib/pipoca/whatsapp";
-import { PipocaImage } from "@/components/pipoca/PipocaImage";
 
 
 
@@ -36,12 +34,14 @@ type Step =
   | "choose"
   | "visitor_registration"
   | "stories"
-  | "camera_identity_simple"
-  | "camera_appearance_simple"
+  | "camera_identity"
+  | "orient_appearance"
+  | "camera_appearance"
+  | "confirm"
   | "processing"
   | "result";
 
-type ShotType = "identity" | "appearance";
+type CameraVariant = "identity" | "appearance";
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
@@ -54,7 +54,6 @@ const LOADING_PHRASES = [
 ];
 
 const PAGE_SIZE = 4;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const COUNTDOWN_SECONDS = 10;
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -91,108 +90,6 @@ function getDeviceId(): string | null {
 }
 
 const GEN_LOG = "[PIPOCA_GENERATION]";
-const BUILD_ID = "pipoca-flow-2026-06-16-identity-faceguide-1";
-if (typeof window !== "undefined") {
-  (window as unknown as { __PIPOCA_BUILD_TOKEN?: string }).__PIPOCA_BUILD_TOKEN = BUILD_ID;
-}
-
-function useViewportHeightVar(stepName: string) {
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    console.log(`[PIPOCA_BUILD] ${BUILD_ID}`);
-    let logged = false;
-    const apply = () => {
-      const vv = window.visualViewport;
-      const h = Math.round(vv?.height ?? window.innerHeight);
-      const w = Math.round(vv?.width ?? window.innerWidth);
-      document.documentElement.style.setProperty("--pipoca-app-height", `${h}px`);
-      if (!logged) {
-        logged = true;
-        const orient =
-          (screen.orientation && screen.orientation.type) ||
-          (h >= w ? "portrait" : "landscape");
-        console.log(
-          `[PIPOCA_VIEWPORT_DEBUG] inner=${window.innerWidth}x${window.innerHeight} ` +
-            `client=${document.documentElement.clientWidth}x${document.documentElement.clientHeight} ` +
-            `vv=${w}x${h} dpr=${window.devicePixelRatio} orient=${orient} step=${stepName}`,
-        );
-      }
-    };
-    apply();
-    const onResize = () => apply();
-    window.addEventListener("resize", onResize);
-    window.addEventListener("orientationchange", onResize);
-    window.visualViewport?.addEventListener("resize", onResize);
-    window.visualViewport?.addEventListener("scroll", onResize);
-    document.addEventListener("fullscreenchange", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("orientationchange", onResize);
-      window.visualViewport?.removeEventListener("resize", onResize);
-      window.visualViewport?.removeEventListener("scroll", onResize);
-      document.removeEventListener("fullscreenchange", onResize);
-    };
-  }, [stepName]);
-}
-
-function DebugViewportPanel({ step }: { step: string }) {
-  const [, force] = useState(0);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const tick = () => force((n) => n + 1);
-    window.addEventListener("resize", tick);
-    window.addEventListener("orientationchange", tick);
-    window.visualViewport?.addEventListener("resize", tick);
-    const id = window.setInterval(tick, 1000);
-    return () => {
-      window.removeEventListener("resize", tick);
-      window.removeEventListener("orientationchange", tick);
-      window.visualViewport?.removeEventListener("resize", tick);
-      window.clearInterval(id);
-    };
-  }, []);
-  if (typeof window === "undefined") return null;
-  const vv = window.visualViewport;
-  const cssH = getComputedStyle(document.documentElement).getPropertyValue("--pipoca-app-height").trim() || "—";
-  const zoom = vv ? Math.round((window.innerWidth / vv.width) * 100) / 100 : 1;
-  const ua = navigator.userAgent.length > 80 ? navigator.userAgent.slice(0, 80) + "…" : navigator.userAgent;
-  const rows: Array<[string, string | number]> = [
-    ["step", step],
-    ["window.inner", `${window.innerWidth} × ${window.innerHeight}`],
-    ["doc.client", `${document.documentElement.clientWidth} × ${document.documentElement.clientHeight}`],
-    ["visualViewport", vv ? `${Math.round(vv.width)} × ${Math.round(vv.height)}` : "n/a"],
-    ["--pipoca-app-height", cssH],
-    ["dpr", window.devicePixelRatio],
-    ["orientation", (screen.orientation && screen.orientation.type) || "—"],
-    ["zoom est.", zoom],
-    ["UA", ua],
-  ];
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 8,
-        right: 8,
-        zIndex: 99999,
-        background: "rgba(0,0,0,0.82)",
-        color: "#7CFC9B",
-        font: "11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace",
-        padding: "8px 10px",
-        borderRadius: 6,
-        border: "1px solid #1f8a4d",
-        maxWidth: 360,
-        pointerEvents: "none",
-      }}
-    >
-      <div style={{ color: "#F8BA32", marginBottom: 4 }}>PIPOCA viewport debug</div>
-      {rows.map(([k, v]) => (
-        <div key={k}>
-          <span style={{ color: "#9aa" }}>{k}:</span> {String(v)}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function PipocaFlow() {
   const [step, setStep] = useState<Step>("choose");
@@ -221,22 +118,24 @@ export function PipocaFlow() {
   const statusGenFn = useServerFn(getPipocaGenerationStatus);
   const createVisitorFn = useServerFn(createPipocaVisitor);
 
+  // Keep refs in sync so the unmount cleanup can revoke without re-running
+  // the effect (and prematurely revoking) whenever a photo state changes.
   const identityRef = useRef<{ blob: Blob; url: string } | null>(null);
   const appearanceRef = useRef<{ blob: Blob; url: string } | null>(null);
-  useEffect(() => { identityRef.current = identityPhoto; }, [identityPhoto]);
-  useEffect(() => { appearanceRef.current = appearancePhoto; }, [appearancePhoto]);
-  useViewportHeightVar(step);
+  useEffect(() => {
+    identityRef.current = identityPhoto;
+  }, [identityPhoto]);
+  useEffect(() => {
+    appearanceRef.current = appearancePhoto;
+  }, [appearancePhoto]);
   useEffect(() => {
     return () => {
       if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
       if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
+      // Encerra a câmera ao desmontar o fluxo principal.
       releaseSharedCamera();
     };
   }, []);
-
-  const debugViewport =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("debugViewport") === "1";
 
   function transitionTo(swap: () => void) {
     setTransitioning(true);
@@ -277,7 +176,7 @@ export function PipocaFlow() {
     async (sessionId: string, captureId: string) => {
       if (generationStartedRef.current) return;
       generationStartedRef.current = true;
-      console.log(`${GEN_LOG} iniciando geração com duas fotos (identity + appearance)`);
+      console.log(`${GEN_LOG} usando identidade, aparência e cenário`);
       try {
         const res = await createGenFn({ data: { sessionId, captureId } });
         setGenerationId(res.generationId);
@@ -291,116 +190,79 @@ export function PipocaFlow() {
     [createGenFn],
   );
 
-  const confirmingRef = useRef(false);
-
-  const runUpload = useCallback(
-    async (
-      identity: { blob: Blob; url: string },
-      appearance: { blob: Blob; url: string },
-    ) => {
-      if (!selected) return;
-      setUploadError(null);
-      let current = prepared;
-      console.log("[PIPOCA_UPLOAD_FLOW]", { step: "upload_started" });
-      try {
-        if (!current) {
-          setUploadStatus("preparing");
-          const res = await prepareFn({
-            data: {
-              filmId: selected.id,
-              deviceId: getDeviceId(),
-              contentType: "image/jpeg",
-              visitorId: visitorId ?? null,
-            },
-          });
-          current = res as Prepared;
-          setPrepared(current);
-        }
-
-        setUploadStatus("uploading");
-
-        if (!identityUploadedRef.current) {
-          const { error: upErr } = await supabase.storage
-            .from("pipoca-visitor-originals")
-            .uploadToSignedUrl(
-              current.uploads.identity.path,
-              current.uploads.identity.token,
-              identity.blob,
-              { contentType: "image/jpeg" },
-            );
-          if (upErr) throw upErr;
-          identityUploadedRef.current = true;
-          console.log(`${UPLOAD_LOG} identity enviada`);
-        }
-
-        if (!appearanceUploadedRef.current) {
-          const { error: upErr } = await supabase.storage
-            .from("pipoca-visitor-originals")
-            .uploadToSignedUrl(
-              current.uploads.appearance.path,
-              current.uploads.appearance.token,
-              appearance.blob,
-              { contentType: "image/jpeg" },
-            );
-          if (upErr) throw upErr;
-          appearanceUploadedRef.current = true;
-          console.log(`${UPLOAD_LOG} appearance enviada`);
-        }
-
-        setUploadStatus("confirming");
-        await confirmFn({
+  const runUpload = useCallback(async () => {
+    if (!identityPhoto || !appearancePhoto || !selected) return;
+    setUploadError(null);
+    let current = prepared;
+    try {
+      if (!current) {
+        setUploadStatus("preparing");
+        const res = await prepareFn({
           data: {
-            sessionId: current.sessionId,
-            captureId: current.captureId,
+            filmId: selected.id,
+            deviceId: getDeviceId(),
+            contentType: "image/jpeg",
+            visitorId: visitorId ?? null,
           },
         });
-        setUploadStatus("idle");
-        console.log("[PIPOCA_UPLOAD_FLOW]", { step: "upload_completed" });
-        releaseSharedCamera();
-        transitionTo(() => setStep("processing"));
-        void startGeneration(current.sessionId, current.captureId);
-      } catch (err) {
-        const stage = !current
-          ? "prepare"
-          : !identityUploadedRef.current
-            ? "upload_identity"
-            : !appearanceUploadedRef.current
-              ? "upload_appearance"
-              : "confirm";
-        console.warn(`${UPLOAD_LOG} falhou`, { stage });
-        setUploadStatus("error");
-        setUploadError(stage);
-      } finally {
-        confirmingRef.current = false;
+        current = res as Prepared;
+        setPrepared(current);
       }
-    },
-    [selected, prepared, prepareFn, confirmFn, startGeneration, visitorId],
-  );
 
-  const handleIdentityConfirm = useCallback(
-    (photo: { blob: Blob; url: string }) => {
-      console.log("[PIPOCA_SHOT_CONFIRM]", { shotType: "identity" });
-      setIdentityPhoto(photo);
-      transitionTo(() => setStep("camera_appearance_simple"));
-    },
-    [],
-  );
+      setUploadStatus("uploading");
 
-  const handleAppearanceConfirm = useCallback(
-    (photo: { blob: Blob; url: string }) => {
-      if (confirmingRef.current) return;
-      const identity = identityRef.current;
-      if (!identity) {
-        console.warn("[PIPOCA_SHOT_CONFIRM] appearance sem identity prévia");
-        return;
+      if (!identityUploadedRef.current) {
+        const { error: upErr } = await supabase.storage
+          .from("pipoca-visitor-originals")
+          .uploadToSignedUrl(
+            current.uploads.identity.path,
+            current.uploads.identity.token,
+            identityPhoto.blob,
+            { contentType: "image/jpeg" },
+          );
+        if (upErr) throw upErr;
+        identityUploadedRef.current = true;
+        console.log(`${UPLOAD_LOG} identidade enviada`);
       }
-      confirmingRef.current = true;
-      console.log("[PIPOCA_SHOT_CONFIRM]", { shotType: "appearance" });
-      setAppearancePhoto(photo);
-      void runUpload(identity, photo);
-    },
-    [runUpload],
-  );
+
+      if (!appearanceUploadedRef.current) {
+        const { error: upErr } = await supabase.storage
+          .from("pipoca-visitor-originals")
+          .uploadToSignedUrl(
+            current.uploads.appearance.path,
+            current.uploads.appearance.token,
+            appearancePhoto.blob,
+            { contentType: "image/jpeg" },
+          );
+        if (upErr) throw upErr;
+        appearanceUploadedRef.current = true;
+        console.log(`${UPLOAD_LOG} aparência enviada`);
+      }
+
+      setUploadStatus("confirming");
+      await confirmFn({
+        data: {
+          sessionId: current.sessionId,
+          captureId: current.captureId,
+        },
+      });
+      setUploadStatus("idle");
+      releaseSharedCamera();
+      transitionTo(() => setStep("processing"));
+      void startGeneration(current.sessionId, current.captureId);
+    } catch (err) {
+      const stage = !current
+        ? "prepare"
+        : !identityUploadedRef.current
+          ? "upload-identidade"
+          : !appearanceUploadedRef.current
+            ? "upload-aparencia"
+            : "confirm";
+      console.warn(`${UPLOAD_LOG} falhou`, { stage });
+      setUploadStatus("error");
+      setUploadError(stage);
+    }
+  }, [identityPhoto, appearancePhoto, selected, prepared, prepareFn, confirmFn, startGeneration, visitorId]);
 
   const retryGeneration = useCallback(() => {
     if (!prepared) return;
@@ -417,6 +279,7 @@ export function PipocaFlow() {
     transitionTo(() => {
       console.log(`${UX} fotos descartadas`);
       clearPhotos();
+      // New attempt = new session for cleanliness.
       setPrepared(null);
       generationStartedRef.current = false;
       setGenerationId(null);
@@ -426,12 +289,11 @@ export function PipocaFlow() {
       setGenError(null);
       setUploadStatus("idle");
       setUploadError(null);
-      setStep("camera_identity_simple");
+      setStep("camera_identity");
     });
 
   return (
     <div className="bg-cinema text-white relative">
-      {debugViewport && <DebugViewportPanel step={step} />}
       {step === "choose" && (
         <Choose
           movies={films}
@@ -470,7 +332,7 @@ export function PipocaFlow() {
           firstName={firstName}
           onDone={() => {
             console.log(`${UX} stories concluídos, abrindo câmera`);
-            transitionTo(() => setStep("camera_identity_simple"));
+            transitionTo(() => setStep("camera_identity"));
           }}
           onChangeFilm={() => {
             releaseSharedCamera();
@@ -481,11 +343,14 @@ export function PipocaFlow() {
           }}
         />
       )}
-      {step === "camera_identity_simple" && (
-        <GuidedCamera
-          shotType="identity"
-          confirming={false}
-          onConfirm={handleIdentityConfirm}
+      {step === "camera_identity" && (
+        <Camera
+          variant="identity"
+          onCaptured={(p) => {
+            console.log(`${CAPTURE_LOG} foto de identidade capturada`);
+            setIdentityPhoto(p);
+            transitionTo(() => setStep("orient_appearance"));
+          }}
           onBack={() =>
             transitionTo(() => {
               setStep("stories");
@@ -493,16 +358,37 @@ export function PipocaFlow() {
           }
         />
       )}
-      {step === "camera_appearance_simple" && (
-        <GuidedCamera
-          shotType="appearance"
-          confirming={uploadStatus !== "idle" && uploadStatus !== "error"}
-          onConfirm={handleAppearanceConfirm}
+      {step === "orient_appearance" && (
+        <OrientAppearance
+          onNext={() => {
+            transitionTo(() => setStep("camera_appearance"));
+          }}
+        />
+      )}
+      {step === "camera_appearance" && (
+        <Camera
+          variant="appearance"
+          onCaptured={(p) => {
+            console.log(`${CAPTURE_LOG} foto de aparência capturada`);
+            setAppearancePhoto(p);
+            transitionTo(() => setStep("confirm"));
+          }}
           onBack={() =>
             transitionTo(() => {
-              setStep("camera_identity_simple");
+              setStep("orient_appearance");
             })
           }
+        />
+      )}
+      {step === "confirm" && identityPhoto && appearancePhoto && (
+        <Confirm
+          identityUrl={identityPhoto.url}
+          appearanceUrl={appearancePhoto.url}
+          onRetake={retakeAll}
+          onUse={() => {
+            console.log(`${UX} fotos confirmadas`);
+            void runUpload();
+          }}
         />
       )}
       {step === "processing" && selected && (
@@ -546,9 +432,7 @@ export function PipocaFlow() {
       {uploadStatus === "error" && (
         <UploadError
           stage={uploadError}
-          onRetry={() => {
-            if (identityPhoto && appearancePhoto) void runUpload(identityPhoto, appearancePhoto);
-          }}
+          onRetry={() => void runUpload()}
           onRetake={retakeAll}
         />
       )}
@@ -666,7 +550,7 @@ function Screen({
 }) {
   return (
     <div
-      className={`pipoca-stage-dvh relative film-grain vignette flex flex-col items-center px-4 sm:px-6 lg:px-10 pt-5 pb-4 sm:pt-7 sm:pb-5 lg:pt-8 lg:pb-6 text-center box-border ${
+      className={`relative h-[100svh] w-full overflow-hidden film-grain vignette flex flex-col items-center px-4 sm:px-6 lg:px-10 pt-5 pb-4 sm:pt-7 sm:pb-5 lg:pt-8 lg:pb-6 text-center ${
         aurora ? "bg-aurora" : "bg-cinema"
       } ${className}`}
     >
@@ -759,7 +643,7 @@ function Choose({
 
   return (
     <Screen aurora>
-      <Header />
+      <Header subtitle="Pipoca & Cena" />
 
       {/* CENTER */}
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-5xl py-3">
@@ -877,13 +761,10 @@ function PosterCard({
       onClick={() => onPick(movie)}
       className="bg-card relative overflow-hidden text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl w-full h-full group rounded-2xl border border-white/10"
     >
-      <PipocaImage
+      <img
         src={movie.posterUrl}
         alt={movie.title}
-        fit="cover"
-        eager
-        logTag={`poster:${movie.id}`}
-        className="transition-transform duration-700 group-hover:scale-110"
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
       />
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
       <div className="absolute top-3 left-4 z-10">
@@ -918,9 +799,6 @@ function Stories({
   const [idx, setIdx] = useState(0);
   const [progress, setProgress] = useState(0);
   const [cameraStatus, setCameraStatus] = useState(getSharedStatus());
-  // Story 0 (the film poster) must NOT start its timer until the poster
-  // image is fully loaded — otherwise the totem can skip past a blank card.
-  const [posterReady, setPosterReady] = useState(false);
   const advanceLockRef = useRef(false);
 
   useEffect(() => {
@@ -934,29 +812,21 @@ function Stories({
     setProgress(0);
     const duration = STORY_DURATIONS_MS[idx];
     if (duration === undefined) return;
-    // Gate story 0 until the poster is on screen.
-    if (idx === 0 && !posterReady) return;
-    // Small breathing room before the timer kicks in, per spec.
-    const startDelay = idx === 0 ? 350 : 0;
+    const start = performance.now();
     let raf = 0;
-    let startedAt = 0;
     const tick = (now: number) => {
-      if (!startedAt) startedAt = now;
-      const pct = Math.min(1, (now - startedAt) / duration);
+      const pct = Math.min(1, (now - start) / duration);
       setProgress(pct);
       if (pct < 1) raf = requestAnimationFrame(tick);
     };
-    const startTimeout = window.setTimeout(() => {
-      raf = requestAnimationFrame(tick);
-    }, startDelay);
-    const t = window.setTimeout(() => advance(), duration + startDelay);
+    raf = requestAnimationFrame(tick);
+    const t = window.setTimeout(() => advance(), duration);
     return () => {
-      window.clearTimeout(startTimeout);
       window.clearTimeout(t);
       cancelAnimationFrame(raf);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, posterReady]);
+  }, [idx]);
 
   function advance() {
     if (advanceLockRef.current) return;
@@ -988,25 +858,16 @@ function Stories({
         })}
       </div>
 
-      {/* Tap-to-advance area — only after poster is ready on story 0. */}
+      {/* Tap-to-advance area */}
       <button
         type="button"
-        onClick={() => {
-          if (idx === 0 && !posterReady) return;
-          advance();
-        }}
+        onClick={advance}
         aria-label="Próximo"
         className="absolute inset-0 z-10 cursor-pointer"
       />
 
       <div className="relative z-20 flex-1 min-h-0 w-full flex flex-col items-center justify-center max-w-2xl py-3 pointer-events-none">
-        {idx === 0 && (
-          <StoryFilm
-            movie={movie}
-            firstName={firstName}
-            onPosterReady={() => setPosterReady(true)}
-          />
-        )}
+        {idx === 0 && <StoryFilm movie={movie} firstName={firstName} />}
         {idx === 1 && <StoryTwoPhotos firstName={firstName} />}
         {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} firstName={firstName} />}
       </div>
@@ -1025,7 +886,7 @@ function Stories({
           </button>
         ) : (
           <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
-            {idx === 0 && !posterReady ? "carregando pôster…" : "toque para avançar"}
+            toque para avançar
           </span>
         )}
       </div>
@@ -1033,53 +894,18 @@ function Stories({
   );
 }
 
-function StoryFilm({
-  movie,
-  firstName,
-  onPosterReady,
-}: {
-  movie: Movie;
-  firstName?: string;
-  onPosterReady?: () => void;
-}) {
+function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
   const prefix = firstName ? `${firstName.toUpperCase()}, você escolheu` : "Você escolheu";
-  const firedRef = useRef(false);
-  // Prefetch decode so the timer can start as soon as bytes are in.
-  useEffect(() => {
-    if (!movie.posterUrl) return;
-    const img = new Image();
-    img.src = movie.posterUrl;
-    let cancelled = false;
-    const done = () => {
-      if (cancelled || firedRef.current) return;
-      firedRef.current = true;
-      console.log("[PIPOCA_STORY_POSTER] prefetch ready");
-      onPosterReady?.();
-    };
-    if (img.decode) {
-      img.decode().then(done).catch(() => {
-        // Fallback to onload if decode rejects (rare on some browsers).
-        if (img.complete) done();
-      });
-    }
-    img.onload = done;
-    return () => {
-      cancelled = true;
-    };
-  }, [movie.posterUrl, onPosterReady]);
-
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
         {prefix}
       </span>
-      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] pipoca-kiosk-poster aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
-        <PipocaImage
+      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
+        <img
           src={movie.posterUrl}
           alt={movie.title}
-          fit="cover"
-          eager
-          logTag={`story-poster:${movie.id}`}
+          className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
         <div className="absolute top-3 left-3">
@@ -1156,9 +982,195 @@ function StoryPrepare({ cameraStatus, firstName }: { cameraStatus: ReturnType<ty
 }
 
 
+/* ---------- Step 2b: Orient appearance (between identity and appearance captures) ---------- */
 
-/* ---------- (Legacy Camera with fixed mask removed — both captures now use GuidedCamera) ---------- */
+function OrientAppearance({
+  onNext,
+}: {
+  onNext: () => void;
+}) {
+  const firedRef = useRef(false);
+  useEffect(() => {
+    if (firedRef.current) return;
+    const t = window.setTimeout(() => {
+      firedRef.current = true;
+      onNext();
+    }, 2000);
+    return () => window.clearTimeout(t);
+  }, [onNext]);
 
+  return (
+    <Screen aurora>
+      <Header subtitle="Segunda foto" />
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-5 sm:gap-6">
+        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-gold/60 grid place-items-center animate-badge-in">
+          <svg viewBox="0 0 24 24" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" stroke="#F8BA32" strokeWidth="2">
+            <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl text-white leading-[0.95] animate-fade-up">
+          Agora, <span className="text-gold">dê um passo para trás</span>
+        </h1>
+        <p className="text-base sm:text-lg text-white/80 max-w-md animate-fade-up">
+          Vamos registrar seu corpo da cintura para cima.
+        </p>
+      </div>
+      <div className="relative z-10 shrink-0">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-white/50">
+          Preparando câmera…
+        </p>
+      </div>
+    </Screen>
+  );
+}
+
+/* ---------- Step 3 / 5: Camera (variant-aware) ---------- */
+
+function Camera({
+  variant,
+  onCaptured,
+  onBack,
+}: {
+  variant: CameraVariant;
+  onCaptured: (p: { blob: Blob; url: string }) => void;
+  onBack: () => void;
+}) {
+  const { videoRef, ready, errorKind, retry, capture } = useCamera(true);
+  const [count, setCount] = useState<number | null>(null);
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (ready && count === null && !startedRef.current) {
+      console.log(`${UX} contagem iniciada`, { variant });
+      setCount(COUNTDOWN_SECONDS);
+    }
+  }, [ready, count, variant]);
+
+  useEffect(() => {
+    if (count === null) return;
+    if (count === 0) {
+      if (startedRef.current) return;
+      startedRef.current = true;
+      (async () => {
+        const result = await capture();
+        if (result) onCaptured(result);
+      })();
+      return;
+    }
+    const t = setTimeout(() => setCount((c) => (c === null ? null : c - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [count, capture, onCaptured]);
+
+  if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
+
+  const title =
+    variant === "identity" ? "Posicione seu rosto na marcação" : "Encaixe o rosto e o corpo na marcação";
+  const hint =
+    variant === "identity"
+      ? "Cabelo, testa e queixo dentro da área."
+      : "Mantenha a cabeça no topo e o corpo dentro do contorno.";
+  const subtitle = variant === "identity" ? "Foto de rosto" : "Foto de corpo";
+
+  return (
+    <Screen>
+      <Header subtitle={subtitle} />
+
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-3 sm:gap-4">
+        <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-white leading-[0.95] animate-fade-up">
+          {title}
+        </h1>
+        <p className="text-xs sm:text-sm text-white/70 max-w-md">{hint}</p>
+
+        <div className="relative w-full max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ transform: "scaleX(-1)" }}
+          />
+
+          {!ready && !errorKind ? (
+            <div className="absolute inset-0 grid place-items-center text-white/70 text-sm tracking-wide animate-pulse-soft">
+              Iniciando câmera…
+            </div>
+          ) : null}
+
+          {/* Adaptive SVG mask — pure overlay, never crops the captured file. */}
+          <svg
+            viewBox="0 0 100 125"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-0 w-full h-full animate-pulse-soft"
+            aria-hidden
+          >
+            {variant === "identity" ? (
+              <>
+                {/* Head + shoulders oval, centered at ~36% of height */}
+                <ellipse
+                  cx="50"
+                  cy="45"
+                  rx="22"
+                  ry="30"
+                  fill="none"
+                  stroke="#F8BA32"
+                  strokeWidth="0.6"
+                  strokeDasharray="1.5 1.2"
+                />
+              </>
+            ) : (
+              <>
+                {/* Face oval at ~28% height */}
+                <ellipse
+                  cx="50"
+                  cy="35"
+                  rx="11"
+                  ry="14"
+                  fill="none"
+                  stroke="#F8BA32"
+                  strokeWidth="0.6"
+                  strokeDasharray="1.5 1.2"
+                />
+                {/* Shoulders + torso silhouette down to waist (~82% height) */}
+                <path
+                  d="M22 102 C 24 78, 32 60, 50 60 C 68 60, 76 78, 78 102"
+                  fill="none"
+                  stroke="#F8BA32"
+                  strokeWidth="0.6"
+                  strokeDasharray="1.5 1.2"
+                  strokeLinecap="round"
+                />
+              </>
+            )}
+          </svg>
+
+
+
+          {count !== null && count > 0 ? (
+            <div className="absolute inset-0 grid place-items-center bg-black/40 backdrop-blur-[1px]">
+              <span
+                key={count}
+                className="font-display text-white text-[140px] sm:text-[170px] lg:text-[220px] leading-none animate-pop-in"
+                style={{ textShadow: "0 6px 30px rgba(0,0,0,0.6)" }}
+              >
+                {count}
+              </span>
+            </div>
+          ) : null}
+          {count === 0 ? (
+            <div className="absolute inset-0 bg-white animate-fade-in" />
+          ) : null}
+        </div>
+
+      </div>
+
+
+      <div className="relative z-10 shrink-0">
+        <GhostBtn onClick={onBack}>Voltar</GhostBtn>
+      </div>
+    </Screen>
+  );
+}
 
 
 function CameraError({
@@ -1215,6 +1227,100 @@ function CameraError({
   );
 }
 
+/* ---------- Step 4: Confirm ---------- */
+
+function Confirm({
+  identityUrl,
+  appearanceUrl,
+  onRetake,
+  onUse,
+}: {
+  identityUrl: string;
+  appearanceUrl: string;
+  onRetake: () => void;
+  onUse: () => void;
+}) {
+  const [remaining, setRemaining] = useState(5);
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    if (firedRef.current) return;
+    if (remaining <= 0) {
+      firedRef.current = true;
+      onUse();
+      return;
+    }
+    const t = window.setTimeout(() => setRemaining((r) => r - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [remaining, onUse]);
+
+  return (
+    <Screen aurora>
+      <Header subtitle="Pré-visualização" />
+
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-3 gap-3 sm:gap-4">
+        <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-[0.95] animate-fade-up">
+          Confira suas <span className="text-gold">fotos</span>
+        </h1>
+
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full max-w-[520px]">
+          <div className="flex flex-col items-center gap-1.5 animate-pop-in">
+            <div className="bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10">
+              <img
+                src={identityUrl}
+                alt="Foto de rosto"
+                className="w-full h-full object-cover"
+                style={{ transform: "scaleX(-1)" }}
+              />
+            </div>
+            <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
+              Foto de rosto
+            </span>
+          </div>
+          <div className="flex flex-col items-center gap-1.5 animate-pop-in">
+            <div className="bg-card w-full aspect-[4/5] overflow-hidden shadow-2xl rounded-xl border border-white/10">
+              <img
+                src={appearanceUrl}
+                alt="Foto de corpo"
+                className="w-full h-full object-cover"
+                style={{ transform: "scaleX(-1)" }}
+              />
+            </div>
+            <span className="text-[10px] sm:text-xs uppercase tracking-[0.25em] text-gold">
+              Foto de corpo
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center gap-2 pt-1">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full border-2 border-gold grid place-items-center">
+              <span className="font-display text-2xl text-gold leading-none">
+                {Math.max(remaining, 0)}
+              </span>
+            </div>
+            <p className="text-sm sm:text-base text-white/80 max-w-[18rem] text-left">
+              Se estiver tudo certo, vamos continuar automaticamente.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative z-10 shrink-0">
+        <button
+          type="button"
+          onClick={() => {
+            firedRef.current = true;
+            onRetake();
+          }}
+          className="text-xs uppercase tracking-[0.3em] text-white/55 hover:text-white/85 underline underline-offset-4 py-2 px-3"
+        >
+          Tirar fotos novamente
+        </button>
+      </div>
+    </Screen>
+  );
+}
 
 
 /* ---------- Step 5: Processing ---------- */
@@ -1383,8 +1489,26 @@ function Result({
     };
   }, [slide]);
 
+  const bgUrl = imageUrl ?? movie.posterUrl;
+
   return (
     <Screen aurora>
+      {/* Blurred backdrop of the generated photo */}
+      {bgUrl && (
+        <div
+          aria-hidden
+          className="absolute inset-0 z-0 pointer-events-none"
+          style={{
+            backgroundImage: `url(${bgUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            filter: "blur(40px) brightness(0.45)",
+            transform: "scale(1.15)",
+          }}
+        />
+      )}
+      <div aria-hidden className="absolute inset-0 z-0 bg-black/55 pointer-events-none" />
+
       {/* Progress bars */}
       <div className="relative z-20 w-full max-w-2xl flex gap-1.5 px-1 pt-1">
         {[0, 1].map((i) => {
@@ -1407,15 +1531,11 @@ function Result({
               {firstName ? `${firstName}, sua ` : "Sua "}<span className="text-gold">cena</span> está pronta
             </h1>
 
-            {/* Edge-to-edge 4:5 frame — single image element, object-cover, no
-                blurred backdrop, no padding, no inner border-radius bands. */}
-            <div className="relative w-full flex-1 min-h-0 max-w-[560px] pipoca-kiosk-result-frame mx-auto aspect-[4/5] overflow-hidden bg-black">
-              <PipocaImage
+            <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto flex items-center justify-center">
+              <img
                 src={imageUrl ?? movie.posterUrl}
                 alt="Cena gerada"
-                fit="cover"
-                logTag="result-final"
-                eager
+                className="max-w-full max-h-full object-contain rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]"
               />
             </div>
 
@@ -1432,7 +1552,7 @@ function Result({
             </h1>
 
             <div className="flex items-center gap-3 bg-white/5 border border-white/15 rounded-xl p-3 sm:p-4 w-full max-w-sm">
-              <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center pipoca-kiosk-qr">
+              <div className="bg-white p-2 rounded-lg shrink-0 grid place-items-center">
                 {resultPageUrl ? (
                   <QRCodeSVG
                     value={resultPageUrl}
@@ -1481,25 +1601,20 @@ function VisitorRegistration({
 }) {
   const [fullName, setFullName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [consent, setConsent] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const nameOk = fullName.replace(/\s+/g, " ").trim().length >= 2 && !/^\d+$/.test(fullName.trim());
   const phoneOk = isValidBrWhatsapp(whatsapp);
-  const fieldsOk = nameOk && phoneOk;
-  const canSubmit = fieldsOk && !loading;
+  const canSubmit = nameOk && phoneOk && consent && !loading;
 
   async function submit() {
     if (!canSubmit) return;
     setLoading(true);
     setError(null);
     try {
-      const acceptedAt = new Date().toISOString();
-      console.log("[PIPOCA_CONSENT] aceite registrado", {
-        accepted_at: acceptedAt,
-        version: PRIVACY_NOTICE_VERSION,
-      });
       const res = await createVisitorFn({
         data: {
           fullName: fullName.replace(/\s+/g, " ").trim(),
@@ -1548,17 +1663,30 @@ function VisitorRegistration({
             className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base disabled:opacity-60"
           />
         </label>
-        <p className="text-left text-sm text-white/85 leading-snug">
-          Li o{" "}
-          <button
-            type="button"
-            onClick={() => setShowNotice(true)}
-            className="text-gold underline underline-offset-2 hover:text-gold/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-gold rounded-sm"
-          >
-            Aviso de Privacidade
-          </button>{" "}
-          e autorizo o tratamento do meu nome, WhatsApp e imagem para criar, disponibilizar e produzir minha foto personalizada.
-        </p>
+        <label className="flex items-start gap-2 text-left text-sm text-white/85">
+          <input
+            type="checkbox"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+            disabled={loading}
+            className="mt-1 w-4 h-4 accent-gold flex-shrink-0"
+          />
+          <span>
+            Li o{" "}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowNotice(true);
+              }}
+              className="text-gold underline underline-offset-2 hover:text-gold/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-gold rounded-sm"
+            >
+              Aviso de Privacidade
+            </button>{" "}
+            e autorizo o tratamento do meu nome, WhatsApp e imagens para criar e disponibilizar minha cena personalizada e, caso eu solicite, identificar e imprimir minha foto.
+          </span>
+        </label>
         {error && (
           <div className="rounded-md border border-red-400/40 bg-red-950/30 p-3 text-center">
             <p className="text-sm font-semibold text-red-200 uppercase tracking-wide">
@@ -1572,12 +1700,11 @@ function VisitorRegistration({
         )}
         <div className="flex flex-col items-center gap-2 pt-2">
           <PrimaryCta onClick={submit} disabled={!canSubmit}>
-            {loading ? "Registrando…" : error ? "Tentar novamente" : "Li e autorizo. Continuar"}
+            {loading ? "Cadastrando…" : error ? "Tentar novamente" : "Continuar"}
           </PrimaryCta>
           <GhostBtn onClick={onBack} disabled={loading}>Voltar</GhostBtn>
         </div>
       </div>
-
 
       {showNotice && (
         <div
@@ -1603,516 +1730,6 @@ function VisitorRegistration({
         </div>
       )}
     </Screen>
-  );
-}
-
-
-
-/* ---------- Guided camera (simple auto 3-2-1, no face detection) ---------- */
-
-type CaptureUiState = "opening" | "counting" | "captured" | "error" | "timeout";
-
-function GuidedCamera({
-  shotType,
-  onConfirm,
-  onBack,
-  confirming = false,
-}: {
-  shotType: ShotType;
-  onConfirm: (p: { blob: Blob; url: string }) => void;
-  onBack: () => void;
-  confirming?: boolean;
-}) {
-  const { videoRef, errorKind, retry } = useCamera(true);
-  const [videoReady, setVideoReady] = useState(false);
-  const [captured, setCaptured] = useState<{ blob: Blob; url: string } | null>(null);
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const [uiState, setUiState] = useState<CaptureUiState>("opening");
-  const [flashKey, setFlashKey] = useState(0);
-
-  const captureRef = useRef(false);
-  const confirmRef = useRef(false);
-  const countdownStartedRef = useRef(false);
-  const captureInProgressRef = useRef(false);
-  const captureCompletedRef = useRef(false);
-  const autostartTimerRef = useRef<number | null>(null);
-  const timerRef = useRef<number | null>(null);
-  const countdownRef = useRef<HTMLSpanElement | null>(null);
-
-  const clearTimer = () => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-  const clearAutostartTimer = () => {
-    if (autostartTimerRef.current !== null) {
-      window.clearTimeout(autostartTimerRef.current);
-      autostartTimerRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      clearTimer();
-      clearAutostartTimer();
-    };
-  }, []);
-
-  const logSimple = useCallback((tag: string, extra?: Record<string, unknown>) => {
-    const v = videoRef.current;
-    console.log("[PIPOCA_CAMERA_SIMPLE]", {
-      tag,
-      shotType,
-      readyState: v?.readyState ?? null,
-      videoWidth: v?.videoWidth ?? null,
-      videoHeight: v?.videoHeight ?? null,
-      paused: v?.paused ?? null,
-      ended: v?.ended ?? null,
-      hasSrcObject: Boolean(v?.srcObject),
-      ...extra,
-    });
-  }, [videoRef, shotType]);
-
-  // --- Local videoReady detection (events + polling fallback for kiosk) ---
-  useEffect(() => {
-    if (captured) return;
-    let cancelled = false;
-    let pollId: number | null = null;
-    let timeoutId: number | null = null;
-
-    const checkVideoReady = () => {
-      if (cancelled) return;
-      const v = videoRef.current;
-      if (!v) return;
-      const ok =
-        Boolean(v.srcObject) &&
-        v.readyState >= 2 /* HAVE_CURRENT_DATA */ &&
-        v.videoWidth > 0 &&
-        v.videoHeight > 0 &&
-        !v.paused &&
-        !v.ended;
-      if (ok && !videoReady) {
-        setVideoReady(true);
-        logSimple("video_ready");
-        if (pollId !== null) window.clearInterval(pollId);
-        if (timeoutId !== null) window.clearTimeout(timeoutId);
-        pollId = null;
-        timeoutId = null;
-      }
-    };
-
-    const v = videoRef.current;
-    const onMeta = () => { logSimple("loadedmetadata"); checkVideoReady(); };
-    const onData = () => { logSimple("loadeddata"); checkVideoReady(); };
-    const onCanPlay = () => { logSimple("canplay"); checkVideoReady(); };
-    const onPlaying = () => { logSimple("playing"); checkVideoReady(); };
-    v?.addEventListener("loadedmetadata", onMeta);
-    v?.addEventListener("loadeddata", onData);
-    v?.addEventListener("canplay", onCanPlay);
-    v?.addEventListener("playing", onPlaying);
-
-    // Kick the play() in case kiosk paused it.
-    if (v && v.srcObject) v.play().catch(() => {});
-    logSimple("stream_attached");
-
-    // Polling fallback (every 200ms, max 8s).
-    pollId = window.setInterval(checkVideoReady, 200);
-    timeoutId = window.setTimeout(() => {
-      if (cancelled) return;
-      if (!videoReady) {
-        logSimple("camera_timeout");
-        setUiState("timeout");
-        if (pollId !== null) window.clearInterval(pollId);
-        pollId = null;
-      }
-    }, 8000);
-
-    // Initial check (stream may already be live).
-    checkVideoReady();
-
-    return () => {
-      cancelled = true;
-      v?.removeEventListener("loadedmetadata", onMeta);
-      v?.removeEventListener("loadeddata", onData);
-      v?.removeEventListener("canplay", onCanPlay);
-      v?.removeEventListener("playing", onPlaying);
-      if (pollId !== null) window.clearInterval(pollId);
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-    };
-  }, [videoRef, videoReady, captured, logSimple]);
-
-  // 4:5 center-crop at native resolution.
-  const capture4x5 = useCallback(async (): Promise<{ blob: Blob; url: string } | null> => {
-    const v = videoRef.current;
-    if (!v || !v.videoWidth || !v.videoHeight || v.readyState < 2) return null;
-    const vw = v.videoWidth;
-    const vh = v.videoHeight;
-    const targetRatio = 4 / 5;
-    let cropW = vw;
-    let cropH = Math.round(vw / targetRatio);
-    if (cropH > vh) {
-      cropH = vh;
-      cropW = Math.round(vh * targetRatio);
-    }
-    const sx = Math.round((vw - cropW) / 2);
-    const sy = Math.round((vh - cropH) / 2);
-    const canvas = document.createElement("canvas");
-    canvas.width = cropW;
-    canvas.height = cropH;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.drawImage(v, sx, sy, cropW, cropH, 0, 0, cropW, cropH);
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92),
-    );
-    if (!blob) return null;
-    const url = URL.createObjectURL(blob);
-    console.log("[PIPOCA_CAPTURE_RESOLUTION]", {
-      mode: shotType,
-      videoWidth: vw,
-      videoHeight: vh,
-      cropWidth: cropW,
-      cropHeight: cropH,
-      outputWidth: cropW,
-      outputHeight: cropH,
-    });
-    return { blob, url };
-  }, [videoRef, shotType]);
-
-  const performCapture = useCallback(async () => {
-    if (captureRef.current || captureCompletedRef.current) return;
-    captureRef.current = true;
-    captureInProgressRef.current = true;
-    logSimple("capture_started");
-    const result = await capture4x5();
-    if (!result) {
-      captureRef.current = false;
-      captureInProgressRef.current = false;
-      setCountdown(null);
-      setUiState("error");
-      logSimple("capture_failed");
-      return;
-    }
-    captureCompletedRef.current = true;
-    captureInProgressRef.current = false;
-    setFlashKey((k) => k + 1);
-    setCaptured(result);
-    setCountdown(null);
-    setUiState("captured");
-    logSimple("capture_completed");
-  }, [capture4x5, logSimple]);
-
-  const startCountdown = useCallback(() => {
-    if (countdownStartedRef.current) return;
-    if (!videoReady || captureRef.current || captureCompletedRef.current) return;
-    countdownStartedRef.current = true;
-    setUiState("counting");
-    setCountdown(3);
-    logSimple("countdown_started");
-    const schedule = (next: number) => {
-      clearTimer();
-      if (next < 0) {
-        timerRef.current = window.setTimeout(() => {
-          void performCapture();
-        }, 800);
-        return;
-      }
-      timerRef.current = window.setTimeout(() => {
-        setCountdown(next);
-        schedule(next - 1);
-      }, 1000);
-    };
-    schedule(2);
-  }, [videoReady, performCapture, logSimple]);
-
-  // Auto-start the 3-2-1 countdown 700ms after videoReady becomes true.
-  useEffect(() => {
-    if (!videoReady) return;
-    if (captured) return;
-    if (countdownStartedRef.current) return;
-    if (captureCompletedRef.current) return;
-    clearAutostartTimer();
-    autostartTimerRef.current = window.setTimeout(() => {
-      startCountdown();
-    }, 700);
-    return () => {
-      clearAutostartTimer();
-    };
-  }, [videoReady, captured, startCountdown]);
-
-  const handleRetake = useCallback(() => {
-    clearTimer();
-    clearAutostartTimer();
-    captureRef.current = false;
-    confirmRef.current = false;
-    countdownStartedRef.current = false;
-    captureInProgressRef.current = false;
-    captureCompletedRef.current = false;
-    if (captured) URL.revokeObjectURL(captured.url);
-    setCaptured(null);
-    setCountdown(null);
-    setUiState("opening");
-    // videoReady stays true if stream is still live; the auto-start effect
-    // will fire again after the 700ms delay.
-  }, [captured]);
-
-  const handleUse = useCallback(() => {
-    if (!captured || confirmRef.current) return;
-    confirmRef.current = true;
-    onConfirm(captured);
-  }, [captured, onConfirm]);
-
-  if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
-
-  const stepLabel = shotType === "identity" ? "FOTO 1 DE 2" : "FOTO 2 DE 2";
-  const defaultHint =
-    shotType === "identity" ? "APROXIME-SE DA CÂMERA" : "AFASTE-SE UM POUCO";
-  const subHint =
-    shotType === "identity"
-      ? "ENQUADRE O ROSTO, O CABELO E OS OMBROS"
-      : "APAREÇA DA CABEÇA ATÉ A CINTURA";
-  let hint = defaultHint;
-  if (uiState === "captured") {
-    hint = confirming ? "PREPARANDO..." : "FOTO CAPTURADA";
-  } else if (uiState === "counting") {
-    hint = "FIQUE PARADO";
-  } else if (uiState === "timeout") {
-    hint = "NÃO FOI POSSÍVEL INICIAR A CÂMERA";
-  } else if (uiState === "error") {
-    hint = "TENTE NOVAMENTE";
-  }
-  const hintClass = `pipoca-camera-hint ${
-    uiState === "captured" ? "pipoca-camera-hint--success" : ""
-  }`;
-  const showCountdown = uiState === "counting" && countdown !== null && countdown > 0;
-  const showSubHint = uiState === "opening" || uiState === "counting";
-
-  return (
-    <div
-      className="pipoca-camera-screen bg-cinema relative"
-      data-pipoca-camera={shotType}
-      data-pipoca-state={uiState}
-    >
-      <div className="pipoca-camera-preview-wrap">
-        <div className="pipoca-camera-top">
-          <p className="pipoca-camera-step-label">{stepLabel}</p>
-          {showCountdown ? (
-            <span key={countdown} ref={countdownRef} className="pipoca-camera-countdown">
-              {countdown}
-            </span>
-          ) : null}
-          <p className={hintClass}>{hint}</p>
-          {showSubHint ? <p className="pipoca-camera-subhint">{subHint}</p> : null}
-        </div>
-        <div className="pipoca-camera-frame">
-          {captured ? (
-            <img src={captured.url} alt="" style={{ transform: "scaleX(-1)" }} />
-          ) : (
-            <>
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                style={{ transform: "scaleX(-1)" }}
-              />
-              {!videoReady && uiState !== "timeout" ? (
-                <div className="absolute inset-0 grid place-items-center text-white/75 text-sm tracking-wide animate-pulse-soft">
-                  Iniciando câmera…
-                </div>
-              ) : null}
-            </>
-          )}
-          {flashKey > 0 ? (
-            <span key={`flash-${flashKey}`} className="pipoca-camera-flash" aria-hidden />
-          ) : null}
-        </div>
-      </div>
-
-      <div className="pipoca-camera-footer">
-        {uiState === "timeout" ? (
-          <>
-            <button
-              type="button"
-              onClick={() => {
-                setUiState("opening");
-                setVideoReady(false);
-                retry();
-              }}
-              className="pipoca-cta-primary"
-              style={{ touchAction: "manipulation" }}
-            >
-              TENTAR NOVAMENTE
-            </button>
-            <GhostBtn onClick={onBack}>Voltar</GhostBtn>
-          </>
-        ) : uiState === "captured" ? (
-          <>
-            <button
-              type="button"
-              onClick={handleUse}
-              disabled={confirming || confirmRef.current}
-              className="pipoca-cta-primary"
-              style={{ touchAction: "manipulation" }}
-            >
-              {confirming ? "PREPARANDO..." : "USAR ESTA FOTO"}
-            </button>
-            <button
-              type="button"
-              onClick={handleRetake}
-              disabled={confirming}
-              className="pipoca-cta-secondary"
-              style={{ touchAction: "manipulation" }}
-            >
-              TIRAR NOVAMENTE
-            </button>
-          </>
-        ) : (
-          <GhostBtn onClick={onBack}>Voltar</GhostBtn>
-        )}
-      </div>
-    </div>
-  );
-}
-
-
-/**
- * Overlay frame that follows the detected face. Accounts for object-fit: cover
- * by measuring container vs video and applying the cover offset, so the
- * bracket follows the visible face rather than the raw video coordinates.
- */
-function FaceScanOverlay({
-  guide,
-  videoRef,
-  discreet = false,
-}: {
-  guide: GuideState;
-  videoRef: React.RefObject<HTMLVideoElement | null>;
-  discreet?: boolean;
-}) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const [size, setSize] = useState({ cw: 0, ch: 0, vw: 0, vh: 0 });
-  const logRef = useRef(0);
-
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const update = () => {
-      const v = videoRef.current;
-      const rect = el.getBoundingClientRect();
-      const cw = rect.width;
-      const ch = rect.height;
-      const vw = v?.videoWidth ?? 0;
-      const vh = v?.videoHeight ?? 0;
-      setSize((prev) =>
-        prev.cw === cw && prev.ch === ch && prev.vw === vw && prev.vh === vh
-          ? prev
-          : { cw, ch, vw, vh },
-      );
-      if (++logRef.current % 30 === 0) {
-        console.log(
-          `[PIPOCA_FACE_DEBUG] preview-size=${Math.round(cw)}x${Math.round(ch)} video-size=${vw}x${vh}`,
-        );
-      }
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    const v = videoRef.current;
-    v?.addEventListener("loadedmetadata", update);
-    const interval = window.setInterval(update, 500);
-    return () => {
-      ro.disconnect();
-      v?.removeEventListener("loadedmetadata", update);
-      window.clearInterval(interval);
-    };
-  }, [videoRef]);
-
-  const box = guide.box;
-  if (!box) {
-    return <div ref={wrapRef} aria-hidden className="absolute inset-0 pointer-events-none" />;
-  }
-
-  const { cw, ch, vw, vh } = size;
-  let left = box.x * 100;
-  let top = box.y * 100;
-  let width = box.w * 100;
-  let height = box.h * 100;
-
-  if (cw > 0 && ch > 0 && vw > 0 && vh > 0) {
-    // object-fit: cover mapping
-    const scale = Math.max(cw / vw, ch / vh);
-    const rw = vw * scale;
-    const rh = vh * scale;
-    const offX = (rw - cw) / 2;
-    const offY = (rh - ch) / 2;
-    const pxX = box.x * rw - offX;
-    const pxY = box.y * rh - offY;
-    const pxW = box.w * rw;
-    const pxH = box.h * rh;
-    left = (pxX / cw) * 100;
-    top = (pxY / ch) * 100;
-    width = (pxW / cw) * 100;
-    height = (pxH / ch) * 100;
-    if (logRef.current % 30 === 1) {
-      console.log(
-        `[PIPOCA_FACE_DEBUG] cover-offset offX=${Math.round(offX)} offY=${Math.round(offY)} scale=${scale.toFixed(3)}`,
-      );
-    }
-  }
-
-  const ok = guide.status === "ok";
-  const color = ok ? "#7CFC9B" : "#F8BA32";
-  const cornerSize = discreet ? 14 : 22;
-  const bw = discreet ? 2 : 3;
-
-  return (
-    <div ref={wrapRef} aria-hidden className="absolute inset-0 pointer-events-none">
-      <div
-        style={{
-          position: "absolute",
-          left: `${left}%`,
-          top: `${top}%`,
-          width: `${Math.max(5, width)}%`,
-          height: `${Math.max(5, height)}%`,
-          transition: "left 120ms linear, top 120ms linear, width 120ms linear, height 120ms linear",
-        }}
-      >
-        {(["tl", "tr", "bl", "br"] as const).map((pos) => {
-          const base: React.CSSProperties = {
-            position: "absolute",
-            width: cornerSize,
-            height: cornerSize,
-            borderColor: color,
-            borderStyle: "solid",
-            opacity: discreet ? 0.85 : 1,
-          };
-          const styles: Record<typeof pos, React.CSSProperties> = {
-            tl: { ...base, top: -2, left: -2, borderWidth: `${bw}px 0 0 ${bw}px` },
-            tr: { ...base, top: -2, right: -2, borderWidth: `${bw}px ${bw}px 0 0` },
-            bl: { ...base, bottom: -2, left: -2, borderWidth: `0 0 ${bw}px ${bw}px` },
-            br: { ...base, bottom: -2, right: -2, borderWidth: `0 ${bw}px ${bw}px 0` },
-          };
-          return <span key={pos} style={styles[pos]} />;
-        })}
-        {!ok ? (
-          <span
-            className="pipoca-scan-line"
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: 0,
-              height: 2,
-              background: `linear-gradient(90deg, transparent, ${color}, transparent)`,
-              animation: "pipoca-scan-line 2.2s ease-in-out infinite",
-              willChange: "transform, opacity",
-            }}
-          />
-        ) : null}
-      </div>
-    </div>
   );
 }
 

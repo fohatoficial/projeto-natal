@@ -8,11 +8,8 @@ const ORIGINALS_BUCKET = "pipoca-visitor-originals";
 const GENERATED_BUCKET = "pipoca-generated-scenes";
 const SIGNED_DOWNLOAD_TTL = 60 * 30;
 const SIGNED_REF_TTL = 60 * 30;
-// Canonical published domain — never use preview/lovableproject hosts or
-// window.location.origin. Result QR code MUST always point here.
-const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/, "");
+const PUBLIC_RESULT_BASE_URL = "https://pipoca-cena-studio.lovable.app".replace(/\/+$/, "");
 
-// Two distinct visitor photos written by the totem capture flow.
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
 
@@ -20,6 +17,12 @@ const ENABLE_HAT_REFERENCE = true;
 
 const FIXED_HAT_REFERENCE_URL =
   "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-em-uso-v2.jpg";
+
+const FIXED_HAT_REFERENCE_FRONT_URL =
+  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-frente-v3.png";
+
+const FIXED_HAT_REFERENCE_SIDE_URL =
+  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-lado-v3.png.png";
 
 
 function isUuid(value: unknown): value is string {
@@ -60,99 +63,6 @@ async function ensurePublicResultFields(
   }
 
   return { publicToken, resultPageUrl };
-}
-
-/**
- * Idempotently create a print-queue entry for a completed generation.
- * Safe to call multiple times — uses generation_id as the dedupe key.
- * Never throws: any failure is logged and surfaced via the return value so
- * the visitor flow is never blocked.
- */
-async function ensurePrintQueueEntry(
-  supabaseAdmin: any,
-  generationId: string,
-): Promise<{ created: boolean; alreadyExists: boolean }> {
-  const LOG_AUTO = "[PIPOCA_PRINT_QUEUE_AUTO]";
-  try {
-    const { data: gen, error: gErr } = await supabaseAdmin
-      .from("pipoca_generations")
-      .select("id, session_id, status, final_image_path")
-      .eq("id", generationId)
-      .maybeSingle();
-    if (gErr || !gen) {
-      console.warn(LOG_AUTO, { generationId, errorCode: gErr?.code ?? "not_found", created: false });
-      return { created: false, alreadyExists: false };
-    }
-    if (gen.status !== "completed" || !gen.final_image_path || !gen.session_id) {
-      return { created: false, alreadyExists: false };
-    }
-    const { data: existing } = await supabaseAdmin
-      .from("pipoca_print_queue")
-      .select("id, status")
-      .eq("generation_id", generationId)
-      .maybeSingle();
-    if (existing) {
-      console.log(LOG_AUTO, {
-        generationId,
-        status: existing.status,
-        created: false,
-        alreadyExists: true,
-        retry: false,
-      });
-      return { created: false, alreadyExists: true };
-    }
-    const { data: session } = await supabaseAdmin
-      .from("pipoca_sessions")
-      .select("visitor_id")
-      .eq("id", gen.session_id)
-      .maybeSingle();
-    if (!session?.visitor_id) {
-      console.warn(LOG_AUTO, { generationId, errorCode: "no_visitor", created: false });
-      return { created: false, alreadyExists: false };
-    }
-    const { error: iErr } = await supabaseAdmin
-      .from("pipoca_print_queue")
-      .insert({
-        visitor_id: session.visitor_id,
-        generation_id: generationId,
-        status: "pending",
-      });
-    if (iErr) {
-      if (iErr.code === "23505") {
-        console.log(LOG_AUTO, {
-          generationId,
-          status: "pending",
-          created: false,
-          alreadyExists: true,
-          retry: false,
-        });
-        return { created: false, alreadyExists: true };
-      }
-      console.warn(LOG_AUTO, {
-        generationId,
-        errorCode: iErr.code,
-        created: false,
-        retry: true,
-      });
-      return { created: false, alreadyExists: false };
-    }
-    console.log(LOG_AUTO, {
-      generationId,
-      status: "pending",
-      created: true,
-      alreadyExists: false,
-      retry: false,
-    });
-    return { created: true, alreadyExists: false };
-  } catch (e) {
-    console.warn(LOG_AUTO, {
-      generationId,
-      errorCode: e instanceof Error ? e.message.slice(0, 60) : "unknown",
-      created: false,
-      retry: true,
-    });
-    return { created: false, alreadyExists: false };
-  }
 }
 
 type ReplicatePrediction = {
@@ -245,82 +155,103 @@ function buildPromptText(
   const parsed = parseScenePackPrompt(rawPrompt);
   const parts: string[] = [];
 
-  // 1. Reference roles
+  // 1. Reference role declaration — strict visual priority
   parts.push(
-    "Image 1 is the EXCLUSIVE FACIAL IDENTITY REFERENCE. It is a close, guided portrait of the visitor and is the only source for face, identity, face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair, eyebrows, glasses, and apparent age.",
+    "Image 1 is the PRIMARY FACE IDENTITY REFERENCE and has the highest priority. It is a close, guided portrait of the visitor and is the absolute source of truth for facial identity.",
   );
   parts.push(
-    "Image 2 is the APPEARANCE REFERENCE. Use it for body proportions, posture, shoulders, torso, general appearance and base clothing of the same visitor. Do not take facial features from Image 2.",
+    "Use Image 1 for face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair (beard/stubble), eyebrows, glasses if present, apparent age, and overall recognizable identity.",
   );
   parts.push(
-    "Image 3 is the SCENE REFERENCE. Use it for environment, sertão landscape, composition, lighting direction and cinematic atmosphere. Do not take facial features from Image 3.",
+    "Image 2 is the FULL APPEARANCE, CLOTHING AND BODY PROPORTION REFERENCE. It shows the same visitor framed from the waist up.",
   );
+  parts.push(
+    "Use Image 2 for posture, body proportions, full hair shape, shoulders, torso, clothing texture, and general appearance — but always defer to Image 1 for the face itself.",
+  );
+  parts.push(
+    "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it ONLY for the sertão landscape, scenery, composition, the wooden cross, lighting direction and cinematographic atmosphere.",
+  );
+
   if (hasHatRef) {
     parts.push(
-      "Image 4 is a HAT DESIGN CUE only. Use it as visual reference for the cangaceiro hat shape, scale and natural fit on the head. Do not take facial features, body, clothing, pose or environment from Image 4. Image 4 must never override or distort the visitor's identity, face, hairstyle, clothing, pose or the environment.",
+      "Images 4 and 5 are low-priority hat design and fit references only.",
+    );
+    parts.push(
+      "Image 4 is the front hat reference. Image 5 is the side hat reference. Use them only to guide the authentic shape, scale, side profile and natural fit of a northeastern Brazilian cangaceiro leather hat.",
+    );
+    parts.push(
+      "The hat must remain proportional to the visitor's head and naturally integrated into the costume.",
+    );
+    parts.push(
+      "Images 4 and 5 must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
+    );
+    parts.push(
+      "The hat must not dominate the image, become oversized, become too small, cover the face or cause close-up framing.",
     );
   }
 
-  // 2. Identity protection
+
+  // 2. Hard identity rules
   parts.push(
-    "The generated person must be clearly recognizable as the visitor from Image 1. Preserve face shape, eye spacing, nose shape, mouth shape, jawline, hairline, hairstyle, skin tone and facial characteristics. Do not create a different person.",
+    "HARD RULES (highest priority): facial identity has absolute priority. The visitor's facial identity from Image 1 must remain the highest priority and must not be altered by any other reference. Do NOT redraw the face. Do NOT blend the face with another person. Do NOT stylize the face to match the scene.",
   );
   parts.push(
-    `Do not blend facial features from Images 2, 3${hasHatRef ? " or 4" : ""} into the visitor's face. Image 1 is the only facial identity reference.`,
+    "Exactly one person in the final image, and that person must be clearly recognizable as the visitor from Image 1 — not a similar person.",
   );
   parts.push(
-    "Exactly one person in the final image. The visitor is naturally integrated into the environment from Image 3: matching scale, posture, skin light, contact shadows and depth of field.",
+    "Wardrobe and environment must adapt to fit the visitor. The visitor's face must NOT be altered to fit the style.",
+  );
+  parts.push(
+    "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
   );
 
   // 3. Style
   parts.push(
-    "STYLE: strictly black and white, neutral grayscale. No sepia, no brown, yellow, beige or golden tint. Strong contrast, deep shadows, luminous highlights, visible film grain.",
+    "STYLE: strictly black and white, neutral grayscale. No sepia. No brown, yellow, beige or golden tint. No earthy toning.",
   );
   parts.push(
-    "Austere Brazilian Cinema Novo mood in the spirit of Glauber Rocha — serious, iconic, mythic. Expression neutral or mildly serious, never smiling.",
+    "Strong contrast, deep shadows, luminous highlights, visible film grain, slightly desaturated.",
+  );
+  parts.push(
+    "Austere Brazilian Cinema Novo mood in the spirit of Glauber Rocha — serious, iconic, mythic. Not casual, not touristic, not editorial fashion. Expression: neutral or mildly serious. Never smiling.",
   );
 
-  // 4. Wardrobe / clothing
+  // 4. Wardrobe
   parts.push(
-    "WARDROBE: historically inspired by Brazilian cangaço and northeastern sertão. Rustic, natural, dusty, believable and non-theatrical. Leather details are welcome. No modern clothing, no t-shirt, no jeans, no sneakers, no streetwear, no costume-party look, no fantasy exaggeration. Clothing must remain visible and coherent with the framing.",
-  );
-  parts.push(
-    "The wardrobe must look authentic, restrained and cinematic, not caricatured.",
+    "WARDROBE: rustic, timeless, non-modern, rooted in the northeastern Brazilian sertão. Avoid modern t-shirts, modern jeans, sneakers, streetwear or bright casual clothing. Clothing must remain complete, coherent and clearly visible — never cropped or obscured.",
   );
 
-  // 5. Hat
+  // 5. Hat — cangaceiro (strictly subordinate, no visual reference)
   parts.push(
-    "HAT: traditional Brazilian cangaceiro leather hat, historically appropriate, worn naturally, proportional to the head and visually integrated with the outfit. May include subtle front ornamentation. Must not be oversized, must not be theatrical, must not dominate the image, must not cover the face, must not reduce facial recognizability. Never a cowboy or western wide-brim hat.",
+    "HAT: only a subtle textual costume cue. The visitor may wear an authentic northeastern Brazilian cangaceiro leather hat, also known as a traditional cangaço hat. It has a characteristic silhouette with curved side flaps and subtle front ornamentation typical of cangaço leatherwork. The hat must be proportional to the head, never oversized, never theatrical, never ceremonial, never fantasy, never a cowboy or western wide-brim hat. The hat is a lower priority than the clothing and the environment.",
   );
-  parts.push(
-    "The hat is important, but it is secondary to identity, clothing and scene.",
-  );
+  if (hasHatRef) {
+    parts.push(
+      "When Images 4 and 5 are used, apply them only as restrained secondary cues for the hat's authentic shape, scale, side profile and natural fit. The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT change the pose. The hat must NOT replace or distort the environment. The hat must NOT become oversized, theatrical, ceremonial, fantastical, a cowboy hat, a western wide-brim hat or the main subject.",
+    );
+  }
 
   const hatUsage = extractHatUsage(parsed);
   if (hatUsage) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
 
   // 6. Cross
   parts.push(
-    "A small wooden cross may appear in the composition — visible but secondary.",
+    "A small wooden cross may appear in the composition — visible but visually secondary, never the focal point. The cross and the sertão landscape must remain part of the composition.",
   );
 
-  // 7. Framing
+  // 7. Composition
   parts.push(
-    "Vertical 4:5 framing, cinematic composition, shallow depth of field. Medium or medium-full shot showing the visitor from head to waist or just above the knees — enough room to see the face clearly, the clothing clearly and to understand the scene. Do not crop too tightly on the face, and do not hide the wardrobe.",
+    "Vertical 4:5 framing, cinematic composition, shallow depth of field. The visitor anchored in the environment as if captured in a film still.",
+  );
+  parts.push(
+    "FRAMING: prefer a medium shot or medium-full shot, showing the visitor from the head down to the waist or just above the knees. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment. The environment must remain visible and legible, and the rustic clothing must remain fully visible and important.",
+  );
+  parts.push(
+    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Images 4 and 5, when present, are the lowest priority and must only guide the shape, scale, side profile and natural fit of the cangaceiro hat. Images 4 and 5 must never replace or weaken Images 1, 2 or 3.",
   );
 
-  // 8. Hierarchy
-  if (hasHatRef) {
-    parts.push(
-      "HIERARCHY: Image 1 (face) = highest priority. Image 2 (body, appearance, base clothing) = second. Image 3 (scene, atmosphere) = third. Image 4 (cangaceiro hat design cue) = lowest priority, used only for hat shape and fit.",
-    );
-  } else {
-    parts.push(
-      "HIERARCHY: Image 1 (face) = highest priority. Image 2 (appearance/body) = second. Image 3 (environment) = third.",
-    );
-  }
 
-  // 9. Film context
+  // 8. Film context
   parts.push(
     `Cinematic scene from the arid Brazilian sertão, in the spirit of "Deus e o Diabo na Terra do Sol"${
       filmTitle ? ` and the film "${filmTitle}"` : ""
@@ -354,19 +285,21 @@ async function createReplicatePrediction(input: {
   identityUrl: string;
   appearanceUrl: string;
   sceneImageUrl: string;
-  hatReferenceUrl?: string | null;
+  hatReferenceUrls: string[];
 }): Promise<ReplicatePrediction> {
   const token = getReplicateToken();
+  // Send both hat references when available: front (image 4) and side (image 5).
+  const hatRefs = input.hatReferenceUrls.slice(0, 2);
   const inputImages = [
     input.identityUrl,
     input.appearanceUrl,
     input.sceneImageUrl,
+    ...hatRefs,
   ];
-  if (input.hatReferenceUrl) inputImages.push(input.hatReferenceUrl);
   const body = {
     input: {
       prompt: input.prompt,
-      // Order: identity (Image 1), appearance (Image 2), scene base (Image 3), hat cue (Image 4, optional).
+      // Order: identity, appearance, scene base, then up to 2 hat refs.
       input_images: inputImages,
       aspect_ratio: "4:5",
       output_format: "jpg",
@@ -435,7 +368,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       throw new Error("Sessão sem filme/scene pack");
     }
 
-    // Server-derived paths only — two distinct visitor photos.
+    // Server-derived paths only.
     const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
     const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;
 
@@ -486,28 +419,31 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .eq("capture_id", capture.id);
     const attemptNumber = (priorCount ?? 0) + 1;
 
-    // Two distinct signed URLs — identity (close) and appearance (medium).
-    const [
-      { data: signedIdentity, error: signIdErr },
-      { data: signedAppearance, error: signApErr },
-    ] = await Promise.all([
-      supabaseAdmin.storage.from(ORIGINALS_BUCKET).createSignedUrl(identityPath, SIGNED_REF_TTL),
-      supabaseAdmin.storage.from(ORIGINALS_BUCKET).createSignedUrl(appearancePath, SIGNED_REF_TTL),
-    ]);
+    // Signed URLs for the two visitor photos.
+    const { data: signedIdentity, error: signIdErr } = await supabaseAdmin.storage
+      .from(ORIGINALS_BUCKET)
+      .createSignedUrl(identityPath, SIGNED_REF_TTL);
     if (signIdErr || !signedIdentity?.signedUrl) {
       throw new Error("Falha ao gerar URL da foto de identidade");
     }
+    const { data: signedAppearance, error: signApErr } = await supabaseAdmin.storage
+      .from(ORIGINALS_BUCKET)
+      .createSignedUrl(appearancePath, SIGNED_REF_TTL);
     if (signApErr || !signedAppearance?.signedUrl) {
       throw new Error("Falha ao gerar URL da foto de aparência");
     }
-    const identityUrl = signedIdentity.signedUrl;
-    const appearanceUrl = signedAppearance.signedUrl;
 
-    
-    const hatReferenceUrl = ENABLE_HAT_REFERENCE ? FIXED_HAT_REFERENCE_URL : null;
-    const inputImageCount = hatReferenceUrl ? 4 : 3;
+    const parsedScenePrompt = parseScenePackPrompt(scenePack.prompt);
+    let hatReferenceUrls: string[] = [];
+    let hatRefUsed: string[] = [];
+    if (ENABLE_HAT_REFERENCE) {
+      hatReferenceUrls = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
+      hatRefUsed = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
+      console.log(`${LOG} referências de chapéu fixas ativas (2 URLs)`);
+    }
     console.log(`${GEN_LOG} hat reference enabled: ${ENABLE_HAT_REFERENCE}`);
-    const promptText = buildPromptText(scenePack.prompt, film?.title, Boolean(hatReferenceUrl));
+    console.log(`${GEN_LOG} fixed hat references: ${hatRefUsed.length}`);
+    const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
 
 
     const { data: generation, error: genErr } = await supabaseAdmin
@@ -525,22 +461,31 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .single();
     if (genErr || !generation) throw new Error("Falha ao criar registro de geração");
 
-    console.log(`${GEN_LOG} geração com ${inputImageCount} imagens`, {
+    console.log(`${GEN_LOG} geração usando referências`, {
       generationId: generation.id,
       attempt: attemptNumber,
-      order: hatReferenceUrl
-        ? ["identity-close", "appearance-medium", "scene-base", "hat-reference"]
-        : ["identity-close", "appearance-medium", "scene-base"],
+      hatReferenceAvailable: hatReferenceUrls.length,
+      hatReferenceUsed: hatRefUsed.length,
+      order: [
+        "identity-close",
+        "appearance-medium",
+        "scene-base",
+        "hat-front",
+        "hat-side",
+      ].slice(0, 3 + hatRefUsed.length),
     });
+    if (hatRefUsed.length > 0) {
+      console.log(`${GEN_LOG} usando chapéu como referência secundária`);
+    }
 
     let prediction: ReplicatePrediction;
     try {
       prediction = await createReplicatePrediction({
         prompt: promptText,
-        identityUrl,
-        appearanceUrl,
+        identityUrl: signedIdentity.signedUrl,
+        appearanceUrl: signedAppearance.signedUrl,
         sceneImageUrl: scenePack.reference_image_url,
-        hatReferenceUrl,
+        hatReferenceUrls: hatRefUsed,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "erro desconhecido";
@@ -565,10 +510,13 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           attempt: attemptNumber,
           identity_photo_path: identityPath,
           appearance_photo_path: appearancePath,
-          input_image_count: inputImageCount,
+          input_image_count: 3 + hatRefUsed.length,
           scene_pack_id: chosenScenePackId,
-          hat_reference_enabled: ENABLE_HAT_REFERENCE,
-          hat_reference_url_used: hatReferenceUrl,
+          hat_reference_count_available: hatReferenceUrls.length,
+          hat_reference_count_used: hatRefUsed.length,
+          hat_reference_url_used: hatRefUsed[0] ?? null,
+          hat_reference_front_url: hatRefUsed[0] ?? null,
+          hat_reference_side_url: hatRefUsed[1] ?? null,
           post_process: "neutral-grayscale",
           post_process_contrast: 8,
         },
@@ -627,8 +575,6 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
 
     if (gen.status === "completed" && gen.final_image_path) {
       const { publicToken, resultPageUrl } = await ensurePublicResultFields(supabaseAdmin, gen);
-      // Auto-enqueue if not already in the print queue (idempotent retry).
-      await ensurePrintQueueEntry(supabaseAdmin, gen.id);
       const { data: signed, error: sErr } = await supabaseAdmin.storage
         .from(GENERATED_BUCKET)
         .createSignedUrl(gen.final_image_path, SIGNED_DOWNLOAD_TTL);
@@ -750,10 +696,6 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
       .from("pipoca_sessions")
       .update({ status: "completed", completed_at: new Date().toISOString() })
       .eq("id", gen.session_id);
-
-    // Auto-enqueue this generation for production. Idempotent by generation_id.
-    await ensurePrintQueueEntry(supabaseAdmin, gen.id);
-
 
     const { data: signed, error: sErr } = await supabaseAdmin.storage
       .from(GENERATED_BUCKET)
