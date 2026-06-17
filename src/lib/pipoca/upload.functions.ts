@@ -30,7 +30,7 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
 
     const { data: scenePack, error: spError } = await supabaseAdmin
       .from("pipoca_scene_packs")
-      .select("id")
+      .select("id, film_id")
       .eq("film_id", data.filmId)
       .eq("active", true)
       .eq("status", "active")
@@ -39,6 +39,21 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
       .maybeSingle();
     if (spError) throw new Error("Falha ao localizar scene pack");
     if (!scenePack) throw new Error("Scene pack indisponível para este filme");
+    if (scenePack.film_id !== data.filmId) {
+      console.warn(`${LOG} SCENE_PACK_FILM_MISMATCH no prepare`, {
+        selected_film_id: data.filmId,
+        scene_pack_id: scenePack.id,
+        scene_pack_film_id: scenePack.film_id,
+      });
+      throw new Error("SCENE_PACK_FILM_MISMATCH");
+    }
+    console.log(`[PIPOCA_FILM_ROUTING]`, {
+      stage: "prepare",
+      selected_film_id: data.filmId,
+      resolved_scene_pack_id: scenePack.id,
+      resolved_scene_pack_film_id: scenePack.film_id,
+      routing_match: true,
+    });
 
     // If a visitorId was provided, ensure the visitor exists and granted
     // experience consent before linking it to the session.
