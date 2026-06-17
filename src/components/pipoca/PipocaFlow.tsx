@@ -1573,10 +1573,12 @@ function GuidedCamera({
   mode,
   onConfirm,
   onBack,
+  confirming = false,
 }: {
   mode: GuideMode;
   onConfirm: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
+  confirming?: boolean;
 }) {
   const { videoRef, ready, errorKind, retry } = useCamera(true);
   const [captured, setCaptured] = useState<{ blob: Blob; url: string } | null>(null);
