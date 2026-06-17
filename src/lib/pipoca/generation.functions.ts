@@ -298,12 +298,75 @@ function extractHatUsage(parsedPrompt: unknown): string | null {
   return typeof usage === "string" && usage.trim() ? usage.trim() : null;
 }
 
+function extractPromptFields(parsedPrompt: unknown): string[] {
+  if (typeof parsedPrompt === "string") return parsedPrompt.trim() ? [parsedPrompt.trim()] : [];
+  if (!parsedPrompt || typeof parsedPrompt !== "object" || Array.isArray(parsedPrompt)) return [];
+  const obj = parsedPrompt as Record<string, unknown>;
+  const fields = [
+    "scene",
+    "setting",
+    "environment",
+    "mood",
+    "atmosphere",
+    "style",
+    "look",
+    "wardrobe",
+    "costume",
+    "description",
+    "prompt",
+  ];
+  return fields
+    .map((key) => obj[key])
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim());
+}
+
+function safeFilenameFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const path = new URL(url).pathname;
+    return decodeURIComponent(path.split("/").filter(Boolean).pop() ?? "") || null;
+  } catch {
+    const clean = url.split("?")[0]?.split("#")[0] ?? "";
+    return clean.split("/").filter(Boolean).pop() || null;
+  }
+}
+
+function containsAny(text: string, terms: string[]): boolean {
+  const normalized = text.toLocaleLowerCase("pt-BR");
+  return terms.some((term) => normalized.includes(term.toLocaleLowerCase("pt-BR")));
+}
+
+function analyzePrompt(positivePromptText: string, scenePackId: string): PromptDiagnostics {
+  const contains_monochrome = containsAny(positivePromptText, [
+    "monochrome",
+    "black and white",
+    "grayscale",
+    "preto e branco",
+    "monocromático",
+    "monocromatico",
+  ]);
+  const contains_sertao = containsAny(positivePromptText, ["sertão", "sertao"]);
+  const contains_cangaco = containsAny(positivePromptText, ["cangaço", "cangaco", "cangaceiro"]);
+  const contains_cinema_novo = containsAny(positivePromptText, ["Cinema Novo", "Glauber Rocha"]);
+  const contains_circo = containsAny(positivePromptText, ["circo", "circense", "cortinas", "teatral"]);
+  return {
+    contains_monochrome,
+    contains_sertao,
+    contains_cangaco,
+    contains_cinema_novo,
+    contains_circo,
+    prompt_contamination_detected:
+      scenePackId === CIRCO_SCENE_PACK_ID &&
+      containsAny(positivePromptText, CIRCO_FORBIDDEN_POSITIVE_TERMS),
+  };
+}
+
 function buildPromptText(
-  rawPrompt: unknown,
-  filmTitle?: string | null,
+  scenePack: ScenePackForGeneration,
   hasHatRef = false,
-): string {
-  const parsed = parseScenePackPrompt(rawPrompt);
+): BuiltPrompt {
+  const parsed = parseScenePackPrompt(scenePack.prompt);
   const parts: string[] = [];
 
   // 1. Reference role declaration — strict visual priority
@@ -320,24 +383,18 @@ function buildPromptText(
     "Use Image 2 for posture, body proportions, full hair shape, shoulders, torso, clothing texture, and general appearance — but always defer to Image 1 for the face itself.",
   );
   parts.push(
-    "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it ONLY for the sertão landscape, scenery, composition, the wooden cross, lighting direction and cinematographic atmosphere.",
+    "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it only for the selected scene pack environment, composition, lighting direction and atmosphere.",
   );
 
   if (hasHatRef) {
     parts.push(
-      "Images 4 and 5 are low-priority hat design and fit references only.",
+      "Images 4 and 5 are low-priority prop design and fit references only, used only when the selected scene pack explicitly provides them.",
     );
     parts.push(
-      "Image 4 is the front hat reference. Image 5 is the side hat reference. Use them only to guide the authentic shape, scale, side profile and natural fit of a northeastern Brazilian cangaceiro leather hat.",
+      "Use prop references only to guide the explicit prop from the selected scene pack. They must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
     );
     parts.push(
-      "The hat must remain proportional to the visitor's head and naturally integrated into the costume.",
-    );
-    parts.push(
-      "Images 4 and 5 must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
-    );
-    parts.push(
-      "The hat must not dominate the image, become oversized, become too small, cover the face or cause close-up framing.",
+      "Any prop must remain proportional to the visitor and naturally integrated into the costume, without dominating the image, covering the face or changing the framing.",
     );
   }
 
@@ -356,77 +413,47 @@ function buildPromptText(
     "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
   );
 
-  // 3. Style
-  parts.push(
-    "STYLE: strictly black and white, neutral grayscale. No sepia. No brown, yellow, beige or golden tint. No earthy toning.",
-  );
-  parts.push(
-    "Strong contrast, deep shadows, luminous highlights, visible film grain, slightly desaturated.",
-  );
-  parts.push(
-    "Austere Brazilian Cinema Novo mood in the spirit of Glauber Rocha — serious, iconic, mythic. Not casual, not touristic, not editorial fashion. Expression: neutral or mildly serious. Never smiling.",
-  );
-
-  // 4. Wardrobe
-  parts.push(
-    "WARDROBE: rustic, timeless, non-modern, rooted in the northeastern Brazilian sertão. Avoid modern t-shirts, modern jeans, sneakers, streetwear or bright casual clothing. Clothing must remain complete, coherent and clearly visible — never cropped or obscured.",
-  );
-
-  // 5. Hat — cangaceiro (strictly subordinate, no visual reference)
-  parts.push(
-    "HAT: only a subtle textual costume cue. The visitor may wear an authentic northeastern Brazilian cangaceiro leather hat, also known as a traditional cangaço hat. It has a characteristic silhouette with curved side flaps and subtle front ornamentation typical of cangaço leatherwork. The hat must be proportional to the head, never oversized, never theatrical, never ceremonial, never fantasy, never a cowboy or western wide-brim hat. The hat is a lower priority than the clothing and the environment.",
-  );
-  if (hasHatRef) {
-    parts.push(
-      "When Images 4 and 5 are used, apply them only as restrained secondary cues for the hat's authentic shape, scale, side profile and natural fit. The hat must have natural human scale. The brim must remain proportional to the visitor's head and shoulders. The hat must NOT dominate the composition. The hat must NOT cover the face. The hat must NOT change the visitor's facial identity. The hat must NOT change the clothing. The hat must NOT change the pose. The hat must NOT replace or distort the environment. The hat must NOT become oversized, theatrical, ceremonial, fantastical, a cowboy hat, a western wide-brim hat or the main subject.",
-    );
-  }
-
   const hatUsage = extractHatUsage(parsed);
   if (hatUsage) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
 
-  // 6. Cross
-  parts.push(
-    "A small wooden cross may appear in the composition — visible but visually secondary, never the focal point. The cross and the sertão landscape must remain part of the composition.",
-  );
-
-  // 7. Composition
+  // 3. Neutral composition
   parts.push(
     "Vertical 4:5 framing, cinematic composition, shallow depth of field. The visitor anchored in the environment as if captured in a film still.",
   );
   parts.push(
-    "FRAMING: prefer a medium shot or medium-full shot, showing the visitor from the head down to the waist or just above the knees. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment. The environment must remain visible and legible, and the rustic clothing must remain fully visible and important.",
+    "FRAMING: keep the selected scene pack framing visible and legible. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment.",
   );
   parts.push(
-    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Images 4 and 5, when present, are the lowest priority and must only guide the shape, scale, side profile and natural fit of the cangaceiro hat. Images 4 and 5 must never replace or weaken Images 1, 2 or 3.",
+    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Additional prop images, when present, are the lowest priority and must never replace or weaken Images 1, 2 or 3.",
   );
 
+  // 4. Scene-pack-specific style — only from the resolved scene pack.
+  const scenePackFields = extractPromptFields(parsed);
+  if (scenePackFields.length > 0) parts.push(`SCENE PACK PROMPT: ${scenePackFields.join(" ")}`);
+  if (scenePack.visual_style?.trim()) parts.push(`VISUAL STYLE: ${scenePack.visual_style.trim()}.`);
+  if (scenePack.color_mode?.trim()) parts.push(`COLOR MODE: ${scenePack.color_mode.trim()}.`);
+  if (scenePack.framing?.trim()) parts.push(`SCENE PACK FRAMING: ${scenePack.framing.trim()}.`);
+  if (scenePack.pose_type?.trim()) parts.push(`POSE TYPE: ${scenePack.pose_type.trim()}.`);
+  if (scenePack.id === CIRCO_SCENE_PACK_ID) parts.push(CIRCO_COLOR_INSTRUCTION);
 
-  // 8. Film context
-  parts.push(
-    `Cinematic scene from the arid Brazilian sertão, in the spirit of "Deus e o Diabo na Terra do Sol"${
-      filmTitle ? ` and the film "${filmTitle}"` : ""
-    }: dramatic sunlight, dust in the air, 1960s Cinema Novo aesthetic, photoreal, high quality.`,
-  );
+  const positivePromptText = parts.join(" ");
+  const negativeParts = [scenePack.negative_prompt?.trim() ?? ""];
+  if (scenePack.id === CIRCO_SCENE_PACK_ID) negativeParts.push(...CIRCO_NEGATIVE_PROMPT_ADDITIONS);
+  const negativePromptText = negativeParts.filter(Boolean).join(", ");
+  const promptText = negativePromptText
+    ? `${positivePromptText} NEGATIVE PROMPT: ${negativePromptText}.`
+    : positivePromptText;
 
-  if (parsed && typeof parsed === "object") {
-    const obj = parsed as Record<string, unknown>;
-    const pickStr = (k: string) => (typeof obj[k] === "string" ? (obj[k] as string) : undefined);
-    const scene = pickStr("scene") ?? pickStr("setting") ?? pickStr("environment");
-    const mood = pickStr("mood") ?? pickStr("atmosphere");
-    const style = pickStr("style") ?? pickStr("look");
-    const wardrobe = pickStr("wardrobe") ?? pickStr("costume");
-    const extra = pickStr("description") ?? pickStr("prompt");
-    if (scene) parts.push(`Scene details: ${scene}.`);
-    if (mood) parts.push(`Mood: ${mood}.`);
-    if (style) parts.push(`Visual style: ${style}.`);
-    if (wardrobe) parts.push(`Wardrobe notes from scene pack: ${wardrobe}.`);
-    if (extra) parts.push(extra);
-  } else if (typeof parsed === "string" && parsed.trim()) {
-    parts.push(parsed.trim());
-  }
-
-  return parts.join(" ");
+  return {
+    promptText,
+    positivePromptText,
+    negativePromptText,
+    diagnostics: analyzePrompt(positivePromptText, scenePack.id),
+    shouldApplyNeutralGrayscale: containsAny(
+      [scenePack.color_mode, scenePack.visual_style, ...scenePackFields].filter(Boolean).join(" "),
+      ["black and white", "preto e branco", "grayscale", "monochrome", "monocromático", "monocromatico"],
+    ),
+  };
 }
 
 /* ---------- Replicate helpers ---------- */
