@@ -1431,20 +1431,25 @@ function VisitorRegistration({
 }) {
   const [fullName, setFullName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
-  const [consent, setConsent] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const nameOk = fullName.replace(/\s+/g, " ").trim().length >= 2 && !/^\d+$/.test(fullName.trim());
   const phoneOk = isValidBrWhatsapp(whatsapp);
-  const canSubmit = nameOk && phoneOk && consent && !loading;
+  const fieldsOk = nameOk && phoneOk;
+  const canSubmit = fieldsOk && !loading;
 
   async function submit() {
     if (!canSubmit) return;
     setLoading(true);
     setError(null);
     try {
+      const acceptedAt = new Date().toISOString();
+      console.log("[PIPOCA_CONSENT] aceite registrado", {
+        accepted_at: acceptedAt,
+        version: PRIVACY_NOTICE_VERSION,
+      });
       const res = await createVisitorFn({
         data: {
           fullName: fullName.replace(/\s+/g, " ").trim(),
@@ -1493,30 +1498,17 @@ function VisitorRegistration({
             className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base disabled:opacity-60"
           />
         </label>
-        <label className="flex items-start gap-2 text-left text-sm text-white/85">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-            disabled={loading}
-            className="mt-1 w-4 h-4 accent-gold flex-shrink-0"
-          />
-          <span>
-            Li o{" "}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowNotice(true);
-              }}
-              className="text-gold underline underline-offset-2 hover:text-gold/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-gold rounded-sm"
-            >
-              Aviso de Privacidade
-            </button>{" "}
-            e autorizo o tratamento do meu nome, WhatsApp e imagens para criar e disponibilizar minha cena personalizada e, caso eu solicite, identificar e imprimir minha foto.
-          </span>
-        </label>
+        <p className="text-left text-sm text-white/85 leading-snug">
+          Li o{" "}
+          <button
+            type="button"
+            onClick={() => setShowNotice(true)}
+            className="text-gold underline underline-offset-2 hover:text-gold/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-gold rounded-sm"
+          >
+            Aviso de Privacidade
+          </button>{" "}
+          e autorizo o tratamento do meu nome, WhatsApp e imagem para criar, disponibilizar e produzir minha foto personalizada.
+        </p>
         {error && (
           <div className="rounded-md border border-red-400/40 bg-red-950/30 p-3 text-center">
             <p className="text-sm font-semibold text-red-200 uppercase tracking-wide">
@@ -1530,11 +1522,12 @@ function VisitorRegistration({
         )}
         <div className="flex flex-col items-center gap-2 pt-2">
           <PrimaryCta onClick={submit} disabled={!canSubmit}>
-            {loading ? "Cadastrando…" : error ? "Tentar novamente" : "Continuar"}
+            {loading ? "Registrando…" : error ? "Tentar novamente" : "Li e autorizo. Continuar"}
           </PrimaryCta>
           <GhostBtn onClick={onBack} disabled={loading}>Voltar</GhostBtn>
         </div>
       </div>
+
 
       {showNotice && (
         <div
