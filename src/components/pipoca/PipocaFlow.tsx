@@ -812,11 +812,6 @@ function PosterCard({
         className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
       />
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
-      <div className="absolute top-3 left-4 z-10">
-        <span className="inline-block bg-gold text-cinema text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded">
-          Tela Brasil
-        </span>
-      </div>
       <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 z-10">
         <h3 className="font-display text-xl sm:text-2xl md:text-3xl leading-tight text-white">
           {movie.title}
