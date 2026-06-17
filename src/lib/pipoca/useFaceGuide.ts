@@ -79,7 +79,6 @@ const HINTS: Record<GuideMode, Record<GuideStatus, string>> = {
     off_left: "FIQUE DE FRENTE PARA A CÂMERA",
     off_right: "FIQUE DE FRENTE PARA A CÂMERA",
     off_high: "FIQUE DE FRENTE PARA A CÂMERA",
-    off_right: "FIQUE DE FRENTE PARA A CÂMERA" as never,
     off_low: "FIQUE DE FRENTE PARA A CÂMERA",
     head_turned: "FIQUE DE FRENTE PARA A CÂMERA",
     ok: "PRONTO PARA A FOTO",
