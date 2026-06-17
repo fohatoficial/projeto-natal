@@ -392,16 +392,8 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
 
     const parsedScenePrompt = parseScenePackPrompt(scenePack.prompt);
-    let hatReferenceUrls: string[] = [];
-    let hatRefUsed: string[] = [];
-    if (ENABLE_HAT_REFERENCE) {
-      hatReferenceUrls = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
-      hatRefUsed = [FIXED_HAT_REFERENCE_FRONT_URL, FIXED_HAT_REFERENCE_SIDE_URL];
-      console.log(`${LOG} referências de chapéu fixas ativas (2 URLs)`);
-    }
     console.log(`${GEN_LOG} hat reference enabled: ${ENABLE_HAT_REFERENCE}`);
-    console.log(`${GEN_LOG} fixed hat references: ${hatRefUsed.length}`);
-    const promptText = buildPromptText(scenePack.prompt, film?.title, hatRefUsed.length > 0);
+    const promptText = buildPromptText(scenePack.prompt, film?.title, false);
 
 
     const { data: generation, error: genErr } = await supabaseAdmin
@@ -419,22 +411,11 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .single();
     if (genErr || !generation) throw new Error("Falha ao criar registro de geração");
 
-    console.log(`${GEN_LOG} geração usando referências`, {
+    console.log(`${GEN_LOG} geração com 3 imagens`, {
       generationId: generation.id,
       attempt: attemptNumber,
-      hatReferenceAvailable: hatReferenceUrls.length,
-      hatReferenceUsed: hatRefUsed.length,
-      order: [
-        "identity-close",
-        "appearance-medium",
-        "scene-base",
-        "hat-front",
-        "hat-side",
-      ].slice(0, 3 + hatRefUsed.length),
+      order: ["identity-close", "appearance-medium", "scene-base"],
     });
-    if (hatRefUsed.length > 0) {
-      console.log(`${GEN_LOG} usando chapéu como referência secundária`);
-    }
 
     let prediction: ReplicatePrediction;
     try {
@@ -443,7 +424,6 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         identityUrl: signedIdentity.signedUrl,
         appearanceUrl: signedAppearance.signedUrl,
         sceneImageUrl: scenePack.reference_image_url,
-        hatReferenceUrls: hatRefUsed,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "erro desconhecido";
@@ -468,13 +448,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           attempt: attemptNumber,
           identity_photo_path: identityPath,
           appearance_photo_path: appearancePath,
-          input_image_count: 3 + hatRefUsed.length,
+          input_image_count: 3,
           scene_pack_id: chosenScenePackId,
-          hat_reference_count_available: hatReferenceUrls.length,
-          hat_reference_count_used: hatRefUsed.length,
-          hat_reference_url_used: hatRefUsed[0] ?? null,
-          hat_reference_front_url: hatRefUsed[0] ?? null,
-          hat_reference_side_url: hatRefUsed[1] ?? null,
+          hat_reference_enabled: false,
           post_process: "neutral-grayscale",
           post_process_contrast: 8,
         },
