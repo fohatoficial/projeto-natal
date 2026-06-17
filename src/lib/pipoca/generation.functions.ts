@@ -247,21 +247,17 @@ async function createReplicatePrediction(input: {
   identityUrl: string;
   appearanceUrl: string;
   sceneImageUrl: string;
-  hatReferenceUrls: string[];
 }): Promise<ReplicatePrediction> {
   const token = getReplicateToken();
-  // Send both hat references when available: front (image 4) and side (image 5).
-  const hatRefs = input.hatReferenceUrls.slice(0, 2);
   const inputImages = [
     input.identityUrl,
     input.appearanceUrl,
     input.sceneImageUrl,
-    ...hatRefs,
   ];
   const body = {
     input: {
       prompt: input.prompt,
-      // Order: identity, appearance, scene base, then up to 2 hat refs.
+      // Order: identity (Image 1), appearance (Image 2), scene base (Image 3).
       input_images: inputImages,
       aspect_ratio: "4:5",
       output_format: "jpg",
