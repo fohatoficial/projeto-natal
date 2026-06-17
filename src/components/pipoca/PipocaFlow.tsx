@@ -1460,11 +1460,11 @@ function Processing({
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <span
               key={i}
-              className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full bg-gold/80"
+              className="absolute left-1/2 top-1/2 -ml-1 -mt-1 w-2 h-2 rounded-full bg-gold/80"
               style={{
-                transform: `rotate(${i * 60}deg) translateY(-3.6rem)`,
+                ["--r" as string]: `${i * 60}deg`,
                 animation: `orbit-pulse 1.6s ease-in-out ${i * 0.18}s infinite`,
-              }}
+              } as React.CSSProperties}
             />
           ))}
           {/* Rotating cinema icon */}
