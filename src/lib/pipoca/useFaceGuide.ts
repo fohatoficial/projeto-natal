@@ -49,7 +49,7 @@ export type GuideState = {
 const HINTS: Record<GuideMode, Record<GuideStatus, string>> = {
   identity: {
     no_face: "POSICIONE SEU ROSTO",
-    multi_face: "APENAS UMA PESSOA NA FOTO",
+    multi_face: "DEIXE APENAS UMA PESSOA NA ÁREA DA FOTO",
     too_far: "APROXIME-SE UM POUCO",
     too_close: "AFASTE-SE UM POUCO",
     off_left: "CENTRALIZE SEU ROSTO",
@@ -61,7 +61,7 @@ const HINTS: Record<GuideMode, Record<GuideStatus, string>> = {
   },
   appearance: {
     no_face: "POSICIONE-SE DIANTE DA CÂMERA",
-    multi_face: "APENAS UMA PESSOA NA FOTO",
+    multi_face: "DEIXE APENAS UMA PESSOA NA ÁREA DA FOTO",
     too_far: "APROXIME-SE UM POUCO",
     too_close: "AFASTE-SE UM POUCO",
     off_left: "CENTRALIZE-SE",
