@@ -496,7 +496,9 @@ export function PipocaFlow() {
       {uploadStatus === "error" && (
         <UploadError
           stage={uploadError}
-          onRetry={() => void runUpload()}
+          onRetry={() => {
+            if (mediumPhoto) void runUpload(mediumPhoto);
+          }}
           onRetake={retakeAll}
         />
       )}
