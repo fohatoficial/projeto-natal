@@ -1064,22 +1064,45 @@ function Camera({
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
   const title =
-    variant === "identity" ? "Posicione seu rosto na marcação" : "Encaixe o rosto e o corpo na marcação";
+    variant === "identity" ? "OLHE PARA A CÂMERA" : "DÊ UM PASSO PARA TRÁS";
   const hint =
     variant === "identity"
-      ? "Cabelo, testa e queixo dentro da área."
-      : "Mantenha a cabeça no topo e o corpo dentro do contorno.";
-  const subtitle = variant === "identity" ? "Foto de rosto" : "Foto de corpo";
+      ? "APROXIME-SE ATÉ APARECER O ROSTO, O CABELO E OS OMBROS"
+      : "APAREÇA DA CABEÇA ATÉ A CINTURA";
+  const subtitle = variant === "identity" ? "FOTO 1 DE 2" : "FOTO 2 DE 2";
+  const countingDown = count !== null && count > 0;
 
   return (
     <Screen>
       <Header subtitle={subtitle} />
 
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-2xl py-3 gap-3 sm:gap-4">
-        <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl text-white leading-[0.95] animate-fade-up">
-          {title}
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-3 gap-3 sm:gap-4">
+        <h1
+          className="font-display text-white animate-fade-up"
+          style={{
+            fontSize: "clamp(36px, 6vw, 96px)",
+            fontWeight: 900,
+            lineHeight: 1,
+            textAlign: "center",
+            maxWidth: "94vw",
+          }}
+        >
+          {countingDown ? "FIQUE PARADO" : title}
         </h1>
-        <p className="text-xs sm:text-sm text-white/70 max-w-md">{hint}</p>
+        {!countingDown ? (
+          <p
+            className="text-white/80"
+            style={{
+              fontSize: "clamp(18px, 2.4vw, 40px)",
+              fontWeight: 700,
+              lineHeight: 1.1,
+              textAlign: "center",
+              maxWidth: "92vw",
+            }}
+          >
+            {hint}
+          </p>
+        ) : null}
 
         <div className="relative w-full max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
           <video
@@ -1097,61 +1120,17 @@ function Camera({
             </div>
           ) : null}
 
-          {/* Adaptive SVG mask — pure overlay, never crops the captured file. */}
-          <svg
-            viewBox="0 0 100 125"
-            preserveAspectRatio="none"
-            className="pointer-events-none absolute inset-0 w-full h-full animate-pulse-soft"
-            aria-hidden
-          >
-            {variant === "identity" ? (
-              <>
-                {/* Head + shoulders oval, centered at ~36% of height */}
-                <ellipse
-                  cx="50"
-                  cy="45"
-                  rx="22"
-                  ry="30"
-                  fill="none"
-                  stroke="#F8BA32"
-                  strokeWidth="0.6"
-                  strokeDasharray="1.5 1.2"
-                />
-              </>
-            ) : (
-              <>
-                {/* Face oval at ~28% height */}
-                <ellipse
-                  cx="50"
-                  cy="35"
-                  rx="11"
-                  ry="14"
-                  fill="none"
-                  stroke="#F8BA32"
-                  strokeWidth="0.6"
-                  strokeDasharray="1.5 1.2"
-                />
-                {/* Shoulders + torso silhouette down to waist (~82% height) */}
-                <path
-                  d="M22 102 C 24 78, 32 60, 50 60 C 68 60, 76 78, 78 102"
-                  fill="none"
-                  stroke="#F8BA32"
-                  strokeWidth="0.6"
-                  strokeDasharray="1.5 1.2"
-                  strokeLinecap="round"
-                />
-              </>
-            )}
-          </svg>
-
-
-
-          {count !== null && count > 0 ? (
+          {countingDown ? (
             <div className="absolute inset-0 grid place-items-center bg-black/40 backdrop-blur-[1px]">
               <span
                 key={count}
-                className="font-display text-white text-[140px] sm:text-[170px] lg:text-[220px] leading-none animate-pop-in"
-                style={{ textShadow: "0 6px 30px rgba(0,0,0,0.6)" }}
+                className="font-display text-white animate-pop-in"
+                style={{
+                  fontSize: "clamp(120px, 16vw, 280px)",
+                  fontWeight: 900,
+                  lineHeight: 0.8,
+                  textShadow: "0 6px 30px rgba(0,0,0,0.6)",
+                }}
               >
                 {count}
               </span>
