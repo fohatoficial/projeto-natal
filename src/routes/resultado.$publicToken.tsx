@@ -2,7 +2,6 @@ import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { getPublicPipocaResult, type PublicResult } from "@/lib/pipoca/public-result.functions";
-import { requestPipocaPrint } from "@/lib/pipoca/print-queue.functions";
 
 const LOGO_URL =
   "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
@@ -29,22 +28,15 @@ type Status =
   | { kind: "imageUnavailable" }
   | { kind: "error"; message: string };
 
-type PrintState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "ok"; alreadyQueued: boolean }
-  | { kind: "error"; message: string };
-
 function PublicResultPage() {
   const { publicToken } = useParams({ from: "/resultado/$publicToken" });
   const normalizedPublicToken = publicToken.trim();
   const fetchPublic = useServerFn(getPublicPipocaResult);
-  const requestPrint = useServerFn(requestPipocaPrint);
   const [status, setStatus] = useState<Status>({ kind: "loading" });
-  const [print, setPrint] = useState<PrintState>({ kind: "idle" });
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
   const fetchedTokenRef = useRef<string | null>(null);
+
 
   // Release any kiosk scroll-lock that may be inherited and ensure mobile
   // scroll works on this public page. Restore prior styles on unmount.
