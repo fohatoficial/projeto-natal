@@ -49,7 +49,10 @@ const LOGO_URL =
 const LOADING_PHRASES = [
   "Preparando o cenário...",
   "Ajustando luz e atmosfera...",
+  "Posicionando a câmera...",
   "Colocando você no centro da cena...",
+  "Aplicando o figurino...",
+  "Revelando os detalhes...",
   "Finalizando sua imagem cinematográfica...",
 ];
 
@@ -1395,15 +1398,86 @@ function Processing({
     };
   }, [generationId, errored, pollFn, onDone, onError]);
 
+  const ICONS = [
+    // clapperboard
+    (
+      <svg key="clap" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9h18v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9Z" />
+        <path d="M3 9 5 4l4 1-2 5M9 5l4 1-2 5M13 6l4 1-2 5M17 7l4 1-2 5" />
+      </svg>
+    ),
+    // film reel
+    (
+      <svg key="reel" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="1.4" />
+        <circle cx="12" cy="5.5" r="1.4" />
+        <circle cx="12" cy="18.5" r="1.4" />
+        <circle cx="5.5" cy="12" r="1.4" />
+        <circle cx="18.5" cy="12" r="1.4" />
+      </svg>
+    ),
+    // camera
+    (
+      <svg key="cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 7h3l2-2h6l2 2h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z" />
+        <circle cx="12" cy="13" r="4" />
+      </svg>
+    ),
+    // spotlight / star
+    (
+      <svg key="star" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m12 3 2.6 5.5 6 .8-4.4 4.2 1.2 6L12 16.8 6.6 19.5l1.2-6L3.4 9.3l6-.8L12 3Z" />
+      </svg>
+    ),
+    // popcorn
+    (
+      <svg key="pop" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 9h12l-1.2 11.2a1 1 0 0 1-1 .8H8.2a1 1 0 0 1-1-.8L6 9Z" />
+        <path d="M6 9a2.5 2.5 0 0 1 .5-4.9A3 3 0 0 1 12 3.2 3 3 0 0 1 17.5 4 2.5 2.5 0 0 1 18 9" />
+        <path d="M10 12v7M14 12v7" />
+      </svg>
+    ),
+  ];
+  const iconIdx = phraseIdx % ICONS.length;
+
   return (
     <Screen aurora>
       <Header subtitle="Criando sua cena" />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center text-center gap-6 sm:gap-8 max-w-xl">
-        <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full border border-gold/20 grid place-items-center relative animate-badge-in">
-          <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-gold animate-spin [animation-duration:1.8s]" />
-          <div className="absolute inset-2 rounded-full border border-transparent border-t-brand-blue animate-spin [animation-duration:2.6s] [animation-direction:reverse]" />
-          <span className="font-display text-2xl sm:text-3xl lg:text-4xl text-gold">P&amp;C</span>
+        <div className="relative w-36 h-36 sm:w-44 sm:h-44 lg:w-52 lg:h-52 grid place-items-center">
+          {/* pulsing halos */}
+          <div className="absolute inset-0 rounded-full bg-gold/10 blur-2xl animate-pulse-soft" />
+          <div className="absolute inset-3 rounded-full border border-gold/20 animate-ping [animation-duration:2.4s]" />
+          {/* spinning rings */}
+          <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-gold border-r-gold/40 animate-spin [animation-duration:2.2s]" />
+          <div className="absolute inset-3 rounded-full border-2 border-transparent border-b-brand-blue border-l-brand-blue/40 animate-spin [animation-duration:3.2s] [animation-direction:reverse]" />
+          <div className="absolute inset-6 rounded-full border border-white/10" />
+
+          {/* orbiting dots */}
+          <div className="absolute inset-0 animate-spin [animation-duration:6s]">
+            <span className="absolute top-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-gold shadow-[0_0_10px_2px_rgba(212,168,83,0.7)]" />
+          </div>
+          <div className="absolute inset-2 animate-spin [animation-duration:8s] [animation-direction:reverse]">
+            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-brand-blue shadow-[0_0_8px_2px_rgba(59,130,246,0.6)]" />
+          </div>
+
+          {/* cycling icon */}
+          <div className="relative w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 text-gold">
+            {ICONS.map((icon, i) => (
+              <div
+                key={i}
+                className={`absolute inset-0 transition-all duration-700 ease-out ${
+                  i === iconIdx
+                    ? "opacity-100 scale-100 rotate-0"
+                    : "opacity-0 scale-75 -rotate-12"
+                }`}
+              >
+                {icon}
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -1419,8 +1493,8 @@ function Processing({
           {LOADING_PHRASES.map((p, i) => (
             <p
               key={p}
-              className={`absolute inset-0 text-sm sm:text-base tracking-wide text-gold transition-opacity duration-500 ${
-                i === phraseIdx ? "opacity-100" : "opacity-0"
+              className={`absolute inset-0 text-sm sm:text-base tracking-wide text-gold transition-all duration-500 ${
+                i === phraseIdx ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
               }`}
             >
               {p}
@@ -1429,7 +1503,7 @@ function Processing({
         </div>
 
         <div className="w-full max-w-xs h-1.5 rounded-full bg-white/10 overflow-hidden shimmer-bar">
-          <div className="h-full w-1/3 bg-gold rounded-full" />
+          <div className="h-full w-1/3 bg-gradient-to-r from-gold/40 via-gold to-gold/40 rounded-full" />
         </div>
       </div>
     </Screen>
