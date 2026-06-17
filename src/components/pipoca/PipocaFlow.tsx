@@ -1624,12 +1624,6 @@ function GuidedCamera({
     };
   }, []);
 
-  // Slow alternation of the "ready" hint, never during countdown / capture.
-  useEffect(() => {
-    if (uiState !== "ready") return;
-    const t = window.setInterval(() => setHintToggle((n) => n + 1), 4500);
-    return () => window.clearInterval(t);
-  }, [uiState]);
 
   const logUi = useCallback((tag: string) => {
     if (typeof window === "undefined") return;
