@@ -1440,11 +1440,33 @@ function Result({
   const [slide, setSlide] = useState(0);
   const [progress, setProgress] = useState(0);
 
+  const tokenReady = Boolean(
+    publicToken &&
+      publicToken !== "undefined" &&
+      publicToken !== "null" &&
+      resultPageUrl &&
+      /^https:\/\//i.test(resultPageUrl),
+  );
+
   useEffect(() => {
-    if (publicToken && resultPageUrl) {
-      console.log("[PIPOCA_QR] result page URL pronta", resultPageUrl);
-    }
-  }, [publicToken, resultPageUrl]);
+    if (typeof window === "undefined") return;
+    let hostname = "";
+    let pathname = "";
+    try {
+      if (resultPageUrl) {
+        const u = new URL(resultPageUrl);
+        hostname = u.hostname;
+        pathname = u.pathname;
+      }
+    } catch {/* noop */}
+    console.log("[PIPOCA_QR_DEBUG]", {
+      publicTokenAvailable: Boolean(publicToken),
+      resultUrl: resultPageUrl,
+      hostname,
+      pathname,
+      qrRendered: tokenReady && slide === 1,
+    });
+  }, [publicToken, resultPageUrl, tokenReady, slide]);
 
   // Auto-advance slide 0 -> slide 1 over 10s with progress bar
   useEffect(() => {
