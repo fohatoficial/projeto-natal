@@ -1687,36 +1687,106 @@ function ConfirmThumb({
   );
 }
 
-/* ---------- Identity camera (face detection + auto-capture, no fixed mask) ---------- */
+/* ---------- Guided camera (manual capture: button + 3-2-1 countdown) ---------- */
 
-const IDENTITY_COUNTDOWN = 3;
-const IDENTITY_FALLBACK_HINT_MS = 6000;
+type CaptureUiState = "ready" | "counting" | "captured" | "error";
 
 function GuidedCamera({
   mode,
-  onCaptured,
+  onConfirm,
   onBack,
 }: {
   mode: GuideMode;
-  onCaptured: (p: { blob: Blob; url: string }) => void;
+  onConfirm: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
 }) {
   const { videoRef, ready, errorKind, retry } = useCamera(true);
   const [captured, setCaptured] = useState<{ blob: Blob; url: string } | null>(null);
-  const { detectorReady, detectorError, guide } = useFaceGuide({
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [uiState, setUiState] = useState<CaptureUiState>("ready");
+  const [flashKey, setFlashKey] = useState(0);
+  const [hintToggle, setHintToggle] = useState(0);
+  const { guide } = useFaceGuide({
     videoRef,
     enabled: ready && !captured,
     mode,
   });
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const [captureLocked, setCaptureLocked] = useState(false);
-  const [showFallback, setShowFallback] = useState(false);
-  const [flashKey, setFlashKey] = useState(0);
   const captureRef = useRef(false);
-  const handoffRef = useRef(false);
-  const stableMs = getStableMs(mode);
+  const confirmRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
+  const loggedMountRef = useRef(false);
+  const hintRef = useRef<HTMLParagraphElement | null>(null);
+  const countdownRef = useRef<HTMLSpanElement | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
 
-  // 4:5 center-crop capture (vertical), preserving max video resolution.
+  const clearTimer = () => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  // Cleanup all timers + revoke blob URL on unmount.
+  useEffect(() => {
+    return () => {
+      clearTimer();
+    };
+  }, []);
+
+  // Slow alternation of the "ready" hint, never during countdown / capture.
+  useEffect(() => {
+    if (uiState !== "ready") return;
+    const t = window.setInterval(() => setHintToggle((n) => n + 1), 4500);
+    return () => window.clearInterval(t);
+  }, [uiState]);
+
+  const logUi = useCallback((tag: string) => {
+    if (typeof window === "undefined") return;
+    const hintEl = hintRef.current;
+    const cdEl = countdownRef.current;
+    const frEl = frameRef.current;
+    const hintRect = hintEl?.getBoundingClientRect();
+    const cdRect = cdEl?.getBoundingClientRect();
+    const frRect = frEl?.getBoundingClientRect();
+    const rect = (r?: DOMRect) =>
+      r
+        ? { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }
+        : null;
+    console.log("[PIPOCA_CAMERA_UI]", {
+      tag,
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      visualViewportWidth: Math.round(window.visualViewport?.width ?? 0),
+      visualViewportHeight: Math.round(window.visualViewport?.height ?? 0),
+      hintFontSize: hintEl ? getComputedStyle(hintEl).fontSize : null,
+      countdownFontSize: cdEl ? getComputedStyle(cdEl).fontSize : null,
+      hintRect: rect(hintRect),
+      countdownRect: rect(cdRect),
+      frameRect: rect(frRect),
+      gapBetweenHintAndFrame:
+        hintRect && frRect ? Math.round(frRect.top - hintRect.bottom) : null,
+    });
+  }, []);
+
+  // Log once after the layout settles, and again on resize.
+  useEffect(() => {
+    if (!ready || loggedMountRef.current) return;
+    loggedMountRef.current = true;
+    const t = window.setTimeout(() => logUi("mount"), 80);
+    let resizeT: number | null = null;
+    const onResize = () => {
+      if (resizeT !== null) window.clearTimeout(resizeT);
+      resizeT = window.setTimeout(() => logUi("resize"), 200);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.clearTimeout(t);
+      if (resizeT !== null) window.clearTimeout(resizeT);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [ready, logUi]);
+
+  // 4:5 center-crop at native resolution.
   const capture4x5 = useCallback(async (): Promise<{ blob: Blob; url: string } | null> => {
     const v = videoRef.current;
     if (!v || !v.videoWidth || !v.videoHeight) return null;
@@ -1752,100 +1822,103 @@ function GuidedCamera({
       outputHeight: cropH,
     });
     return { blob, url };
-  }, [videoRef]);
+  }, [videoRef, mode]);
 
-  // Freeze + hand off to parent shortly after.
   const performCapture = useCallback(async () => {
     if (captureRef.current) return;
     captureRef.current = true;
-    setCaptureLocked(true);
     const result = await capture4x5();
     if (!result) {
       captureRef.current = false;
-      setCaptureLocked(false);
       setCountdown(null);
+      setUiState("error");
       return;
     }
     setFlashKey((k) => k + 1);
     setCaptured(result);
     setCountdown(null);
+    setUiState("captured");
   }, [capture4x5]);
 
-  // After freeze, hand off to the parent so it can advance.
-  useEffect(() => {
-    if (!captured || handoffRef.current) return;
-    handoffRef.current = true;
-    const t = window.setTimeout(() => onCaptured(captured), 750);
-    return () => window.clearTimeout(t);
-  }, [captured, onCaptured]);
+  const startCountdown = useCallback(() => {
+    if (uiState !== "ready" || !ready || captureRef.current) return;
+    setUiState("counting");
+    setCountdown(3);
+    logUi("countdown_start");
+    const schedule = (next: number) => {
+      clearTimer();
+      if (next < 0) {
+        timerRef.current = window.setTimeout(() => {
+          void performCapture();
+        }, 850);
+        return;
+      }
+      timerRef.current = window.setTimeout(() => {
+        setCountdown(next);
+        schedule(next - 1);
+      }, 1000);
+    };
+    schedule(2);
+  }, [uiState, ready, logUi, performCapture]);
 
-  // Surface manual fallback if the detector never comes up within ~6s.
-  useEffect(() => {
-    if (captured) return;
-    if (detectorReady || detectorError) {
-      if (detectorError) setShowFallback(true);
-      return;
-    }
-    const t = window.setTimeout(() => setShowFallback(true), IDENTITY_FALLBACK_HINT_MS);
-    return () => window.clearTimeout(t);
-  }, [detectorReady, detectorError, captured]);
+  const handleRetake = useCallback(() => {
+    clearTimer();
+    captureRef.current = false;
+    confirmRef.current = false;
+    if (captured) URL.revokeObjectURL(captured.url);
+    setCaptured(null);
+    setCountdown(null);
+    setUiState("ready");
+  }, [captured]);
 
-  // Start countdown when stability threshold is met.
-  useEffect(() => {
-    if (captured || captureLocked) return;
-    if (guide.status === "ok" && guide.stableMs >= stableMs) {
-      if (countdown === null) setCountdown(IDENTITY_COUNTDOWN);
-    } else if (countdown !== null) {
-      setCountdown(null);
-    }
-  }, [guide.status, guide.stableMs, captureLocked, captured, countdown, stableMs]);
-
-  // Tick countdown and capture at 0.
-  useEffect(() => {
-    if (countdown === null || captured) return;
-    if (countdown === 0) {
-      void performCapture();
-      return;
-    }
-    const t = window.setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
-    return () => window.clearTimeout(t);
-  }, [countdown, captured, performCapture]);
-
-  const manualCapture = useCallback(() => {
-    if (!ready || captured) return;
-    void performCapture();
-  }, [performCapture, ready, captured]);
+  const handleUse = useCallback(() => {
+    if (!captured || confirmRef.current) return;
+    confirmRef.current = true;
+    onConfirm(captured);
+  }, [captured, onConfirm]);
 
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
-  const showCountdown = !captured && countdown !== null && countdown > 0;
-  const baseHint: string = !ready
-    ? "ABRINDO A CÂMERA"
-    : !detectorReady && !detectorError
-      ? "PREPARANDO O ENQUADRAMENTO"
-      : getGuideHint(guide.status, mode);
-  const hint = captured ? "FOTO CAPTURADA!" : baseHint;
-  const hintClass = captured
-    ? "pipoca-camera-hint pipoca-camera-hint--success"
-    : `pipoca-camera-hint ${guide.status === "ok" ? "pipoca-camera-hint--ok" : ""}`;
+  let hint = "ABRINDO A CÂMERA";
+  if (uiState === "captured") {
+    hint = "FOTO CAPTURADA";
+  } else if (uiState === "counting") {
+    hint = "FIQUE PARADO";
+  } else if (uiState === "error") {
+    hint = "TENTE NOVAMENTE";
+  } else if (ready) {
+    hint =
+      hintToggle % 2 === 0
+        ? "APAREÇA DA CABEÇA ATÉ A CINTURA"
+        : "FIQUE DE FRENTE PARA A CÂMERA";
+  }
+  const hintClass = `pipoca-camera-hint ${
+    uiState === "captured"
+      ? "pipoca-camera-hint--success"
+      : guide.status === "ok"
+        ? "pipoca-camera-hint--ok"
+        : ""
+  }`;
+  const showCountdown = uiState === "counting" && countdown !== null && countdown > 0;
 
   return (
     <div
       className="pipoca-camera-screen bg-cinema relative"
       data-pipoca-camera={mode}
-      data-pipoca-state={captured ? "captured" : countdown !== null ? "counting" : "guiding"}
+      data-pipoca-state={uiState}
     >
-      {/* Middle — preview with hint/countdown sitting right above it. */}
       <div className="pipoca-camera-preview-wrap">
         <div className="pipoca-camera-top">
           {showCountdown ? (
-            <span key={countdown} className="pipoca-camera-countdown">
+            <span key={countdown} ref={countdownRef} className="pipoca-camera-countdown">
               {countdown}
             </span>
           ) : null}
-          <p className={hintClass}>{hint}</p>
+          <p ref={hintRef} className={hintClass}>
+            {hint}
+          </p>
         </div>
-        <div className="pipoca-camera-frame">
+        <div ref={frameRef} className="pipoca-camera-frame">
           {captured ? (
             <img src={captured.url} alt="" style={{ transform: "scaleX(-1)" }} />
           ) : (
@@ -1862,11 +1935,9 @@ function GuidedCamera({
                   Iniciando câmera…
                 </div>
               ) : null}
-              <FaceScanOverlay
-                guide={guide}
-                videoRef={videoRef}
-                discreet={mode === "appearance"}
-              />
+              {uiState !== "counting" ? (
+                <FaceScanOverlay guide={guide} videoRef={videoRef} discreet />
+              ) : null}
             </>
           )}
           {flashKey > 0 ? (
@@ -1875,19 +1946,46 @@ function GuidedCamera({
         </div>
       </div>
 
-
-      {/* Bottom — fallback / back only. */}
       <div className="pipoca-camera-footer">
-        {!captured && (showFallback || detectorError) && ready ? (
-          <PrimaryCta onClick={manualCapture} disabled={captureLocked}>
-            Tirar foto manualmente
-          </PrimaryCta>
+        {uiState === "ready" || uiState === "error" ? (
+          <>
+            <button
+              type="button"
+              onClick={startCountdown}
+              disabled={!ready}
+              className="pipoca-cta-primary"
+              style={{ touchAction: "manipulation" }}
+            >
+              TIRAR FOTO
+            </button>
+            <GhostBtn onClick={onBack}>Voltar</GhostBtn>
+          </>
         ) : null}
-        {!captured ? <GhostBtn onClick={onBack}>Voltar</GhostBtn> : null}
+        {uiState === "captured" ? (
+          <>
+            <button
+              type="button"
+              onClick={handleUse}
+              className="pipoca-cta-primary"
+              style={{ touchAction: "manipulation" }}
+            >
+              USAR ESTA FOTO
+            </button>
+            <button
+              type="button"
+              onClick={handleRetake}
+              className="pipoca-cta-secondary"
+              style={{ touchAction: "manipulation" }}
+            >
+              TIRAR NOVAMENTE
+            </button>
+          </>
+        ) : null}
       </div>
     </div>
   );
 }
+
 
 /**
  * Overlay frame that follows the detected face. Accounts for object-fit: cover
