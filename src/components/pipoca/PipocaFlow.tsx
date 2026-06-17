@@ -1087,20 +1087,29 @@ function Camera({
             maxWidth: "94vw",
           }}
         >
-          {countingDown ? "FIQUE PARADO" : title}
+          {title}
         </h1>
-        {!countingDown ? (
+        <p
+          className="text-white/80"
+          style={{
+            fontSize: "clamp(18px, 2.4vw, 40px)",
+            fontWeight: 700,
+            lineHeight: 1.15,
+            textAlign: "center",
+            maxWidth: "92vw",
+          }}
+        >
+          {hint}
+        </p>
+        {countingDown ? (
           <p
-            className="text-white/80"
+            className="text-gold font-display animate-pulse-soft"
             style={{
-              fontSize: "clamp(18px, 2.4vw, 40px)",
-              fontWeight: 700,
-              lineHeight: 1.1,
-              textAlign: "center",
-              maxWidth: "92vw",
+              fontSize: "clamp(16px, 2vw, 28px)",
+              letterSpacing: "0.2em",
             }}
           >
-            {hint}
+            FIQUE PARADO
           </p>
         ) : null}
 
