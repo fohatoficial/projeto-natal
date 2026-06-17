@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { mapFilmRow, type Movie } from "@/lib/pipoca/movies";
+import { FALLBACK_MOVIES, mapFilmRow, type Movie } from "@/lib/pipoca/movies";
 
 type State = {
   films: Movie[];
@@ -10,15 +10,16 @@ type State = {
 
 export function usePipocaFilms(): State {
   const [state, setState] = useState<State>({
-    films: [],
+    films: FALLBACK_MOVIES,
     loading: true,
     error: null,
   });
 
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: number | undefined;
 
-    (async () => {
+    const loadFilms = async (attempt = 0) => {
       const { data, error } = await supabase
         .from("pipoca_films")
         .select(
@@ -32,23 +33,29 @@ export function usePipocaFilms(): State {
       if (error) {
         // eslint-disable-next-line no-console
         console.error("[pipoca_films] erro ao carregar:", error);
+        if (attempt < 3) {
+          retryTimer = window.setTimeout(() => void loadFilms(attempt + 1), 1500 * (attempt + 1));
+        }
         setState({
-          films: [],
+          films: FALLBACK_MOVIES,
           loading: false,
-          error: "Não foi possível carregar os filmes. Tente novamente.",
+          error: null,
         });
         return;
       }
 
       setState({
-        films: (data ?? []).map(mapFilmRow),
+        films: data && data.length > 0 ? data.map(mapFilmRow) : FALLBACK_MOVIES,
         loading: false,
         error: null,
       });
-    })();
+    };
+
+    void loadFilms();
 
     return () => {
       cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
     };
   }, []);
 
