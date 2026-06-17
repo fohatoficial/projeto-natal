@@ -12,11 +12,9 @@ const SIGNED_REF_TTL = 60 * 30;
 // window.location.origin. Result QR code MUST always point here.
 const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/, "");
 
-// Single medium-shot file. Used as BOTH identity and appearance until the
-// generation pipeline is revised.
-// Temporary single-photo compatibility mapping. Identity and appearance use
-// the same medium-shot image until generation pipeline revision.
-const MEDIUM_NAME = "visitor-medium.jpg";
+// Two distinct visitor photos written by the totem capture flow.
+const IDENTITY_NAME = "identity-close.jpg";
+const APPEARANCE_NAME = "appearance-medium.jpg";
 
 const ENABLE_HAT_REFERENCE = true;
 
@@ -437,9 +435,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       throw new Error("Sessão sem filme/scene pack");
     }
 
-    // Server-derived paths only.
-    // Single medium-shot file — used as identity AND appearance below.
-    const mediumPath = `${session.id}/${capture.id}/${MEDIUM_NAME}`;
+    // Server-derived paths only — two distinct visitor photos.
+    const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
+    const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;
 
     // Multiple active scene packs: honour session pick if usable, otherwise
     // randomly pick among the active packs for the film.
@@ -488,15 +486,22 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       .eq("capture_id", capture.id);
     const attemptNumber = (priorCount ?? 0) + 1;
 
-    // Single signed URL for the medium-shot photo. Reused as identity AND
-    // appearance below (temporary single-photo compatibility mapping).
-    const { data: signedMedium, error: signMedErr } = await supabaseAdmin.storage
-      .from(ORIGINALS_BUCKET)
-      .createSignedUrl(mediumPath, SIGNED_REF_TTL);
-    if (signMedErr || !signedMedium?.signedUrl) {
-      throw new Error("Falha ao gerar URL da foto");
+    // Two distinct signed URLs — identity (close) and appearance (medium).
+    const [
+      { data: signedIdentity, error: signIdErr },
+      { data: signedAppearance, error: signApErr },
+    ] = await Promise.all([
+      supabaseAdmin.storage.from(ORIGINALS_BUCKET).createSignedUrl(identityPath, SIGNED_REF_TTL),
+      supabaseAdmin.storage.from(ORIGINALS_BUCKET).createSignedUrl(appearancePath, SIGNED_REF_TTL),
+    ]);
+    if (signIdErr || !signedIdentity?.signedUrl) {
+      throw new Error("Falha ao gerar URL da foto de identidade");
     }
-    const signedMediumUrl = signedMedium.signedUrl;
+    if (signApErr || !signedAppearance?.signedUrl) {
+      throw new Error("Falha ao gerar URL da foto de aparência");
+    }
+    const identityUrl = signedIdentity.signedUrl;
+    const appearanceUrl = signedAppearance.signedUrl;
 
     
     const hatReferenceUrl = ENABLE_HAT_REFERENCE ? FIXED_HAT_REFERENCE_URL : null;
