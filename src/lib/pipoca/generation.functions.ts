@@ -15,16 +15,10 @@ const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/,
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
 
-const ENABLE_HAT_REFERENCE = false;
+const ENABLE_HAT_REFERENCE = true;
 
 const FIXED_HAT_REFERENCE_URL =
   "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-em-uso-v2.jpg";
-
-const FIXED_HAT_REFERENCE_FRONT_URL =
-  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-frente-v3.png";
-
-const FIXED_HAT_REFERENCE_SIDE_URL =
-  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/props/deus-e-o-diabo-na-terra-do-sol/chapeu-cangaceiro-lado-v3.png.png";
 
 
 function isUuid(value: unknown): value is string {
