@@ -439,8 +439,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     try {
       prediction = await createReplicatePrediction({
         prompt: promptText,
-        identityUrl: signedIdentity.signedUrl,
-        appearanceUrl: signedAppearance.signedUrl,
+        // Single medium-shot URL used for both roles. Temporary mapping.
+        identityUrl: signedMediumUrl,
+        appearanceUrl: signedMediumUrl,
         sceneImageUrl: scenePack.reference_image_url,
         hatReferenceUrl,
       });
