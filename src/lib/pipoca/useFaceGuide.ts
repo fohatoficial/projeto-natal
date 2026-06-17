@@ -145,6 +145,7 @@ export function useFaceGuide(opts: {
   });
   const detectorRef = useRef<DetectorAny | null>(null);
   const lastOkSinceRef = useRef<number | null>(null);
+  const ambiguousSinceRef = useRef<number | null>(null);
   const readyLoggedRef = useRef(false);
 
   useEffect(() => {
