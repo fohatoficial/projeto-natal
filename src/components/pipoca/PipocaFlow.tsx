@@ -49,7 +49,10 @@ const LOGO_URL =
 const LOADING_PHRASES = [
   "Preparando o cenário...",
   "Ajustando luz e atmosfera...",
+  "Posicionando a câmera...",
   "Colocando você no centro da cena...",
+  "Aplicando o figurino...",
+  "Revelando os detalhes...",
   "Finalizando sua imagem cinematográfica...",
 ];
 
