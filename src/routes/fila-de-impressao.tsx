@@ -300,7 +300,8 @@ function QueueRow({
     [item.requestedAt],
   );
   return (
-    <div className="border border-white/15 rounded-xl p-3 flex gap-3 items-start bg-white/[0.02]">
+    <div className="pipoca-print-queue-card border border-white/15 rounded-xl p-3 bg-white/[0.02]">
+      <div className="flex gap-3 items-start">
       <div className="w-16 h-20 rounded-md overflow-hidden bg-black/60 shrink-0">
         {item.thumbnailUrl ? (
           <img src={item.thumbnailUrl} alt="" className="w-full h-full object-cover" />
