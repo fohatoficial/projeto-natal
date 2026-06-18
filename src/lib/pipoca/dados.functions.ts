@@ -243,47 +243,27 @@ export const getDadosSummary = createServerFn({ method: "POST" })
       p_search: search,
     } as const;
 
-    // Disparar tudo em paralelo: summary, page, options, capitais usadas.
-    const [
-      summaryRes,
-      pageRes,
-      { data: capsAll },
-      { data: filmsAll },
-      { data: capUsage },
-    ] = await Promise.all([
-      supabaseAdmin.rpc("pipoca_dados_summary", {
-        ...rpcArgs,
-        p_today_start: today.startISO,
-        p_today_end: today.endISO,
-      }),
-      supabaseAdmin.rpc("pipoca_dados_page", {
-        ...rpcArgs,
-        p_offset: offset,
-        p_limit: PAGE_SIZE,
-      }),
-      supabaseAdmin
-        .from("pipoca_capitals")
-        .select("id, name, is_system, selectable, active, display_order")
-        .order("is_system", { ascending: true })
-        .order("display_order", { ascending: true })
-        .order("name", { ascending: true }),
-      supabaseAdmin.from("pipoca_films").select("id, title").order("title", { ascending: true }),
-      // Quais capitais aparecem em alguma captura? distinct via group-by emulado:
-      // basta listar capital_id de uma captura por capital. Limit alto e dedup no app
-      // ainda é pequeno (≤ ~10 capitais no projeto), mas evitamos varrer a tabela inteira:
-      supabaseAdmin
-        .from("pipoca_capitals")
-        .select("id")
-        .in(
-          "id",
-          // ids distintos extraídos via uma RPC simples seria melhor; aqui usamos
-          // o sumário per_capital para descobrir quais aparecem no histórico geral.
-          // Como fallback, deixamos a lista vazia e marcamos hasRecords no UI a partir
-          // de per_capital quando filtro está vazio. Para precisão sem custo,
-          // contamos via head=count em pipoca_captures.capital_id (uma única query).
-          [],
-        ),
-    ]);
+    // Disparar em paralelo: summary, page, opções (capitais + filmes).
+    const [summaryRes, pageRes, { data: capsAll }, { data: filmsAll }] =
+      await Promise.all([
+        supabaseAdmin.rpc("pipoca_dados_summary", {
+          ...rpcArgs,
+          p_today_start: today.startISO,
+          p_today_end: today.endISO,
+        }),
+        supabaseAdmin.rpc("pipoca_dados_page", {
+          ...rpcArgs,
+          p_offset: offset,
+          p_limit: PAGE_SIZE,
+        }),
+        supabaseAdmin
+          .from("pipoca_capitals")
+          .select("id, name, is_system, selectable, active, display_order")
+          .order("is_system", { ascending: true })
+          .order("display_order", { ascending: true })
+          .order("name", { ascending: true }),
+        supabaseAdmin.from("pipoca_films").select("id, title").order("title", { ascending: true }),
+      ]);
 
     if (summaryRes.error) {
       console.warn(LOG, "summary rpc fail", { code: summaryRes.error.code });
@@ -299,22 +279,23 @@ export const getDadosSummary = createServerFn({ method: "POST" })
       per_capital: Array<Record<string, any>>;
     };
     const pageRows = (pageRes.data ?? []) as Array<Record<string, any>>;
-    void capUsage; // não usado (mantido por simetria; hasRecords resolvido abaixo)
 
-    // Capitais que possuem registros — uma única consulta agregada.
-    // (Pequeno, irrelevante para escala.)
-    const { data: capitalIdsWithRecords } = await supabaseAdmin
-      .from("pipoca_capitals")
-      .select("id, captures:pipoca_captures!pipoca_captures_capital_id_fkey(id)", {
-        head: false,
-      })
-      .limit(1000);
-
-    const hasRecordsSet = new Set<string>();
-    for (const c of capitalIdsWithRecords ?? []) {
-      const arr = (c as any).captures as Array<any> | undefined;
-      if (arr && arr.length > 0) hasRecordsSet.add((c as any).id as string);
-    }
+    // hasRecords: para cada capital (lista curta, ≤ ~10), uma head-count em
+    // pipoca_captures com LIMIT 1. Nenhuma chamada cresce com a base.
+    const capitalsList = (capsAll ?? []) as Array<{ id: string }>;
+    const hasRecordsChecks = await Promise.all(
+      capitalsList.map(async (c) => {
+        const { count } = await supabaseAdmin
+          .from("pipoca_captures")
+          .select("id", { count: "exact", head: true })
+          .eq("capital_id", c.id)
+          .limit(1);
+        return [c.id, (count ?? 0) > 0] as const;
+      }),
+    );
+    const hasRecordsSet = new Set(
+      hasRecordsChecks.filter(([, has]) => has).map(([id]) => id),
+    );
 
     const capitalsOpt: CapitalOption[] = (capsAll ?? []).map((c: any) => ({
       id: c.id as string,
