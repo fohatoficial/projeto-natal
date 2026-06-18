@@ -16,6 +16,8 @@ export const listActiveCapitals = createServerFn({ method: "GET" }).handler(
       .from("pipoca_capitals")
       .select("id, name, uf, slug, display_order")
       .eq("active", true)
+      .eq("selectable", true)
+      .eq("is_system", false)
       .order("display_order", { ascending: true })
       .order("name", { ascending: true });
     if (error) throw new Error("Falha ao carregar capitais");
