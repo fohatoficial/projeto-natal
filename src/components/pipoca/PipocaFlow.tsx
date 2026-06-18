@@ -706,18 +706,80 @@ function Choose({
     if (page !== safePage) setPage(safePage);
   }, [page, safePage]);
 
+  // ---- Adaptive film grid (measure real available area) ----
+  const BANNER_ASPECT = 16 / 9;
+  const gridWrapRef = useRef<HTMLDivElement | null>(null);
+  const [gridBox, setGridBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = gridWrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      for (const e of entries) {
+        const cr = e.contentRect;
+        setGridBox({ w: cr.width, h: cr.height });
+      }
+    });
+    ro.observe(el);
+    const onChange = () => {
+      const r = el.getBoundingClientRect();
+      setGridBox({ w: r.width, h: r.height });
+    };
+    window.addEventListener("orientationchange", onChange);
+    window.addEventListener("fullscreenchange", onChange);
+    if (document.fonts?.ready) document.fonts.ready.then(onChange).catch(() => {});
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("orientationchange", onChange);
+      window.removeEventListener("fullscreenchange", onChange);
+    };
+  }, []);
+
+  const layout = useMemo(() => {
+    const count = Math.max(1, visibleCount);
+    let cols = 2;
+    let rows = 2;
+    if (count === 1) { cols = 1; rows = 1; }
+    else if (count === 2) { cols = 2; rows = 1; }
+    else { cols = 2; rows = 2; } // 3 or 4: 2x2 grid (3rd item spans row 2)
+
+    // Fallback dims until first measurement returns.
+    const w = gridBox.w > 0 ? gridBox.w : 600;
+    const h = gridBox.h > 0 ? gridBox.h : 420;
+
+    // Progressive gap: shrink first when space is tight.
+    const gap = Math.max(6, Math.min(24, Math.floor(Math.min(w, h) * 0.025)));
+
+    const cardW_byW = (w - gap * (cols - 1)) / cols;
+    const cardH_byH = (h - gap * (rows - 1)) / rows;
+    const cardW_byH = cardH_byH * BANNER_ASPECT;
+    const cardW = Math.max(120, Math.floor(Math.min(cardW_byW, cardW_byH)));
+    const cardH = Math.max(70, Math.floor(cardW / BANNER_ASPECT));
+
+    return { cols, rows, cardW, cardH, gap };
+  }, [gridBox.w, gridBox.h, visibleCount]);
+
   // Temporary diagnostic log — no PII.
   useEffect(() => {
-    console.log("[PIPOCA_FILMS_RENDER]", {
-      films_count: movies.length,
-      active_films_count: activeFilms.length,
-      current_page: page,
-      safe_page: safePage,
-      total_pages: totalPages,
+    if (typeof window === "undefined") return;
+    console.log("[PIPOCA_ADAPTIVE_FILM_GRID]", {
+      viewport_width: window.innerWidth,
+      viewport_height: window.innerHeight,
+      available_width: Math.round(gridBox.w),
+      available_height: Math.round(gridBox.h),
       visible_films_count: visibleCount,
-      visible_film_slugs: visibleFilms.map((f) => f.slug),
+      columns: layout.cols,
+      rows: layout.rows,
+      calculated_card_width: layout.cardW,
+      calculated_card_height: layout.cardH,
+      gap: layout.gap,
+      banner_aspect_ratio: BANNER_ASPECT,
+      has_vertical_overflow:
+        document.documentElement.scrollHeight > document.documentElement.clientHeight,
+      has_horizontal_overflow:
+        document.documentElement.scrollWidth > document.documentElement.clientWidth,
     });
-  }, [movies.length, activeFilms.length, page, safePage, totalPages, visibleCount, visibleFilms]);
+  }, [gridBox.w, gridBox.h, visibleCount, layout]);
 
   return (
     <Screen aurora className="pipoca-film-choose-screen">
@@ -749,7 +811,7 @@ function Choose({
         </div>
 
         {/* Grid */}
-        <div className="pipoca-film-grid-wrap mt-4 sm:mt-5 lg:mt-6">
+        <div ref={gridWrapRef} className="pipoca-film-grid-wrap mt-4 sm:mt-5 lg:mt-6">
           {loading ? (
             <p className="text-base text-white/70 tracking-wide animate-pulse-soft">
               Carregando filmes…
@@ -759,20 +821,41 @@ function Choose({
           ) : activeFilms.length === 0 ? (
             <p className="text-base text-white/70">Nenhum filme disponível.</p>
           ) : (
-            <div className="pipoca-film-grid" data-count={visibleCount}>
-              {visibleFilms.map((m, i) => (
-                <div
-                  key={m.id}
-                  className="pipoca-film-card animate-slide-in"
-                  style={{ animationDelay: `${i * 70}ms` }}
-                >
-                  <PosterCard movie={m} onPick={onPick} />
-                </div>
-              ))}
+            <div
+              className="pipoca-film-grid"
+              data-count={visibleCount}
+              style={{
+                gridTemplateColumns: `repeat(${layout.cols}, ${layout.cardW}px)`,
+                gap: `${layout.gap}px`,
+              }}
+            >
+              {visibleFilms.map((m, i) => {
+                const isThirdOfThree = visibleCount === 3 && i === 2;
+                return (
+                  <div
+                    key={m.id}
+                    className="pipoca-film-card animate-slide-in"
+                    style={{
+                      width: layout.cardW,
+                      animationDelay: `${i * 70}ms`,
+                      ...(isThirdOfThree
+                        ? { gridColumn: "1 / -1", justifySelf: "center" }
+                        : null),
+                    }}
+                  >
+                    <PosterCard
+                      movie={m}
+                      onPick={onPick}
+                      cardHeight={layout.cardH}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       </div>
+
 
       {/* FOOTER pagination */}
       <div className="relative z-10 shrink-0 h-12 flex items-center justify-center gap-4">
@@ -829,16 +912,21 @@ function MarqueeBadge({ color, text }: { color: string; text: string }) {
 function PosterCard({
   movie,
   onPick,
+  cardHeight,
 }: {
   movie: Movie;
   onPick: (m: Movie) => void;
+  cardHeight?: number;
 }) {
   return (
     <button
       onClick={() => onPick(movie)}
       className="bg-card text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl group border border-white/10 pipoca-film-card-btn"
     >
-      <div className="pipoca-film-cover-wrap">
+      <div
+        className="pipoca-film-cover-wrap"
+        style={cardHeight ? { height: cardHeight, aspectRatio: "auto" } : undefined}
+      >
         <img
           src={movie.posterUrl}
           alt={movie.title}

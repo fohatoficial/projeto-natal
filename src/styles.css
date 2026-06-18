@@ -98,8 +98,8 @@
   .text-brand-blue { color: #2E5BE5; }
   .bg-brand-blue { background-color: #2E5BE5; }
 
-  /* ---------- Pipoca film selection (shared by tablet + totem) ---------- */
-  .pipoca-film-choose-screen { display: flex; flex-direction: column; width: 100%; }
+  /* ---------- Pipoca film selection (adaptive — sized by JS via ResizeObserver) ---------- */
+  .pipoca-film-choose-screen { display: flex; flex-direction: column; width: 100%; overflow: hidden; }
 
   .pipoca-film-grid-wrap {
     flex: 1 1 auto;
@@ -108,39 +108,22 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    padding: 12px 0;
+    padding: 8px 0;
     overflow: hidden;
   }
 
   .pipoca-film-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-auto-rows: max-content;
-    gap: clamp(14px, 2vw, 24px);
-    width: min(94vw, 900px);
-    margin: 0 auto;
-    align-items: start;
+    justify-content: center;
+    align-content: center;
     justify-items: center;
-    flex-shrink: 0;
-  }
-  .pipoca-film-grid[data-count="1"] {
-    grid-template-columns: minmax(0, 1fr);
-    width: min(94vw, 460px);
-  }
-  .pipoca-film-grid[data-count="1"] .pipoca-film-card,
-  .pipoca-film-grid[data-count="3"] .pipoca-film-card:nth-child(3) {
-    grid-column: 1 / -1;
-    justify-self: center;
-    width: min(100%, 430px);
+    align-items: center;
+    margin: 0 auto;
   }
   .pipoca-film-card {
     position: relative;
     display: block;
-    width: 100%;
-    max-width: 430px;
-    height: auto !important;
-    min-height: 0;
-    margin: 0 auto;
+    margin: 0;
     padding: 0;
     flex: none;
   }
@@ -156,14 +139,8 @@
     position: relative;
     display: block;
     width: 100%;
-    aspect-ratio: 16 / 9;
-    height: auto !important;
-    min-height: 110px;
     overflow: hidden;
     border-radius: inherit;
-  }
-  @media (min-width: 700px) {
-    .pipoca-film-cover-wrap { min-height: 150px; }
   }
   .pipoca-film-cover {
     position: absolute;
