@@ -31,7 +31,7 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
 
     const { data: gen, error: gErr } = await supabaseAdmin
       .from("pipoca_generations")
-      .select("id, session_id, final_image_path, public_token, status")
+      .select("id, session_id, capture_id, capital_id, final_image_path, public_token, status")
       .eq("public_token", data.publicToken)
       .eq("status", "completed")
       .maybeSingle();
@@ -76,6 +76,36 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
     }
     console.log(`${LOG} visitante localizado`);
 
+    // Resolve + validate capital. generation/capture/print must agree.
+    let captureCapitalId: string | null = null;
+    if (gen.capture_id) {
+      const { data: cap } = await supabaseAdmin
+        .from("pipoca_captures")
+        .select("capital_id")
+        .eq("id", gen.capture_id)
+        .maybeSingle();
+      captureCapitalId = (cap?.capital_id as string | null) ?? null;
+    }
+    const genCapitalId = (gen.capital_id as string | null) ?? null;
+    if (genCapitalId && captureCapitalId && genCapitalId !== captureCapitalId) {
+      console.warn("[PIPOCA_PRINT_CAPITAL]", "PRINT_CAPITAL_MISMATCH", {
+        generation_id: gen.id,
+        generation_capital_id: genCapitalId,
+        capture_capital_id: captureCapitalId,
+      });
+      throw new Error("PRINT_CAPITAL_MISMATCH");
+    }
+    let resolvedCapitalId = genCapitalId ?? captureCapitalId;
+    if (!resolvedCapitalId) {
+      const { data: unknown } = await supabaseAdmin
+        .from("pipoca_capitals")
+        .select("id")
+        .eq("slug", "capital-desconhecida")
+        .maybeSingle();
+      resolvedCapitalId = (unknown?.id as string | null) ?? null;
+    }
+    if (!resolvedCapitalId) throw new Error("Capital indisponível");
+
     // Existing active request?
     const { data: existing } = await supabaseAdmin
       .from("pipoca_print_queue")
@@ -99,6 +129,7 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
         visitor_id: visitor.id,
         generation_id: gen.id,
         status: "pending",
+        capital_id: resolvedCapitalId,
       })
       .select("id, status")
       .single();
