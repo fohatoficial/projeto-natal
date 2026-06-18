@@ -276,7 +276,7 @@ export const getDadosSummary = createServerFn({ method: "POST" })
       totals: Record<string, number | string | null>;
       per_capital: Array<Record<string, any>>;
     };
-    const pageRows = (pageRes.data ?? []) as Array<Record<string, any>>;
+    
 
     // hasRecords: para cada capital (lista curta, ≤ ~10), uma head-count em
     // pipoca_captures com LIMIT 1. Nenhuma chamada cresce com a base.
