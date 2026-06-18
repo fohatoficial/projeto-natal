@@ -790,14 +790,17 @@ function Choose({
                 <span
                   key={i}
                   className={`h-2 rounded-full transition-all ${
-                    i === page ? "w-8 bg-gold" : "w-2 bg-white/25"
+                    i === safePage ? "w-8 bg-gold" : "w-2 bg-white/25"
                   }`}
                 />
               ))}
             </div>
+            <span className="text-xs text-white/60 tracking-wider ml-1">
+              {safePage + 1} de {totalPages}
+            </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
+              disabled={safePage >= totalPages - 1}
               className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-white/25 grid place-items-center text-white text-2xl disabled:opacity-30 active:scale-95"
               aria-label="Próxima"
             >
