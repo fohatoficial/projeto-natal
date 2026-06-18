@@ -139,9 +139,11 @@
     position: relative;
     display: block;
     width: 100%;
+    aspect-ratio: 2 / 3;
     overflow: hidden;
     border-radius: inherit;
   }
+
   .pipoca-film-cover {
     position: absolute;
     inset: 0;
