@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+const PRINT_QUEUE_PAGE_SIZE = 10;
 import {
   loginPrintQueue,
   logoutPrintQueue,
@@ -108,6 +110,18 @@ function PinForm({ onAuthed }: { onAuthed: () => void }) {
 
 type StatusFilter = "active" | "pending" | "printing" | "printed" | "cleared" | "cancelled" | "all";
 
+function getPageNumbers(current: number, total: number): Array<number | "…"> {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: Array<number | "…"> = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) pages.push("…");
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < total - 1) pages.push("…");
+  pages.push(total);
+  return pages;
+}
+
 function QueueView({ onSignOut }: { onSignOut: () => void }) {
   const list = useServerFn(listPrintQueue);
   const startFn = useServerFn(startPrintingItem);
@@ -124,6 +138,8 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   const [confirmClear, setConfirmClear] = useState<0 | 1 | 2>(0);
   const [activeCount, setActiveCount] = useState(0);
   const [printingId, setPrintingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -183,6 +199,32 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   }
 
   const filteredCount = items.length;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PRINT_QUEUE_PAGE_SIZE));
+
+  // Reset to page 1 when filter/search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  // Clamp page if it no longer exists after data refresh
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const startIndex = (currentPage - 1) * PRINT_QUEUE_PAGE_SIZE;
+  const visibleQueueItems = items.slice(startIndex, startIndex + PRINT_QUEUE_PAGE_SIZE);
+  const rangeStart = filteredCount === 0 ? 0 : startIndex + 1;
+  const rangeEnd = Math.min(startIndex + PRINT_QUEUE_PAGE_SIZE, filteredCount);
+
+  function goToPage(p: number) {
+    const next = Math.min(Math.max(1, p), totalPages);
+    setCurrentPage(next);
+    requestAnimationFrame(() => {
+      listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  const pageNumbers = useMemo(() => getPageNumbers(currentPage, totalPages), [currentPage, totalPages]);
 
   return (
     <div className="min-h-[100dvh] bg-[#000C20] text-white">
@@ -233,14 +275,14 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
         </button>
       </div>
 
-      <div className="pipoca-print-queue-grid px-4 pb-10">
+      <div ref={listRef} className="pipoca-print-queue-grid px-4 pb-4">
         {loading && items.length === 0 && (
           <p className="text-white/60 text-sm col-span-full">Carregando…</p>
         )}
         {!loading && filteredCount === 0 && (
           <p className="text-white/60 text-sm col-span-full">Nada na fila no momento.</p>
         )}
-        {items.map((item) => (
+        {visibleQueueItems.map((item) => (
           <QueueRow
             key={item.id}
             item={item}
@@ -251,6 +293,55 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
           />
         ))}
       </div>
+
+      {filteredCount > 0 && (
+        <div className="px-4 pb-10 flex flex-col items-center gap-3">
+          <p className="text-xs text-white/60">
+            {filteredCount === 0
+              ? "0 registros na fila"
+              : `Exibindo ${rangeStart}–${rangeEnd} de ${filteredCount} registros`}
+          </p>
+          {totalPages > 1 && (
+            <nav className="flex flex-wrap items-center justify-center gap-1.5">
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-2 text-xs uppercase tracking-wider border border-white/20 rounded-md hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              {pageNumbers.map((p, i) =>
+                p === "…" ? (
+                  <span key={`e${i}`} className="px-2 text-white/40 text-sm">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => goToPage(p)}
+                    aria-current={p === currentPage ? "page" : undefined}
+                    className={`min-w-[2.5rem] px-3 py-2 text-sm rounded-md border ${
+                      p === currentPage
+                        ? "bg-gold text-[#000C20] border-gold font-semibold"
+                        : "border-white/20 hover:bg-white/5"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ),
+              )}
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 text-xs uppercase tracking-wider border border-white/20 rounded-md hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Próxima
+              </button>
+            </nav>
+          )}
+          {totalPages > 1 && (
+            <p className="text-[11px] text-white/45">Página {currentPage} de {totalPages}</p>
+          )}
+        </div>
+      )}
 
       {confirmClear > 0 && (
         <div className="fixed inset-0 z-50 bg-black/80 grid place-items-center px-5">
