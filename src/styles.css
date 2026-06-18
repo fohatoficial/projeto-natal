@@ -98,6 +98,65 @@
   .text-brand-blue { color: #2E5BE5; }
   .bg-brand-blue { background-color: #2E5BE5; }
 
+  /* ---------- Explicit Totem display mode (?display=totem) ---------- */
+  html[data-display-mode="totem"],
+  html[data-display-mode="totem"] body {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  html[data-display-mode="totem"] body > * {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    transform: none !important;
+    zoom: 1 !important;
+  }
+  html[data-display-mode="totem"] .pipoca-film-choose-screen {
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    height: 100vh !important;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+  html[data-display-mode="totem"] .pipoca-film-choose-screen > div {
+    max-width: none !important;
+  }
+  html[data-display-mode="totem"] .pipoca-film-choose-screen .pipoca-film-grid-wrap {
+    max-width: none !important;
+    width: 100% !important;
+  }
+  html[data-display-mode="totem"] .pipoca-film-choose-screen h1 {
+    font-size: clamp(2.2rem, 4.5vh, 4rem) !important;
+    line-height: 1.02 !important;
+  }
+  html[data-display-mode="totem"] .pipoca-film-choose-screen p {
+    margin-top: 0.4rem !important;
+  }
+  .pipoca-totem-debug-badge {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.75);
+    color: #F8BA32;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    line-height: 1.35;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(248, 186, 50, 0.5);
+    pointer-events: none;
+    white-space: pre;
+  }
+
+
   /* ---------- Pipoca film selection (adaptive — sized by JS via ResizeObserver) ---------- */
   .pipoca-film-choose-screen { display: flex; flex-direction: column; width: 100%; overflow: hidden; }
 
