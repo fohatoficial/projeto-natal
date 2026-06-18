@@ -108,35 +108,71 @@
     align-items: center;
     justify-content: center;
     width: 100%;
+    padding: 12px 0;
+    overflow: hidden;
   }
 
   .pipoca-film-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: clamp(16px, 2vw, 28px);
-    width: min(92vw, 900px);
+    grid-auto-rows: max-content;
+    gap: clamp(14px, 2vw, 24px);
+    width: min(94vw, 900px);
     margin: 0 auto;
-    align-items: stretch;
+    align-items: start;
+    justify-items: center;
+    flex-shrink: 0;
   }
   .pipoca-film-grid[data-count="1"] {
     grid-template-columns: minmax(0, 1fr);
-    width: min(92vw, 460px);
+    width: min(94vw, 460px);
   }
-  .pipoca-film-grid[data-count="1"] .pipoca-film-card {
-    grid-column: 1 / -1;
-    justify-self: center;
-    width: min(100%, 420px);
-  }
+  .pipoca-film-grid[data-count="1"] .pipoca-film-card,
   .pipoca-film-grid[data-count="3"] .pipoca-film-card:nth-child(3) {
     grid-column: 1 / -1;
     justify-self: center;
-    width: min(100%, 420px);
+    width: min(100%, 430px);
   }
   .pipoca-film-card {
+    position: relative;
+    display: block;
     width: 100%;
-    max-width: 420px;
-    min-width: 0;
+    max-width: 430px;
+    height: auto !important;
+    min-height: 0;
     margin: 0 auto;
+    padding: 0;
+    flex: none;
+  }
+  .pipoca-film-card-btn {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 0;
+    border-radius: 20px;
+    overflow: hidden;
+  }
+  .pipoca-film-cover-wrap {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto !important;
+    min-height: 110px;
+    overflow: hidden;
+    border-radius: inherit;
+  }
+  @media (min-width: 700px) {
+    .pipoca-film-cover-wrap { min-height: 150px; }
+  }
+  .pipoca-film-cover {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
   }
 
   /* ---------- Print queue list (shared across desktop/tablet/mobile) ---------- */
