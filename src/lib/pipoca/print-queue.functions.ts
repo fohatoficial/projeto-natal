@@ -208,7 +208,7 @@ export const listPrintQueue = createServerFn({ method: "POST" })
       .select(
         "id, status, requested_at, printing_started_at, printed_at, generation_id, visitor_id",
       )
-      .order("requested_at", { ascending: true })
+      .order("requested_at", { ascending: false })
       .limit(200);
 
     const statusFilter = data.status ?? "active";
