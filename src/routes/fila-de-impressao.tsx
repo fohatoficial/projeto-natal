@@ -187,6 +187,32 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   }
 
   const filteredCount = items.length;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PRINT_QUEUE_PAGE_SIZE));
+
+  // Reset to page 1 when filter/search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  // Clamp page if it no longer exists after data refresh
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const startIndex = (currentPage - 1) * PRINT_QUEUE_PAGE_SIZE;
+  const visibleQueueItems = items.slice(startIndex, startIndex + PRINT_QUEUE_PAGE_SIZE);
+  const rangeStart = filteredCount === 0 ? 0 : startIndex + 1;
+  const rangeEnd = Math.min(startIndex + PRINT_QUEUE_PAGE_SIZE, filteredCount);
+
+  function goToPage(p: number) {
+    const next = Math.min(Math.max(1, p), totalPages);
+    setCurrentPage(next);
+    requestAnimationFrame(() => {
+      listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  const pageNumbers = useMemo(() => getPageNumbers(currentPage, totalPages), [currentPage, totalPages]);
 
   return (
     <div className="min-h-[100dvh] bg-[#000C20] text-white">
@@ -237,14 +263,14 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
         </button>
       </div>
 
-      <div className="pipoca-print-queue-grid px-4 pb-10">
+      <div ref={listRef} className="pipoca-print-queue-grid px-4 pb-4">
         {loading && items.length === 0 && (
           <p className="text-white/60 text-sm col-span-full">Carregando…</p>
         )}
         {!loading && filteredCount === 0 && (
           <p className="text-white/60 text-sm col-span-full">Nada na fila no momento.</p>
         )}
-        {items.map((item) => (
+        {visibleQueueItems.map((item) => (
           <QueueRow
             key={item.id}
             item={item}
@@ -255,6 +281,55 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
           />
         ))}
       </div>
+
+      {filteredCount > 0 && (
+        <div className="px-4 pb-10 flex flex-col items-center gap-3">
+          <p className="text-xs text-white/60">
+            {filteredCount === 0
+              ? "0 registros na fila"
+              : `Exibindo ${rangeStart}–${rangeEnd} de ${filteredCount} registros`}
+          </p>
+          {totalPages > 1 && (
+            <nav className="flex flex-wrap items-center justify-center gap-1.5">
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-2 text-xs uppercase tracking-wider border border-white/20 rounded-md hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              {pageNumbers.map((p, i) =>
+                p === "…" ? (
+                  <span key={`e${i}`} className="px-2 text-white/40 text-sm">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => goToPage(p)}
+                    aria-current={p === currentPage ? "page" : undefined}
+                    className={`min-w-[2.5rem] px-3 py-2 text-sm rounded-md border ${
+                      p === currentPage
+                        ? "bg-gold text-[#000C20] border-gold font-semibold"
+                        : "border-white/20 hover:bg-white/5"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ),
+              )}
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 text-xs uppercase tracking-wider border border-white/20 rounded-md hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Próxima
+              </button>
+            </nav>
+          )}
+          {totalPages > 1 && (
+            <p className="text-[11px] text-white/45">Página {currentPage} de {totalPages}</p>
+          )}
+        </div>
+      )}
 
       {confirmClear > 0 && (
         <div className="fixed inset-0 z-50 bg-black/80 grid place-items-center px-5">
