@@ -276,6 +276,29 @@ export const getDadosSummary = createServerFn({ method: "POST" })
       totals: Record<string, number | string | null>;
       per_capital: Array<Record<string, any>>;
     };
+
+    // Debug: totais brutos (sem dados pessoais) — diagnóstico do KPI Capturas.
+    const _rawT = summary.totals ?? {};
+    const _capturesRaw = _rawT.captures;
+    const _capturesTodayRaw = _rawT.captures_today;
+    console.log(LOG, "DADOS_SUMMARY_TOTALS_DEBUG", {
+      captures: _capturesRaw,
+      captures_today: _capturesTodayRaw,
+      generations: _rawT.generations,
+      unique_visitors: _rawT.unique_visitors,
+      totals_keys: Object.keys(_rawT),
+    });
+    if (
+      _capturesRaw != null &&
+      _capturesTodayRaw != null &&
+      Number(_capturesTodayRaw) > Number(_capturesRaw)
+    ) {
+      console.warn(LOG, "DADOS_CAPTURE_TOTAL_INCONSISTENT", {
+        captures: Number(_capturesRaw),
+        captures_today: Number(_capturesTodayRaw),
+      });
+    }
+    
     
 
     // hasRecords: para cada capital (lista curta, ≤ ~10), uma head-count em
