@@ -243,18 +243,14 @@ export const getDadosSummary = createServerFn({ method: "POST" })
       p_search: search,
     } as const;
 
-    // Disparar em paralelo: summary, page, opções (capitais + filmes).
-    const [summaryRes, pageRes, { data: capsAll }, { data: filmsAll }] =
+    // Painel executivo: apenas summary (agregados). A RPC pipoca_dados_page
+    // não é mais consultada — listagem detalhada/PII não aparece em /dados.
+    const [summaryRes, { data: capsAll }, { data: filmsAll }] =
       await Promise.all([
         supabaseAdmin.rpc("pipoca_dados_summary", {
           ...rpcArgs,
           p_today_start: today.startISO,
           p_today_end: today.endISO,
-        }),
-        supabaseAdmin.rpc("pipoca_dados_page", {
-          ...rpcArgs,
-          p_offset: offset,
-          p_limit: PAGE_SIZE,
         }),
         supabaseAdmin
           .from("pipoca_capitals")
@@ -264,21 +260,23 @@ export const getDadosSummary = createServerFn({ method: "POST" })
           .order("name", { ascending: true }),
         supabaseAdmin.from("pipoca_films").select("id, title").order("title", { ascending: true }),
       ]);
+    const pageRows: Array<Record<string, any>> = [];
+    void offset;
 
     if (summaryRes.error) {
-      console.warn(LOG, "summary rpc fail", { code: summaryRes.error.code });
-      throw new Error("Falha ao consultar resumo");
-    }
-    if (pageRes.error) {
-      console.warn(LOG, "page rpc fail", { code: pageRes.error.code });
-      throw new Error("Falha ao consultar página");
+      console.warn(LOG, "DADOS_DASHBOARD_LOAD_FAILED", {
+        rpc_name: "pipoca_dados_summary",
+        error_code: summaryRes.error.code,
+        error_message: summaryRes.error.message,
+      });
+      throw new Error("Não foi possível carregar os dados do painel.");
     }
 
     const summary = (summaryRes.data ?? { totals: {}, per_capital: [] }) as {
       totals: Record<string, number | string | null>;
       per_capital: Array<Record<string, any>>;
     };
-    const pageRows = (pageRes.data ?? []) as Array<Record<string, any>>;
+    
 
     // hasRecords: para cada capital (lista curta, ≤ ~10), uma head-count em
     // pipoca_captures com LIMIT 1. Nenhuma chamada cresce com a base.
