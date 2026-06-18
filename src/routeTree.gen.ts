@@ -14,6 +14,7 @@ import { Route as FilaDeImpressaoRouteImport } from './routes/fila-de-impressao'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ResultadoPublicTokenRouteImport } from './routes/resultado.$publicToken'
 import { Route as ImprimirQueueIdRouteImport } from './routes/imprimir.$queueId'
+import { Route as ExperienciaCapitalSlugRouteImport } from './routes/experiencia.$capitalSlug'
 
 const ResultadoRoute = ResultadoRouteImport.update({
   id: '/resultado',
@@ -40,11 +41,17 @@ const ImprimirQueueIdRoute = ImprimirQueueIdRouteImport.update({
   path: '/imprimir/$queueId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExperienciaCapitalSlugRoute = ExperienciaCapitalSlugRouteImport.update({
+  id: '/experiencia/$capitalSlug',
+  path: '/experiencia/$capitalSlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/fila-de-impressao': typeof FilaDeImpressaoRoute
   '/resultado': typeof ResultadoRouteWithChildren
+  '/experiencia/$capitalSlug': typeof ExperienciaCapitalSlugRoute
   '/imprimir/$queueId': typeof ImprimirQueueIdRoute
   '/resultado/$publicToken': typeof ResultadoPublicTokenRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/fila-de-impressao': typeof FilaDeImpressaoRoute
   '/resultado': typeof ResultadoRouteWithChildren
+  '/experiencia/$capitalSlug': typeof ExperienciaCapitalSlugRoute
   '/imprimir/$queueId': typeof ImprimirQueueIdRoute
   '/resultado/$publicToken': typeof ResultadoPublicTokenRoute
 }
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/fila-de-impressao': typeof FilaDeImpressaoRoute
   '/resultado': typeof ResultadoRouteWithChildren
+  '/experiencia/$capitalSlug': typeof ExperienciaCapitalSlugRoute
   '/imprimir/$queueId': typeof ImprimirQueueIdRoute
   '/resultado/$publicToken': typeof ResultadoPublicTokenRoute
 }
@@ -69,6 +78,7 @@ export interface FileRouteTypes {
     | '/'
     | '/fila-de-impressao'
     | '/resultado'
+    | '/experiencia/$capitalSlug'
     | '/imprimir/$queueId'
     | '/resultado/$publicToken'
   fileRoutesByTo: FileRoutesByTo
@@ -76,6 +86,7 @@ export interface FileRouteTypes {
     | '/'
     | '/fila-de-impressao'
     | '/resultado'
+    | '/experiencia/$capitalSlug'
     | '/imprimir/$queueId'
     | '/resultado/$publicToken'
   id:
@@ -83,6 +94,7 @@ export interface FileRouteTypes {
     | '/'
     | '/fila-de-impressao'
     | '/resultado'
+    | '/experiencia/$capitalSlug'
     | '/imprimir/$queueId'
     | '/resultado/$publicToken'
   fileRoutesById: FileRoutesById
@@ -91,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   FilaDeImpressaoRoute: typeof FilaDeImpressaoRoute
   ResultadoRoute: typeof ResultadoRouteWithChildren
+  ExperienciaCapitalSlugRoute: typeof ExperienciaCapitalSlugRoute
   ImprimirQueueIdRoute: typeof ImprimirQueueIdRoute
 }
 
@@ -131,6 +144,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ImprimirQueueIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/experiencia/$capitalSlug': {
+      id: '/experiencia/$capitalSlug'
+      path: '/experiencia/$capitalSlug'
+      fullPath: '/experiencia/$capitalSlug'
+      preLoaderRoute: typeof ExperienciaCapitalSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -150,6 +170,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   FilaDeImpressaoRoute: FilaDeImpressaoRoute,
   ResultadoRoute: ResultadoRouteWithChildren,
+  ExperienciaCapitalSlugRoute: ExperienciaCapitalSlugRoute,
   ImprimirQueueIdRoute: ImprimirQueueIdRoute,
 }
 export const routeTree = rootRouteImport
