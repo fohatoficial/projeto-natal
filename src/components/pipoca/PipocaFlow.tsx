@@ -793,22 +793,24 @@ function Choose({
   // Temporary diagnostic log — no PII.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    console.log("[PIPOCA_ADAPTIVE_FILM_GRID]", {
-      viewport_width: window.innerWidth,
-      viewport_height: window.innerHeight,
-      available_width: Math.round(gridBox.w),
-      available_height: Math.round(gridBox.h),
-      visible_films_count: visibleCount,
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const displayMode =
+      document.documentElement.dataset.displayMode || "default";
+    console.log("[PIPOCA_STATIC_FILM_GRID]", {
+      display_mode: displayMode,
+      portrait_mode: vh > vw,
+      viewport_width: vw,
+      viewport_height: vh,
+      container_width: Math.round(gridBox.w),
+      container_height: Math.round(gridBox.h),
+      card_width: layout.cardW,
+      card_height: layout.cardH,
       columns: layout.cols,
       rows: layout.rows,
-      calculated_card_width: layout.cardW,
-      calculated_card_height: layout.cardH,
       gap: layout.gap,
-      poster_aspect_ratio: POSTER_ASPECT,
-      has_vertical_overflow:
-        document.documentElement.scrollHeight > document.documentElement.clientHeight,
-      has_horizontal_overflow:
-        document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      resize_update_count: resizeCountRef.current,
+      layout_stable: gridBox.w > 0 && gridBox.h > 0,
     });
   }, [gridBox.w, gridBox.h, visibleCount, layout]);
 
