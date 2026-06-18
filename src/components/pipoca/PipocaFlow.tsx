@@ -707,7 +707,9 @@ function Choose({
   }, [page, safePage]);
 
   // ---- Adaptive film grid (measure real available area) ----
-  const BANNER_ASPECT = 16 / 9;
+  // Posters use vertical aspect 2:3 (W:H). We try candidate (cols x rows)
+  // layouts and pick the one that maximizes card width within the box.
+  const POSTER_ASPECT = 2 / 3; // width / height
   const gridWrapRef = useRef<HTMLDivElement | null>(null);
   const [gridBox, setGridBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
@@ -737,26 +739,40 @@ function Choose({
 
   const layout = useMemo(() => {
     const count = Math.max(1, visibleCount);
-    let cols = 2;
-    let rows = 2;
-    if (count === 1) { cols = 1; rows = 1; }
-    else if (count === 2) { cols = 2; rows = 1; }
-    else { cols = 2; rows = 2; } // 3 or 4: 2x2 grid (3rd item spans row 2)
 
-    // Fallback dims until first measurement returns.
-    const w = gridBox.w > 0 ? gridBox.w : 600;
-    const h = gridBox.h > 0 ? gridBox.h : 420;
+    // Fallback dims until first measurement returns: assume portrait 2x2.
+    const w = gridBox.w > 0 ? gridBox.w : 360;
+    const h = gridBox.h > 0 ? gridBox.h : 560;
+    const isPortrait = h >= w;
 
-    // Progressive gap: shrink first when space is tight.
-    const gap = Math.max(6, Math.min(24, Math.floor(Math.min(w, h) * 0.025)));
+    // Candidate (cols, rows) per count.
+    let candidates: Array<{ cols: number; rows: number }>;
+    if (count === 1) candidates = [{ cols: 1, rows: 1 }];
+    else if (count === 2) {
+      candidates = isPortrait
+        ? [{ cols: 2, rows: 1 }, { cols: 1, rows: 2 }]
+        : [{ cols: 2, rows: 1 }];
+    } else if (count === 3) {
+      candidates = [{ cols: 2, rows: 2 }];
+    } else {
+      // 4: portrait → only 2x2; landscape → pick best of 2x2 / 4x1.
+      candidates = isPortrait
+        ? [{ cols: 2, rows: 2 }]
+        : [{ cols: 4, rows: 1 }, { cols: 2, rows: 2 }];
+    }
 
-    const cardW_byW = (w - gap * (cols - 1)) / cols;
-    const cardH_byH = (h - gap * (rows - 1)) / rows;
-    const cardW_byH = cardH_byH * BANNER_ASPECT;
-    const cardW = Math.max(120, Math.floor(Math.min(cardW_byW, cardW_byH)));
-    const cardH = Math.max(70, Math.floor(cardW / BANNER_ASPECT));
+    const gap = Math.max(6, Math.min(20, Math.floor(Math.min(w, h) * 0.018)));
 
-    return { cols, rows, cardW, cardH, gap };
+    let best = { cols: candidates[0].cols, rows: candidates[0].rows, cardW: 0, cardH: 0, gap };
+    for (const c of candidates) {
+      const cardW_byW = (w - gap * (c.cols - 1)) / c.cols;
+      const cardH_byH = (h - gap * (c.rows - 1)) / c.rows;
+      const cardW_byH = cardH_byH * POSTER_ASPECT;
+      const cardW = Math.max(100, Math.floor(Math.min(cardW_byW, cardW_byH)));
+      const cardH = Math.floor(cardW / POSTER_ASPECT);
+      if (cardW > best.cardW) best = { cols: c.cols, rows: c.rows, cardW, cardH, gap };
+    }
+    return best;
   }, [gridBox.w, gridBox.h, visibleCount]);
 
   // Temporary diagnostic log — no PII.
