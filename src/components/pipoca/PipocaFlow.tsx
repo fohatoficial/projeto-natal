@@ -690,9 +690,30 @@ function Choose({
 }) {
   const [page, setPage] = useState(0);
   const totalPages = Math.max(1, Math.ceil(movies.length / PAGE_SIZE));
-  const start = page * PAGE_SIZE;
+  // Clamp page when films list changes
+  useEffect(() => {
+    if (page > totalPages - 1) setPage(0);
+  }, [totalPages, page]);
+  const safePage = Math.min(page, totalPages - 1);
+  const start = safePage * PAGE_SIZE;
   const slice = movies.slice(start, start + PAGE_SIZE);
-  const onlyOne = movies.length === 1;
+  const visibleCount = slice.length;
+
+  let gridStyle: React.CSSProperties = {};
+  let gridClass = "";
+  if (visibleCount === 1) {
+    gridStyle = { gridTemplateColumns: "minmax(0, 430px)" };
+    gridClass = "justify-center";
+  } else if (visibleCount === 2) {
+    gridStyle = { gridTemplateColumns: "repeat(2, minmax(0, 1fr))", maxWidth: 900 };
+    gridClass = "justify-center mx-auto";
+  } else {
+    gridStyle = {
+      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+      gridTemplateRows: "repeat(2, minmax(0, 1fr))",
+    };
+    gridClass = "max-w-3xl";
+  }
 
   return (
     <Screen aurora>
@@ -733,17 +754,16 @@ function Choose({
             <p className="text-base text-white/85 max-w-md">{error}</p>
           ) : movies.length === 0 ? (
             <p className="text-base text-white/70">Nenhum filme disponível.</p>
-          ) : onlyOne ? (
-            <div className="h-full max-h-full aspect-[3/4] mx-auto">
-              <PosterCard movie={slice[0]} onPick={onPick} />
-            </div>
           ) : (
-            <div className="h-full w-full max-w-3xl grid grid-cols-2 grid-rows-2 gap-3 sm:gap-4 lg:gap-5">
+            <div
+              className={`h-full w-full grid items-center [gap:clamp(18px,2dvh,32px)] ${gridClass}`}
+              style={gridStyle}
+            >
               {slice.map((m, i) => (
                 <div
                   key={m.id}
-                  className="min-h-0 animate-slide-in"
-                  style={{ animationDelay: `${i * 70}ms` }}
+                  className="min-h-0 min-w-0 w-full mx-auto animate-slide-in"
+                  style={{ animationDelay: `${i * 70}ms`, maxWidth: 430 }}
                 >
                   <PosterCard movie={m} onPick={onPick} />
                 </div>
@@ -759,7 +779,7 @@ function Choose({
           <>
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
+              disabled={safePage === 0}
               className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-white/25 grid place-items-center text-white text-2xl disabled:opacity-30 active:scale-95"
               aria-label="Anterior"
             >
@@ -770,14 +790,17 @@ function Choose({
                 <span
                   key={i}
                   className={`h-2 rounded-full transition-all ${
-                    i === page ? "w-8 bg-gold" : "w-2 bg-white/25"
+                    i === safePage ? "w-8 bg-gold" : "w-2 bg-white/25"
                   }`}
                 />
               ))}
             </div>
+            <span className="text-xs text-white/60 tracking-wider ml-1">
+              {safePage + 1} de {totalPages}
+            </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
+              disabled={safePage >= totalPages - 1}
               className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-white/25 grid place-items-center text-white text-2xl disabled:opacity-30 active:scale-95"
               aria-label="Próxima"
             >
