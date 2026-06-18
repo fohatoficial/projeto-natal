@@ -127,6 +127,30 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const isTotem = params.get("display") === "totem";
+    if (isTotem) {
+      document.documentElement.dataset.displayMode = "totem";
+    }
+    const setAppHeight = () => {
+      const h =
+        window.visualViewport?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty(
+        "--pipoca-app-height",
+        `${h}px`,
+      );
+    };
+    setAppHeight();
+    window.addEventListener("resize", setAppHeight);
+    window.addEventListener("orientationchange", setAppHeight);
+    return () => {
+      window.removeEventListener("resize", setAppHeight);
+      window.removeEventListener("orientationchange", setAppHeight);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
