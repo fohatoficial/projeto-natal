@@ -188,7 +188,7 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
 
   // Construir lista de slides.
   const slides = useMemo(() => {
-    const list: Array<{ key: string; title: string; render: () => JSX.Element }> =
+    const list: Array<{ key: string; title: string; render: () => React.ReactElement }> =
       [];
     if (!data) return list;
     const { real, unknown } = splitCapitals(data.perCapital);
