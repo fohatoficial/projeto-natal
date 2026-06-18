@@ -811,7 +811,7 @@ function Choose({
         </div>
 
         {/* Grid */}
-        <div className="pipoca-film-grid-wrap mt-4 sm:mt-5 lg:mt-6">
+        <div ref={gridWrapRef} className="pipoca-film-grid-wrap mt-4 sm:mt-5 lg:mt-6">
           {loading ? (
             <p className="text-base text-white/70 tracking-wide animate-pulse-soft">
               Carregando filmes…
@@ -821,20 +821,41 @@ function Choose({
           ) : activeFilms.length === 0 ? (
             <p className="text-base text-white/70">Nenhum filme disponível.</p>
           ) : (
-            <div className="pipoca-film-grid" data-count={visibleCount}>
-              {visibleFilms.map((m, i) => (
-                <div
-                  key={m.id}
-                  className="pipoca-film-card animate-slide-in"
-                  style={{ animationDelay: `${i * 70}ms` }}
-                >
-                  <PosterCard movie={m} onPick={onPick} />
-                </div>
-              ))}
+            <div
+              className="pipoca-film-grid"
+              data-count={visibleCount}
+              style={{
+                gridTemplateColumns: `repeat(${layout.cols}, ${layout.cardW}px)`,
+                gap: `${layout.gap}px`,
+              }}
+            >
+              {visibleFilms.map((m, i) => {
+                const isThirdOfThree = visibleCount === 3 && i === 2;
+                return (
+                  <div
+                    key={m.id}
+                    className="pipoca-film-card animate-slide-in"
+                    style={{
+                      width: layout.cardW,
+                      animationDelay: `${i * 70}ms`,
+                      ...(isThirdOfThree
+                        ? { gridColumn: "1 / -1", justifySelf: "center" }
+                        : null),
+                    }}
+                  >
+                    <PosterCard
+                      movie={m}
+                      onPick={onPick}
+                      cardHeight={layout.cardH}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       </div>
+
 
       {/* FOOTER pagination */}
       <div className="relative z-10 shrink-0 h-12 flex items-center justify-center gap-4">
