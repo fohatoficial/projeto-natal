@@ -415,7 +415,7 @@ export const getDadosSummary = createServerFn({ method: "POST" })
         uniqueVisitors: Number(t.unique_visitors ?? 0),
         successRate: generationsTotal > 0 ? generationsCompleted / generationsTotal : 0,
         avgAttemptsPerCapture:
-          capturesTotal > 0 ? generationsTotal / capturesTotal : 0,
+          capturesTotal != null && capturesTotal > 0 ? generationsTotal / capturesTotal : 0,
         queuePending: Number(t.queue_pending ?? 0),
         queuePrinting: Number(t.queue_printing ?? 0),
         queuePrinted: Number(t.queue_printed ?? 0),
