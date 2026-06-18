@@ -63,6 +63,46 @@ function buildResultPageUrl(publicToken: string): string {
 
 const PQ_LOG = "[PIPOCA_PRINT_QUEUE_AUTO]";
 
+const PRINT_CAPITAL_LOG = "[PIPOCA_PRINT_CAPITAL]";
+
+async function resolveCapitalForGeneration(
+  supabaseAdmin: any,
+  generationId: string,
+): Promise<{ capitalId: string | null; mismatch: boolean }> {
+  const { data: gen } = await supabaseAdmin
+    .from("pipoca_generations")
+    .select("id, capital_id, capture_id")
+    .eq("id", generationId)
+    .maybeSingle();
+  if (!gen) return { capitalId: null, mismatch: false };
+  let captureCapitalId: string | null = null;
+  if (gen.capture_id) {
+    const { data: cap } = await supabaseAdmin
+      .from("pipoca_captures")
+      .select("capital_id")
+      .eq("id", gen.capture_id)
+      .maybeSingle();
+    captureCapitalId = (cap?.capital_id as string | null) ?? null;
+  }
+  const genCapitalId = (gen.capital_id as string | null) ?? null;
+  if (genCapitalId && captureCapitalId && genCapitalId !== captureCapitalId) {
+    console.warn(PRINT_CAPITAL_LOG, "PRINT_CAPITAL_MISMATCH", {
+      generation_id: generationId,
+      generation_capital_id: genCapitalId,
+      capture_capital_id: captureCapitalId,
+    });
+    return { capitalId: null, mismatch: true };
+  }
+  const resolved = genCapitalId ?? captureCapitalId;
+  if (resolved) return { capitalId: resolved, mismatch: false };
+  const { data: unknown } = await supabaseAdmin
+    .from("pipoca_capitals")
+    .select("id")
+    .eq("slug", "capital-desconhecida")
+    .maybeSingle();
+  return { capitalId: (unknown?.id as string | null) ?? null, mismatch: false };
+}
+
 async function ensurePrintQueueEntry(
   supabaseAdmin: any,
   generationId: string,
@@ -105,12 +145,28 @@ async function ensurePrintQueueEntry(
       return { queueId: null, alreadyExists: false, error: "no_visitor" };
     }
 
+    const { capitalId, mismatch } = await resolveCapitalForGeneration(supabaseAdmin, generationId);
+    if (mismatch) {
+      return { queueId: null, alreadyExists: false, error: "capital_mismatch" };
+    }
+    if (!capitalId) {
+      console.warn(PQ_LOG, {
+        generationId,
+        outputAvailable: true,
+        queueCreated: false,
+        alreadyExists: false,
+        errorCode: "no_capital",
+      });
+      return { queueId: null, alreadyExists: false, error: "no_capital" };
+    }
+
     const { data: inserted, error: iErr } = await supabaseAdmin
       .from("pipoca_print_queue")
       .insert({
         visitor_id: visitorId,
         generation_id: generationId,
         status: "pending",
+        capital_id: capitalId,
       })
       .select("id")
       .single();
@@ -145,6 +201,11 @@ async function ensurePrintQueueEntry(
       outputAvailable: true,
       queueCreated: true,
       alreadyExists: false,
+    });
+    console.log(PRINT_CAPITAL_LOG, "PRINT_CAPITAL_ATTACHED", {
+      queue_id: inserted.id,
+      generation_id: generationId,
+      capital_id: capitalId,
     });
     return { queueId: inserted.id, alreadyExists: false };
   } catch (e) {
