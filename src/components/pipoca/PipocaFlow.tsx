@@ -709,6 +709,9 @@ function Choose({
   // ---- Adaptive film grid (measure real available area) ----
   // Vertical poster aspect ratio (width / height).
   const POSTER_ASPECT = 2 / 3;
+  const gridWrapRef = useRef<HTMLDivElement | null>(null);
+  const [gridBox, setGridBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
 
   useEffect(() => {
     const el = gridWrapRef.current;
