@@ -264,11 +264,6 @@ function DadosView({ onSignOut }: { onSignOut: () => void }) {
                 <h2 className="font-display text-lg">Por capital</h2>
                 <span className="text-xs text-white/50">
                   Atualizado em {new Date(data.generatedAt).toLocaleString("pt-BR")}
-                  {data.details.truncated && (
-                    <span className="ml-2 text-amber-300">
-                      (conjunto limitado a 5000 capturas — refine os filtros)
-                    </span>
-                  )}
                 </span>
               </div>
               <div className="overflow-x-auto">
