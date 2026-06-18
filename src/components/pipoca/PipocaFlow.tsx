@@ -789,7 +789,7 @@ function Choose({
       calculated_card_width: layout.cardW,
       calculated_card_height: layout.cardH,
       gap: layout.gap,
-      banner_aspect_ratio: BANNER_ASPECT,
+      poster_aspect_ratio: POSTER_ASPECT,
       has_vertical_overflow:
         document.documentElement.scrollHeight > document.documentElement.clientHeight,
       has_horizontal_overflow:
