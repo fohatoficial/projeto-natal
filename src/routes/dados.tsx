@@ -438,7 +438,7 @@ function Kpi({
   accent = false,
 }: {
   label: string;
-  value: number | string;
+  value: number | string | null;
   suffix?: string;
   size?: "lg" | "sm";
   accent?: boolean;
