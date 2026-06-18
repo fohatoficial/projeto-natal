@@ -171,13 +171,14 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   }
 
   async function handleStart(item: PrintQueueItem) {
+    // Do NOT mutate status here. "Imprimir" only opens the print window;
+    // status changes exclusively via "Marcar como impresso".
     setPrintingId(item.id);
     try {
-      await startFn({ data: { queueId: item.id } });
-      // open print window
       window.open(`/imprimir/${item.id}`, "_blank", "noopener,width=900,height=700");
-      await refresh();
     } finally {
+      // Re-enable the button as soon as the window is dispatched so the
+      // operator can reprint immediately if needed.
       setPrintingId(null);
     }
   }
