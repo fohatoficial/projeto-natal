@@ -217,6 +217,7 @@ const ListInput = z.object({
   status: z
     .enum(["pending", "printing", "printed", "failed", "cleared", "cancelled", "active", "all"])
     .optional(),
+  capitalId: z.string().uuid().optional(),
 });
 
 export type PrintQueueItem = {
@@ -231,6 +232,8 @@ export type PrintQueueItem = {
   visitorFullName: string;
   visitorWhatsappLast4: string;
   thumbnailUrl: string | null;
+  capitalId: string | null;
+  capitalName: string;
 };
 
 export const listPrintQueue = createServerFn({ method: "POST" })
@@ -242,7 +245,7 @@ export const listPrintQueue = createServerFn({ method: "POST" })
     let q = supabaseAdmin
       .from("pipoca_print_queue")
       .select(
-        "id, status, requested_at, printing_started_at, printed_at, generation_id, visitor_id",
+        "id, status, requested_at, printing_started_at, printed_at, generation_id, visitor_id, capital_id",
       )
       .order("requested_at", { ascending: false })
       .limit(200);
@@ -253,6 +256,9 @@ export const listPrintQueue = createServerFn({ method: "POST" })
     } else if (statusFilter !== "all") {
       q = q.eq("status", statusFilter);
     }
+    if (data.capitalId) {
+      q = q.eq("capital_id", data.capitalId);
+    }
 
     const { data: rows, error } = await q;
     if (error) throw new Error("Falha ao listar fila");
@@ -260,8 +266,9 @@ export const listPrintQueue = createServerFn({ method: "POST" })
 
     const visitorIds = [...new Set(rows.map((r) => r.visitor_id))];
     const generationIds = [...new Set(rows.map((r) => r.generation_id))];
+    const capitalIds = [...new Set(rows.map((r) => r.capital_id).filter(Boolean) as string[])];
 
-    const [{ data: visitors }, { data: gens }] = await Promise.all([
+    const [{ data: visitors }, { data: gens }, { data: caps }] = await Promise.all([
       supabaseAdmin
         .from("pipoca_visitors")
         .select("id, first_name, full_name, whatsapp_last4")
@@ -270,6 +277,9 @@ export const listPrintQueue = createServerFn({ method: "POST" })
         .from("pipoca_generations")
         .select("id, final_image_path, film_id")
         .in("id", generationIds),
+      capitalIds.length > 0
+        ? supabaseAdmin.from("pipoca_capitals").select("id, name").in("id", capitalIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
     ]);
 
     const filmIds = [...new Set((gens ?? []).map((g) => g.film_id).filter(Boolean))];
@@ -281,6 +291,7 @@ export const listPrintQueue = createServerFn({ method: "POST" })
     const vMap = new Map((visitors ?? []).map((v) => [v.id, v]));
     const gMap = new Map((gens ?? []).map((g) => [g.id, g]));
     const fMap = new Map((films ?? []).map((f) => [f.id, f.title as string]));
+    const cMap = new Map((caps ?? []).map((c) => [c.id as string, c.name as string]));
 
     // Sign thumbnails in parallel.
     const items: PrintQueueItem[] = await Promise.all(
@@ -300,6 +311,7 @@ export const listPrintQueue = createServerFn({ method: "POST" })
           const hay = `${v?.full_name ?? ""} ${v?.first_name ?? ""} ${v?.whatsapp_last4 ?? ""}`.toLowerCase();
           if (!hay.includes(filtered)) return null as unknown as PrintQueueItem;
         }
+        const capId = (r.capital_id as string | null) ?? null;
         return {
           id: r.id,
           status: r.status,
@@ -312,12 +324,43 @@ export const listPrintQueue = createServerFn({ method: "POST" })
           visitorFullName: v?.full_name ?? "—",
           visitorWhatsappLast4: v?.whatsapp_last4 ?? "—",
           thumbnailUrl,
+          capitalId: capId,
+          capitalName: (capId && cMap.get(capId)) || "Capital desconhecida",
         } satisfies PrintQueueItem;
       }),
     );
 
     return { items: items.filter(Boolean) };
   });
+
+// Capitais que aparecem na fila (para popular o filtro).
+export const listPrintQueueCapitals = createServerFn({ method: "GET" }).handler(
+  async (): Promise<{ capitals: Array<{ id: string; name: string; isSystem: boolean }> }> => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .select("capital_id")
+      .not("capital_id", "is", null);
+    if (error) throw new Error("Falha ao listar capitais da fila");
+    const ids = [...new Set((rows ?? []).map((r) => r.capital_id as string))];
+    if (ids.length === 0) return { capitals: [] };
+    const { data: caps } = await supabaseAdmin
+      .from("pipoca_capitals")
+      .select("id, name, is_system, display_order")
+      .in("id", ids)
+      .order("is_system", { ascending: true })
+      .order("display_order", { ascending: true })
+      .order("name", { ascending: true });
+    return {
+      capitals: (caps ?? []).map((c) => ({
+        id: c.id as string,
+        name: c.name as string,
+        isSystem: Boolean(c.is_system),
+      })),
+    };
+  },
+);
 
 // ─── Admin: actions ──────────────────────────────────────────────────────
 const QueueIdInput = z.object({ queueId: z.string().uuid() });
