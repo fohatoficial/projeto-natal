@@ -344,6 +344,7 @@ function QueueRow({
           )}
         </div>
       </div>
+      </div>
     </div>
   );
 }
