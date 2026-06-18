@@ -127,6 +127,44 @@
     padding: 0;
     flex: none;
   }
+  .pipoca-film-card,
+  .pipoca-film-card:hover,
+  .pipoca-film-card:active,
+  .pipoca-film-card:focus,
+  .pipoca-film-card:focus-within {
+    transform: none !important;
+    scale: 1 !important;
+    animation: none !important;
+    transition-property: border-color, box-shadow, opacity;
+  }
+  .pipoca-film-card .pipoca-film-card-btn,
+  .pipoca-film-card .pipoca-film-card-btn:hover,
+  .pipoca-film-card .pipoca-film-card-btn:active,
+  .pipoca-film-card .pipoca-film-card-btn:focus,
+  .pipoca-film-card .pipoca-film-cover,
+  .pipoca-film-card .pipoca-film-cover-wrap {
+    transform: none !important;
+    scale: 1 !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  @media (hover: none) {
+    .pipoca-film-card:hover,
+    .pipoca-film-card .pipoca-film-card-btn:hover,
+    .pipoca-film-card .pipoca-film-cover:hover {
+      transform: none !important;
+      scale: 1 !important;
+    }
+  }
+  html[data-display-mode="totem"] .pipoca-film-card,
+  html[data-display-mode="totem"] .pipoca-film-card .pipoca-film-card-btn,
+  html[data-display-mode="totem"] .pipoca-film-cover-wrap,
+  html[data-display-mode="totem"] .pipoca-film-cover {
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+    will-change: auto !important;
+  }
   .pipoca-film-card-btn {
     position: relative;
     display: block;

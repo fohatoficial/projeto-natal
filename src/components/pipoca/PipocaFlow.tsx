@@ -713,19 +713,34 @@ function Choose({
   const gridWrapRef = useRef<HTMLDivElement | null>(null);
   const [gridBox, setGridBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
+  const resizeCountRef = useRef(0);
   useEffect(() => {
     const el = gridWrapRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
+    const apply = (w: number, h: number) => {
+      setGridBox((prev) => {
+        if (
+          prev.w > 0 &&
+          prev.h > 0 &&
+          Math.abs(w - prev.w) <= 2 &&
+          Math.abs(h - prev.h) <= 2
+        ) {
+          return prev;
+        }
+        resizeCountRef.current += 1;
+        return { w, h };
+      });
+    };
     const ro = new ResizeObserver((entries) => {
       for (const e of entries) {
         const cr = e.contentRect;
-        setGridBox({ w: cr.width, h: cr.height });
+        apply(cr.width, cr.height);
       }
     });
     ro.observe(el);
     const onChange = () => {
       const r = el.getBoundingClientRect();
-      setGridBox({ w: r.width, h: r.height });
+      apply(r.width, r.height);
     };
     window.addEventListener("orientationchange", onChange);
     window.addEventListener("fullscreenchange", onChange);
@@ -778,22 +793,24 @@ function Choose({
   // Temporary diagnostic log — no PII.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    console.log("[PIPOCA_ADAPTIVE_FILM_GRID]", {
-      viewport_width: window.innerWidth,
-      viewport_height: window.innerHeight,
-      available_width: Math.round(gridBox.w),
-      available_height: Math.round(gridBox.h),
-      visible_films_count: visibleCount,
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const displayMode =
+      document.documentElement.dataset.displayMode || "default";
+    console.log("[PIPOCA_STATIC_FILM_GRID]", {
+      display_mode: displayMode,
+      portrait_mode: vh > vw,
+      viewport_width: vw,
+      viewport_height: vh,
+      container_width: Math.round(gridBox.w),
+      container_height: Math.round(gridBox.h),
+      card_width: layout.cardW,
+      card_height: layout.cardH,
       columns: layout.cols,
       rows: layout.rows,
-      calculated_card_width: layout.cardW,
-      calculated_card_height: layout.cardH,
       gap: layout.gap,
-      poster_aspect_ratio: POSTER_ASPECT,
-      has_vertical_overflow:
-        document.documentElement.scrollHeight > document.documentElement.clientHeight,
-      has_horizontal_overflow:
-        document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      resize_update_count: resizeCountRef.current,
+      layout_stable: gridBox.w > 0 && gridBox.h > 0,
     });
   }, [gridBox.w, gridBox.h, visibleCount, layout]);
 
@@ -850,10 +867,9 @@ function Choose({
                 return (
                   <div
                     key={m.id}
-                    className="pipoca-film-card animate-slide-in"
+                    className="pipoca-film-card"
                     style={{
                       width: layout.cardW,
-                      animationDelay: `${i * 70}ms`,
                       ...(isThirdOfThree
                         ? { gridColumn: "1 / -1", justifySelf: "center" }
                         : null),
@@ -937,7 +953,7 @@ function PosterCard({
   return (
     <button
       onClick={() => onPick(movie)}
-      className="bg-card text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl group border border-white/10 pipoca-film-card-btn"
+      className="bg-card text-left shadow-2xl group border border-white/10 pipoca-film-card-btn"
     >
       <div
         className="pipoca-film-cover-wrap"
@@ -946,7 +962,7 @@ function PosterCard({
         <img
           src={movie.posterUrl}
           alt={movie.title}
-          className="pipoca-film-cover transition-transform duration-700 group-hover:scale-110"
+          className="pipoca-film-cover"
         />
         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none" />
         <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3 z-10">
