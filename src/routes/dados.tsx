@@ -160,12 +160,12 @@ function splitCapitals(perCapital: CapitalIndicators[]): {
   return { real, unknown };
 }
 
-// ───────────────────────────── Dashboard ─────────────────────────────
+// ───────────────────────────── Dashboard (vertical scroll) ─────────────────────────────
 function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
   const [data, setData] = useState<DadosSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [slide, setSlide] = useState(0);
+  const [showTop, setShowTop] = useState(false);
 
   const fetchSummary = useServerFn(getDadosSummary);
   const logout = useServerFn(logoutPrintQueue);
@@ -187,90 +187,76 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
     load();
   }, [load]);
 
-  // Construir lista de slides.
-  const slides = useMemo(() => {
-    const list: Array<{ key: string; title: string; render: () => React.ReactElement }> =
-      [];
-    if (!data) return list;
-    const { real, unknown } = splitCapitals(data.perCapital);
-
-    list.push({
-      key: "overview",
-      title: "Resultados gerais",
-      render: () => <SlideOverview data={data} />,
-    });
-    list.push({
-      key: "captures",
-      title: "Experiências por capital",
-      render: () => <SlideCaptures real={real} unknown={unknown} />,
-    });
-    list.push({
-      key: "generations",
-      title: "Fotos geradas por capital",
-      render: () => <SlideGenerations real={real} unknown={unknown} />,
-    });
-    list.push({
-      key: "prints",
-      title: "Impressões por capital",
-      render: () => <SlidePrints real={real} unknown={unknown} data={data} />,
-    });
-
-    // Subpáginas de cards (4 por página), unknown sempre por último.
-    const ordered = [
-      ...real.slice().sort((a, b) => b.captures - a.captures),
-      ...(unknown ? [unknown] : []),
-    ];
-    const CHUNK = 4;
-    if (ordered.length > 0) {
-      const total = Math.max(1, Math.ceil(ordered.length / CHUNK));
-      for (let i = 0; i < total; i++) {
-        const slice = ordered.slice(i * CHUNK, i * CHUNK + CHUNK);
-        const suffix = total > 1 ? ` · ${i + 1}/${total}` : "";
-        list.push({
-          key: `cards-${i}`,
-          title: `Resumo por capital${suffix}`,
-          render: () => <SlideCards items={slice} />,
-        });
-      }
-    }
-    return list;
-  }, [data]);
-
-  const total = slides.length;
-  const safeSlide = total === 0 ? 0 : Math.min(slide, total - 1);
-  const current = slides[safeSlide];
-
-  // Navegação por teclado.
+  // Liberar scroll natural somente enquanto /dados está montada.
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "ArrowRight") setSlide((s) => Math.min(total - 1, s + 1));
-      else if (e.key === "ArrowLeft") setSlide((s) => Math.max(0, s - 1));
+    const html = document.documentElement;
+    const body = document.body;
+    html.classList.add("pipoca-dados-page");
+    body.classList.add("pipoca-dados-page");
+    return () => {
+      html.classList.remove("pipoca-dados-page");
+      body.classList.remove("pipoca-dados-page");
+    };
+  }, []);
+
+  // Botão "voltar ao topo" após rolar uma distância razoável.
+  useEffect(() => {
+    function onScroll() {
+      setShowTop(window.scrollY > 500);
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [total]);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const split = useMemo(
+    () => (data ? splitCapitals(data.perCapital) : { real: [], unknown: null }),
+    [data],
+  );
+
+  function scrollToId(id: string) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  const anchors: Array<{ id: string; label: string }> = [
+    { id: "sec-overview", label: "Visão geral" },
+    { id: "sec-captures", label: "Capitais" },
+    { id: "sec-generations", label: "Gerações" },
+    { id: "sec-prints", label: "Impressões" },
+  ];
+
+  const ordered = data
+    ? [
+        ...split.real.slice().sort((a, b) => b.captures - a.captures),
+        ...(split.unknown ? [split.unknown] : []),
+      ]
+    : [];
 
   return (
-    <div
-      className="h-[100dvh] w-full overflow-hidden text-white relative"
-      style={{ background: COLOR_BG }}
-    >
+    <div className="min-h-screen w-full text-white relative" style={{ background: COLOR_BG }}>
       <div
-        className="absolute inset-0 pointer-events-none opacity-[0.05]"
+        className="pointer-events-none fixed inset-0 opacity-[0.05]"
         style={{
           backgroundImage:
             "radial-gradient(ellipse at top, rgba(248,186,50,0.18), transparent 60%)",
         }}
       />
-      <div className="relative z-10 h-full grid" style={{ gridTemplateRows: "auto minmax(0,1fr) auto" }}>
-        {/* Cabeçalho compacto */}
-        <header className="px-4 sm:px-8 pt-4 pb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+
+      {/* Cabeçalho sticky */}
+      <header
+        className="sticky top-0 z-30 backdrop-blur-md border-b border-white/10"
+        style={{ background: "rgba(0,12,32,0.85)" }}
+      >
+        <div className="px-4 sm:px-8 pt-3 pb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="min-w-0">
             <div className="text-[10px] sm:text-xs tracking-[0.3em] uppercase text-white/50">
               Pipoca &amp; Cena · Tela Brasil
             </div>
             <h1 className="font-display text-lg sm:text-2xl truncate">
-              {current ? current.title : "Painel de resultados"}
+              Painel de resultados
             </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -298,73 +284,111 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
               Sair
             </button>
           </div>
-        </header>
+        </div>
+        <nav className="px-4 sm:px-8 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
+          {anchors.map((a) => (
+            <button
+              key={a.id}
+              onClick={() => scrollToId(a.id)}
+              className="text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap border border-white/15 rounded-full px-3 py-1.5 hover:bg-white/5 hover:border-white/30"
+            >
+              {a.label}
+            </button>
+          ))}
+        </nav>
+      </header>
 
-        {/* Área principal */}
-        <main className="min-h-0 px-4 sm:px-8 pb-2 overflow-hidden">
-          <div className="h-full w-full">
-            {error ? (
-              <ErrorState message={error} onRetry={load} />
-            ) : !data && loading ? (
-              <LoadingState />
-            ) : !data ? (
-              <EmptyState />
-            ) : slides.length === 0 ? (
-              <EmptyState />
-            ) : (
-              <div key={current.key} className="h-full w-full animate-[fadeIn_240ms_ease-out]">
-                {current.render()}
+      {/* Conteúdo */}
+      <main className="relative z-10 px-4 sm:px-8 py-6 sm:py-10 max-w-7xl mx-auto flex flex-col gap-10">
+        {error ? (
+          <ErrorState message={error} onRetry={load} />
+        ) : !data && loading ? (
+          <LoadingState />
+        ) : !data ? (
+          <EmptyState />
+        ) : (
+          <>
+            <Section id="sec-overview" title="Visão geral">
+              <SlideOverview data={data} />
+            </Section>
+
+            <Section id="sec-captures" title="Experiências por capital">
+              <ChartFrame>
+                <SlideCaptures real={split.real} unknown={split.unknown} />
+              </ChartFrame>
+            </Section>
+
+            <Section id="sec-generations" title="Fotos geradas por capital">
+              <ChartFrame>
+                <SlideGenerations real={split.real} unknown={split.unknown} />
+              </ChartFrame>
+            </Section>
+
+            <Section id="sec-prints" title="Impressões por capital">
+              <ChartFrame>
+                <SlidePrints real={split.real} unknown={split.unknown} data={data} />
+              </ChartFrame>
+            </Section>
+
+            <Section id="sec-cards" title="Resumo por capital">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                {ordered.map((c) => (
+                  <CapitalCard key={c.capitalId} c={c} />
+                ))}
               </div>
-            )}
-          </div>
-        </main>
+            </Section>
+          </>
+        )}
 
-        {/* Navegação fixa */}
-        <footer className="px-4 sm:px-8 py-3 border-t border-white/10 flex items-center justify-between gap-3">
-          <button
-            onClick={() => setSlide((s) => Math.max(0, s - 1))}
-            disabled={safeSlide === 0 || total === 0}
-            className="min-w-[56px] min-h-[44px] sm:min-h-[48px] px-3 rounded-md border border-white/15 text-base disabled:opacity-30 hover:bg-white/5"
-            aria-label="Página anterior"
-          >
-            ←
-          </button>
-          <div className="flex-1 flex flex-col items-center gap-1.5 min-w-0">
-            <div className="flex items-center gap-1.5">
-              {slides.map((s, i) => (
-                <button
-                  key={s.key}
-                  onClick={() => setSlide(i)}
-                  aria-label={`Ir para página ${i + 1}`}
-                  className="h-2.5 rounded-full transition-all"
-                  style={{
-                    width: i === safeSlide ? 22 : 8,
-                    background: i === safeSlide ? COLOR_GOLD : "rgba(255,255,255,0.25)",
-                  }}
-                />
-              ))}
-            </div>
-            <div className="text-[11px] text-white/55">
-              {total === 0 ? "—" : `Página ${safeSlide + 1} de ${total}`}
-            </div>
-          </div>
-          <button
-            onClick={() => setSlide((s) => Math.min(total - 1, s + 1))}
-            disabled={safeSlide >= total - 1 || total === 0}
-            className="min-w-[56px] min-h-[44px] sm:min-h-[48px] px-3 rounded-md border border-white/15 text-base disabled:opacity-30 hover:bg-white/5"
-            aria-label="Próxima página"
-          >
-            →
-          </button>
+        <footer className="pt-6 pb-10 text-center text-[11px] text-white/40">
+          Pipoca &amp; Cena · Tela Brasil
         </footer>
-      </div>
+      </main>
+
+      {/* Botão voltar ao topo */}
+      {showTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-5 right-5 z-40 rounded-full shadow-lg px-4 py-3 text-xs font-semibold uppercase tracking-wider"
+          style={{ background: COLOR_GOLD, color: COLOR_BG }}
+          aria-label="Voltar ao topo"
+        >
+          ↑ Topo
+        </button>
+      )}
 
       <style>{`
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );
 }
+
+function Section({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-32 flex flex-col gap-3">
+      <h2 className="font-display text-xl sm:text-2xl text-white/90">{title}</h2>
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-5">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function ChartFrame({ children }: { children: React.ReactNode }) {
+  // Altura fixa por breakpoint para gráficos Recharts responsivos.
+  return <div className="h-[300px] md:h-[340px] lg:h-[400px] w-full">{children}</div>;
+}
+
 
 // ───────────────────────────── Estados ─────────────────────────────
 function LoadingState() {
