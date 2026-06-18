@@ -14,7 +14,7 @@ export const Route = createFileRoute("/imprimir/$queueId")({
 });
 
 const BAR_URL =
-  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/print/barra-impressao-v1.jpg";
+  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/print/barra-impressao-v1.jpg.jpg";
 const CANVAS_W = 1200;
 const CANVAS_H = 1800;
 
