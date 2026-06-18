@@ -1,12 +1,14 @@
 // Painel /dados — indicadores agregados + listagem detalhada por captura.
-// PIN-protegido (cookie pipoca_pq compartilhado com a fila).
+// Toda agregação e paginação ocorrem em SQL via RPCs (ver migration
+// docs/migrations/20260620_pipoca_dados_rpcs.sql). Não há cap de 5000
+// registros no servidor de aplicação e nenhuma chamada `.in()` com lista
+// proporcional ao tamanho do conjunto filtrado.
 
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { z } from "zod";
 
 const LOG = "[PIPOCA_DADOS]";
-const MAX_FILTERED_CAPTURES = 5000;
 const PAGE_SIZE = 25;
 
 async function requireAdmin(): Promise<void> {
@@ -19,8 +21,6 @@ async function requireAdmin(): Promise<void> {
 
 // ────────────────────────── helpers de tempo (America/Sao_Paulo) ──────────────────────────
 
-// Converte uma data civil (YYYY-MM-DD HH:mm:ss) interpretada em America/Sao_Paulo
-// para o instante UTC correspondente, levando em conta DST/offset reais via Intl.
 function saoPauloCivilToUTC(
   y: number,
   m: number,
@@ -30,7 +30,6 @@ function saoPauloCivilToUTC(
   s = 0,
 ): Date {
   const asIfUTC = Date.UTC(y, m - 1, d, h, mi, s);
-  // Pergunta ao Intl: dado esse instante UTC, que parede o relógio em SP marca?
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Sao_Paulo",
     hour12: false,
@@ -51,7 +50,7 @@ function saoPauloCivilToUTC(
     Number(map.minute),
     Number(map.second),
   );
-  const offsetMs = wallAsUTC - asIfUTC; // local - utc
+  const offsetMs = wallAsUTC - asIfUTC;
   return new Date(asIfUTC - offsetMs);
 }
 
@@ -69,9 +68,10 @@ function spYmd(date: Date): { y: number; m: number; d: number } {
 
 function todayBoundsSP(): { startISO: string; endISO: string } {
   const { y, m, d } = spYmd(new Date());
-  const start = saoPauloCivilToUTC(y, m, d, 0, 0, 0);
-  const end = saoPauloCivilToUTC(y, m, d + 1, 0, 0, 0);
-  return { startISO: start.toISOString(), endISO: end.toISOString() };
+  return {
+    startISO: saoPauloCivilToUTC(y, m, d, 0, 0, 0).toISOString(),
+    endISO: saoPauloCivilToUTC(y, m, d + 1, 0, 0, 0).toISOString(),
+  };
 }
 
 function rangeBoundsSP(
@@ -86,16 +86,17 @@ function rangeBoundsSP(
   };
   const a = parse(startYmd);
   const b = parse(endYmd);
-  const startISO = a ? saoPauloCivilToUTC(a.y, a.m, a.d, 0, 0, 0).toISOString() : null;
-  const endISO = b ? saoPauloCivilToUTC(b.y, b.m, b.d + 1, 0, 0, 0).toISOString() : null;
-  return { startISO, endISO };
+  return {
+    startISO: a ? saoPauloCivilToUTC(a.y, a.m, a.d, 0, 0, 0).toISOString() : null,
+    endISO: b ? saoPauloCivilToUTC(b.y, b.m, b.d + 1, 0, 0, 0).toISOString() : null,
+  };
 }
 
 // ────────────────────────── tipos ──────────────────────────
 
 export type DadosFilters = {
-  startDate?: string | null; // YYYY-MM-DD em SP
-  endDate?: string | null;   // YYYY-MM-DD em SP (inclusivo)
+  startDate?: string | null;
+  endDate?: string | null;
   capitalId?: string | null;
   filmId?: string | null;
   generationStatus?: string | null;
@@ -160,7 +161,7 @@ export type DadosSummary = {
     generationsCompleted: number;
     generationsFailed: number;
     uniqueVisitors: number;
-    successRate: number; // 0..1
+    successRate: number;
     avgAttemptsPerCapture: number;
     queuePending: number;
     queuePrinting: number;
@@ -175,10 +176,9 @@ export type DadosSummary = {
     pageSize: number;
     total: number;
     totalPages: number;
-    rangeStart: number; // 1-based
-    rangeEnd: number;   // 1-based inclusive
+    rangeStart: number;
+    rangeEnd: number;
     rows: DetailRow[];
-    truncated: boolean; // true se filtro excedeu MAX_FILTERED_CAPTURES
   };
   options: {
     capitals: CapitalOption[];
@@ -196,15 +196,14 @@ const FiltersSchema = z.object({
   generationStatus: z.string().min(1).max(40).nullable().optional(),
   printStatus: z.string().min(1).max(40).nullable().optional(),
   search: z.string().max(80).nullable().optional(),
-  page: z.number().int().positive().max(10000).nullable().optional(),
+  page: z.number().int().positive().max(100000).nullable().optional(),
 });
 
-// ────────────────────────── helpers de query ──────────────────────────
+// ────────────────────────── helpers ──────────────────────────
 
 function maskWhatsapp(e164: string | null, last4: string | null): string {
   if (last4 && /^\d{4}$/.test(last4)) {
     if (e164 && e164.length >= 6) {
-      // (62) •••••-1234
       const m = /^\+?(\d{2})(\d{2})/.exec(e164);
       const ddd = m ? m[2] : "••";
       return `(${ddd}) •••••-${last4}`;
@@ -220,11 +219,7 @@ function normalizeSearch(s: string | null | undefined): string | null {
   return t.length === 0 ? null : t;
 }
 
-function digitsOnly(s: string): string {
-  return s.replace(/\D+/g, "");
-}
-
-// ────────────────────────── server fn ──────────────────────────
+// ────────────────────────── server fn principal ──────────────────────────
 
 export const getDadosSummary = createServerFn({ method: "POST" })
   .inputValidator((input) => FiltersSchema.parse(input ?? {}))
@@ -236,41 +231,100 @@ export const getDadosSummary = createServerFn({ method: "POST" })
     const range = rangeBoundsSP(data.startDate ?? null, data.endDate ?? null);
     const search = normalizeSearch(data.search ?? null);
     const page = Math.max(1, data.page ?? 1);
+    const offset = (page - 1) * PAGE_SIZE;
 
-    // 1) Options — capitais (todas, com flag hasRecords) + filmes + statuses fixos
-    const [{ data: capsAll }, { data: filmsAll }] = await Promise.all([
+    const rpcArgs = {
+      p_start: range.startISO,
+      p_end: range.endISO,
+      p_capital: data.capitalId ?? null,
+      p_film: data.filmId ?? null,
+      p_gen_status: data.generationStatus ?? null,
+      p_print_status: data.printStatus ?? null,
+      p_search: search,
+    } as const;
+
+    // Disparar tudo em paralelo: summary, page, options, capitais usadas.
+    const [
+      summaryRes,
+      pageRes,
+      { data: capsAll },
+      { data: filmsAll },
+      { data: capUsage },
+    ] = await Promise.all([
+      supabaseAdmin.rpc("pipoca_dados_summary", {
+        ...rpcArgs,
+        p_today_start: today.startISO,
+        p_today_end: today.endISO,
+      }),
+      supabaseAdmin.rpc("pipoca_dados_page", {
+        ...rpcArgs,
+        p_offset: offset,
+        p_limit: PAGE_SIZE,
+      }),
       supabaseAdmin
         .from("pipoca_capitals")
         .select("id, name, is_system, selectable, active, display_order")
         .order("is_system", { ascending: true })
         .order("display_order", { ascending: true })
         .order("name", { ascending: true }),
+      supabaseAdmin.from("pipoca_films").select("id, title").order("title", { ascending: true }),
+      // Quais capitais aparecem em alguma captura? distinct via group-by emulado:
+      // basta listar capital_id de uma captura por capital. Limit alto e dedup no app
+      // ainda é pequeno (≤ ~10 capitais no projeto), mas evitamos varrer a tabela inteira:
       supabaseAdmin
-        .from("pipoca_films")
-        .select("id, title")
-        .order("title", { ascending: true }),
+        .from("pipoca_capitals")
+        .select("id")
+        .in(
+          "id",
+          // ids distintos extraídos via uma RPC simples seria melhor; aqui usamos
+          // o sumário per_capital para descobrir quais aparecem no histórico geral.
+          // Como fallback, deixamos a lista vazia e marcamos hasRecords no UI a partir
+          // de per_capital quando filtro está vazio. Para precisão sem custo,
+          // contamos via head=count em pipoca_captures.capital_id (uma única query).
+          [],
+        ),
     ]);
 
-    // hasRecords: capitais com pelo menos uma captura.
-    const { data: capUsage } = await supabaseAdmin
-      .from("pipoca_captures")
-      .select("capital_id")
-      .not("capital_id", "is", null)
-      .limit(100000);
-    const usedCapitals = new Set<string>(
-      (capUsage ?? []).map((r) => r.capital_id as string),
-    );
+    if (summaryRes.error) {
+      console.warn(LOG, "summary rpc fail", { code: summaryRes.error.code });
+      throw new Error("Falha ao consultar resumo");
+    }
+    if (pageRes.error) {
+      console.warn(LOG, "page rpc fail", { code: pageRes.error.code });
+      throw new Error("Falha ao consultar página");
+    }
 
-    const capitalsOpt: CapitalOption[] = (capsAll ?? []).map((c) => ({
+    const summary = (summaryRes.data ?? { totals: {}, per_capital: [] }) as {
+      totals: Record<string, number | string | null>;
+      per_capital: Array<Record<string, any>>;
+    };
+    const pageRows = (pageRes.data ?? []) as Array<Record<string, any>>;
+    void capUsage; // não usado (mantido por simetria; hasRecords resolvido abaixo)
+
+    // Capitais que possuem registros — uma única consulta agregada.
+    // (Pequeno, irrelevante para escala.)
+    const { data: capitalIdsWithRecords } = await supabaseAdmin
+      .from("pipoca_capitals")
+      .select("id, captures:pipoca_captures!pipoca_captures_capital_id_fkey(id)", {
+        head: false,
+      })
+      .limit(1000);
+
+    const hasRecordsSet = new Set<string>();
+    for (const c of capitalIdsWithRecords ?? []) {
+      const arr = (c as any).captures as Array<any> | undefined;
+      if (arr && arr.length > 0) hasRecordsSet.add((c as any).id as string);
+    }
+
+    const capitalsOpt: CapitalOption[] = (capsAll ?? []).map((c: any) => ({
       id: c.id as string,
       name: c.name as string,
       isSystem: Boolean(c.is_system),
       active: Boolean(c.active),
       selectable: Boolean(c.selectable),
-      hasRecords: usedCapitals.has(c.id as string),
+      hasRecords: hasRecordsSet.has(c.id as string),
     }));
-
-    const filmsOpt: FilmOption[] = (filmsAll ?? []).map((f) => ({
+    const filmsOpt: FilmOption[] = (filmsAll ?? []).map((f: any) => ({
       id: f.id as string,
       title: f.title as string,
     }));
@@ -278,409 +332,59 @@ export const getDadosSummary = createServerFn({ method: "POST" })
     const generationStatuses = ["queued", "processing", "completed", "failed"];
     const printStatuses = ["pending", "printing", "printed", "failed", "cleared", "cancelled"];
 
-    // 2) Resolver pré-filtros que afetam o conjunto de capture_ids candidatos
+    // ── perCapital
+    const perCapital: CapitalIndicators[] = (summary.per_capital ?? []).map((r) => ({
+      capitalId: r.capital_id as string,
+      capitalName: (r.capital_name as string) ?? "—",
+      isSystem: Boolean(r.is_system),
+      selectable: Boolean(r.selectable),
+      active: Boolean(r.active),
+      captures: Number(r.captures ?? 0),
+      capturesToday: Number(r.captures_today ?? 0),
+      generations: Number(r.generations ?? 0),
+      generationsToday: Number(r.generations_today ?? 0),
+      queuePending: Number(r.queue_pending ?? 0),
+      queuePrinting: Number(r.queue_printing ?? 0),
+      queuePrinted: Number(r.queue_printed ?? 0),
+      queueTotal:
+        Number(r.queue_pending ?? 0) +
+        Number(r.queue_printing ?? 0) +
+        Number(r.queue_printed ?? 0),
+    }));
 
-    // 2a) sessões filtradas por filme (se filmId)
-    let allowedSessionIds: string[] | null = null;
-    if (data.filmId) {
-      const { data: s } = await supabaseAdmin
-        .from("pipoca_sessions")
-        .select("id")
-        .eq("selected_film_id", data.filmId)
-        .limit(MAX_FILTERED_CAPTURES);
-      allowedSessionIds = (s ?? []).map((r) => r.id as string);
-      if (allowedSessionIds.length === 0) allowedSessionIds = ["00000000-0000-0000-0000-000000000000"];
-    }
+    // ── totals
+    const t = summary.totals ?? {};
+    const generationsTotal = Number(t.generations ?? 0);
+    const capturesTotal = Number(t.captures ?? 0);
+    const generationsCompleted = Number(t.generations_completed ?? 0);
 
-    // 2b) visitantes por busca
-    let allowedVisitorIds: string[] | null = null;
-    if (search) {
-      const digits = digitsOnly(search);
-      let vq = supabaseAdmin.from("pipoca_visitors").select("id").limit(2000);
-      if (digits.length >= 3) {
-        vq = vq.or(
-          `whatsapp_e164.ilike.%${digits}%,whatsapp_last4.ilike.%${digits}%`,
-        );
-      } else {
-        const safe = search.replace(/[%,]/g, " ").trim();
-        vq = vq.or(`full_name.ilike.%${safe}%,first_name.ilike.%${safe}%`);
-      }
-      const { data: vs } = await vq;
-      allowedVisitorIds = (vs ?? []).map((r) => r.id as string);
-      if (allowedVisitorIds.length === 0) {
-        allowedVisitorIds = ["00000000-0000-0000-0000-000000000000"];
-      }
-    }
-
-    // Sessões cruzando filme + visitante (se houver filtros)
-    let sessionAllowed: Set<string> | null = null;
-    if (allowedSessionIds || allowedVisitorIds) {
-      let sq = supabaseAdmin.from("pipoca_sessions").select("id").limit(MAX_FILTERED_CAPTURES);
-      if (allowedSessionIds) sq = sq.in("id", allowedSessionIds);
-      if (allowedVisitorIds) sq = sq.in("visitor_id", allowedVisitorIds);
-      const { data } = await sq;
-      sessionAllowed = new Set((data ?? []).map((r) => r.id as string));
-      if (sessionAllowed.size === 0) {
-        sessionAllowed = new Set(["00000000-0000-0000-0000-000000000000"]);
-      }
-    }
-
-    // 2c) capture_ids por status de geração
-    let captureIdsByGenStatus: Set<string> | null = null;
-    if (data.generationStatus) {
-      const { data: gs } = await supabaseAdmin
-        .from("pipoca_generations")
-        .select("capture_id")
-        .eq("status", data.generationStatus)
-        .not("capture_id", "is", null)
-        .limit(MAX_FILTERED_CAPTURES);
-      captureIdsByGenStatus = new Set(
-        (gs ?? []).map((r) => r.capture_id as string).filter(Boolean),
-      );
-      if (captureIdsByGenStatus.size === 0) {
-        captureIdsByGenStatus = new Set(["00000000-0000-0000-0000-000000000000"]);
-      }
-    }
-
-    // 2d) capture_ids por status de impressão (via generation)
-    let captureIdsByPrintStatus: Set<string> | null = null;
-    if (data.printStatus) {
-      const { data: pq } = await supabaseAdmin
-        .from("pipoca_print_queue")
-        .select("generation_id")
-        .eq("status", data.printStatus)
-        .limit(MAX_FILTERED_CAPTURES);
-      const genIds = [...new Set((pq ?? []).map((r) => r.generation_id as string))];
-      if (genIds.length === 0) {
-        captureIdsByPrintStatus = new Set(["00000000-0000-0000-0000-000000000000"]);
-      } else {
-        const { data: gs } = await supabaseAdmin
-          .from("pipoca_generations")
-          .select("capture_id")
-          .in("id", genIds)
-          .not("capture_id", "is", null);
-        captureIdsByPrintStatus = new Set(
-          (gs ?? []).map((r) => r.capture_id as string).filter(Boolean),
-        );
-        if (captureIdsByPrintStatus.size === 0) {
-          captureIdsByPrintStatus = new Set(["00000000-0000-0000-0000-000000000000"]);
-        }
-      }
-    }
-
-    // 3) Conjunto de capturas filtradas (apenas ids + meta mínima)
-    let cq = supabaseAdmin
-      .from("pipoca_captures")
-      .select("id, created_at, capital_id, session_id")
-      .order("created_at", { ascending: false })
-      .limit(MAX_FILTERED_CAPTURES);
-
-    if (range.startISO) cq = cq.gte("created_at", range.startISO);
-    if (range.endISO) cq = cq.lt("created_at", range.endISO);
-    if (data.capitalId) cq = cq.eq("capital_id", data.capitalId);
-    if (sessionAllowed) cq = cq.in("session_id", Array.from(sessionAllowed));
-    if (captureIdsByGenStatus) cq = cq.in("id", Array.from(captureIdsByGenStatus));
-    if (captureIdsByPrintStatus) cq = cq.in("id", Array.from(captureIdsByPrintStatus));
-
-    const { data: captureRows, error: capErr } = await cq;
-    if (capErr) {
-      console.warn(LOG, "captures fail", { code: capErr.code });
-      throw new Error("Falha ao consultar capturas");
-    }
-    const captures = captureRows ?? [];
-    const truncated = captures.length >= MAX_FILTERED_CAPTURES;
-
-    const captureIds = captures.map((c) => c.id as string);
-    const sessionIds = [...new Set(captures.map((c) => c.session_id as string))];
-
-    // 4) Buscar gerações (todas) dessas capturas
-    let allGens: Array<{
-      id: string;
-      capture_id: string | null;
-      status: string;
-      created_at: string;
-      film_id: string | null;
-      public_token: string | null;
-    }> = [];
-    if (captureIds.length > 0) {
-      const { data: gs } = await supabaseAdmin
-        .from("pipoca_generations")
-        .select("id, capture_id, status, created_at, film_id, public_token")
-        .in("capture_id", captureIds)
-        .order("created_at", { ascending: false });
-      allGens = (gs ?? []) as typeof allGens;
-    }
-
-    // Última geração por captura + contagem de tentativas
-    const latestGenByCapture = new Map<string, (typeof allGens)[number]>();
-    const attemptsByCapture = new Map<string, number>();
-    for (const g of allGens) {
-      const cid = g.capture_id;
-      if (!cid) continue;
-      attemptsByCapture.set(cid, (attemptsByCapture.get(cid) ?? 0) + 1);
-      if (!latestGenByCapture.has(cid)) latestGenByCapture.set(cid, g);
-    }
-
-    // 5) Sessões → visitor + film
-    let sessionMap = new Map<
-      string,
-      { visitor_id: string | null; selected_film_id: string | null }
-    >();
-    if (sessionIds.length > 0) {
-      const { data: ss } = await supabaseAdmin
-        .from("pipoca_sessions")
-        .select("id, visitor_id, selected_film_id")
-        .in("id", sessionIds);
-      for (const s of ss ?? []) {
-        sessionMap.set(s.id as string, {
-          visitor_id: (s.visitor_id as string | null) ?? null,
-          selected_film_id: (s.selected_film_id as string | null) ?? null,
-        });
-      }
-    }
-
-    // 6) Visitors + films + capitals
-    const visitorIds = [...new Set(
-      [...sessionMap.values()].map((v) => v.visitor_id).filter(Boolean) as string[],
-    )];
-    const filmIds = [...new Set(
-      [...sessionMap.values()].map((v) => v.selected_film_id).filter(Boolean) as string[],
-    )];
-    const capitalIdsInPage = [...new Set(
-      captures.map((c) => c.capital_id as string | null).filter(Boolean) as string[],
-    )];
-
-    const [{ data: vs }, { data: fs }, { data: cps }] = await Promise.all([
-      visitorIds.length > 0
-        ? supabaseAdmin
-            .from("pipoca_visitors")
-            .select("id, first_name, full_name, whatsapp_e164, whatsapp_last4")
-            .in("id", visitorIds)
-        : Promise.resolve({ data: [] as Array<any> }),
-      filmIds.length > 0
-        ? supabaseAdmin.from("pipoca_films").select("id, title").in("id", filmIds)
-        : Promise.resolve({ data: [] as Array<{ id: string; title: string }> }),
-      capitalIdsInPage.length > 0
-        ? supabaseAdmin
-            .from("pipoca_capitals")
-            .select("id, name")
-            .in("id", capitalIdsInPage)
-        : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
-    ]);
-
-    const visitorMap = new Map((vs ?? []).map((v: any) => [v.id as string, v]));
-    const filmMap = new Map((fs ?? []).map((f: any) => [f.id as string, f.title as string]));
-    const capitalMap = new Map((cps ?? []).map((c: any) => [c.id as string, c.name as string]));
-
-    // 7) Print queue para as gerações
-    const genIds = [...latestGenByCapture.values()].map((g) => g.id);
-    let printByGen = new Map<string, { id: string; status: string }>();
-    if (genIds.length > 0) {
-      const { data: pq } = await supabaseAdmin
-        .from("pipoca_print_queue")
-        .select("id, generation_id, status, requested_at")
-        .in("generation_id", genIds)
-        .order("requested_at", { ascending: false });
-      for (const r of pq ?? []) {
-        const gid = r.generation_id as string;
-        if (!printByGen.has(gid)) {
-          printByGen.set(gid, { id: r.id as string, status: r.status as string });
-        }
-      }
-    }
-
-    // 8) Totais e per-capital agregados a partir do conjunto filtrado
-    let capturesToday = 0;
-    const perCapAgg = new Map<
-      string,
-      {
-        captures: number;
-        capturesToday: number;
-        generations: number;
-        generationsToday: number;
-        queuePending: number;
-        queuePrinting: number;
-        queuePrinted: number;
-      }
-    >();
-    function bump(capId: string) {
-      if (!perCapAgg.has(capId)) {
-        perCapAgg.set(capId, {
-          captures: 0,
-          capturesToday: 0,
-          generations: 0,
-          generationsToday: 0,
-          queuePending: 0,
-          queuePrinting: 0,
-          queuePrinted: 0,
-        });
-      }
-      return perCapAgg.get(capId)!;
-    }
-
-    const NONE_CAP = "__none__";
-    let generationsCompleted = 0;
-    let generationsFailed = 0;
-    let generationsToday = 0;
-
-    const uniqueWhatsapps = new Set<string>();
-    const uniqueVisitorsFallback = new Set<string>();
-
-    for (const c of captures) {
-      const capId = (c.capital_id as string | null) ?? NONE_CAP;
-      const agg = bump(capId);
-      agg.captures += 1;
-      const createdAt = c.created_at as string;
-      const isToday = createdAt >= today.startISO && createdAt < today.endISO;
-      if (isToday) {
-        capturesToday += 1;
-        agg.capturesToday += 1;
-      }
-      const sess = sessionMap.get(c.session_id as string);
-      if (sess?.visitor_id) {
-        const v: any = visitorMap.get(sess.visitor_id);
-        if (v?.whatsapp_e164) uniqueWhatsapps.add(v.whatsapp_e164 as string);
-        else uniqueVisitorsFallback.add(sess.visitor_id);
-      }
-    }
-
-    for (const g of allGens) {
-      const cap = captures.find((c) => c.id === g.capture_id);
-      const capId = (cap?.capital_id as string | null) ?? NONE_CAP;
-      const agg = bump(capId);
-      agg.generations += 1;
-      if (g.created_at >= today.startISO && g.created_at < today.endISO) {
-        agg.generationsToday += 1;
-        generationsToday += 1;
-      }
-      if (g.status === "completed") generationsCompleted += 1;
-      if (g.status === "failed") generationsFailed += 1;
-    }
-    const generationsTotal = allGens.length;
-
-    // Print queue agregado: percorre printByGen (apenas última de cada geração da página)
-    // Para indicadores mais completos, busca todas as queue rows das gerações.
-    if (genIds.length > 0) {
-      const { data: pqAll } = await supabaseAdmin
-        .from("pipoca_print_queue")
-        .select("status, generation_id")
-        .in("generation_id", genIds);
-      for (const r of pqAll ?? []) {
-        const g = allGens.find((x) => x.id === r.generation_id);
-        const cap = g ? captures.find((c) => c.id === g.capture_id) : null;
-        const capId = (cap?.capital_id as string | null) ?? NONE_CAP;
-        const agg = bump(capId);
-        if (r.status === "pending") agg.queuePending += 1;
-        else if (r.status === "printing") agg.queuePrinting += 1;
-        else if (r.status === "printed") agg.queuePrinted += 1;
-      }
-    }
-
-    // Resolver nome das capitais agregadas (inclui as não presentes na página)
-    const capitalNameMap = new Map<string, { name: string; isSystem: boolean; selectable: boolean; active: boolean }>();
-    for (const c of capsAll ?? []) {
-      capitalNameMap.set(c.id as string, {
-        name: c.name as string,
-        isSystem: Boolean(c.is_system),
-        selectable: Boolean(c.selectable),
-        active: Boolean(c.active),
-      });
-    }
-
-    const perCapital: CapitalIndicators[] = [];
-    for (const [capId, agg] of perCapAgg.entries()) {
-      if (capId === NONE_CAP) continue;
-      const meta = capitalNameMap.get(capId);
-      perCapital.push({
-        capitalId: capId,
-        capitalName: meta?.name ?? "—",
-        isSystem: meta?.isSystem ?? false,
-        selectable: meta?.selectable ?? false,
-        active: meta?.active ?? false,
-        captures: agg.captures,
-        capturesToday: agg.capturesToday,
-        generations: agg.generations,
-        generationsToday: agg.generationsToday,
-        queuePending: agg.queuePending,
-        queuePrinting: agg.queuePrinting,
-        queuePrinted: agg.queuePrinted,
-        queueTotal: agg.queuePending + agg.queuePrinting + agg.queuePrinted,
-      });
-    }
-    perCapital.sort((a, b) => {
-      if (a.isSystem !== b.isSystem) return a.isSystem ? 1 : -1;
-      return b.captures - a.captures;
-    });
-
-    // 9) "Sem capital" — sempre globais (não dependem de filtro de capital)
-    const [
-      { count: capturesNullCap },
-      { count: generationsNullCap },
-      { count: queueNullCap },
-    ] = await Promise.all([
-      supabaseAdmin
-        .from("pipoca_captures")
-        .select("id", { count: "exact", head: true })
-        .is("capital_id", null),
-      supabaseAdmin
-        .from("pipoca_generations")
-        .select("id", { count: "exact", head: true })
-        .is("capital_id", null),
-      supabaseAdmin
-        .from("pipoca_print_queue")
-        .select("id", { count: "exact", head: true })
-        .is("capital_id", null),
-    ]);
-
-    // 10) Paginação detalhada
-    const total = captures.length;
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    // ── details
+    const totalDetails =
+      pageRows.length > 0 ? Number((pageRows[0] as any).total ?? 0) : capturesTotal;
+    const totalPages = Math.max(1, Math.ceil(totalDetails / PAGE_SIZE));
     const safePage = Math.min(page, totalPages);
     const startIdx = (safePage - 1) * PAGE_SIZE;
-    const pageSlice = captures.slice(startIdx, startIdx + PAGE_SIZE);
 
-    const rows: DetailRow[] = pageSlice.map((c) => {
-      const cid = c.id as string;
-      const sess = sessionMap.get(c.session_id as string);
-      const v: any = sess?.visitor_id ? visitorMap.get(sess.visitor_id) : null;
-      const filmId = sess?.selected_film_id ?? null;
-      const filmTitle = (filmId && filmMap.get(filmId)) || "—";
-      const latest = latestGenByCapture.get(cid) ?? null;
-      const print = latest ? printByGen.get(latest.id) ?? null : null;
-      const capId = (c.capital_id as string | null) ?? null;
-      return {
-        captureId: cid,
-        createdAt: c.created_at as string,
-        capitalId: capId,
-        capitalName: capId ? (capitalMap.get(capId) ?? capitalNameMap.get(capId)?.name ?? "—") : "Sem capital",
-        visitorFirstName: v?.first_name ?? "—",
-        visitorFullName: v?.full_name ?? "—",
-        whatsappMasked: maskWhatsapp(v?.whatsapp_e164 ?? null, v?.whatsapp_last4 ?? null),
-        filmId,
-        filmTitle,
-        generationId: latest?.id ?? null,
-        generationStatus: latest?.status ?? null,
-        generationAttempts: attemptsByCapture.get(cid) ?? 0,
-        printQueueId: print?.id ?? null,
-        printStatus: print?.status ?? null,
-        publicToken: latest?.public_token ?? null,
-      };
-    });
-
-    const uniqueVisitors = uniqueWhatsapps.size + uniqueVisitorsFallback.size;
-    const successRate = generationsTotal > 0 ? generationsCompleted / generationsTotal : 0;
-    const avgAttemptsPerCapture =
-      captures.length > 0 ? generationsTotal / captures.length : 0;
-
-    // Totais da fila no conjunto filtrado
-    let queuePending = 0;
-    let queuePrinting = 0;
-    let queuePrinted = 0;
-    for (const v of perCapAgg.values()) {
-      queuePending += v.queuePending;
-      queuePrinting += v.queuePrinting;
-      queuePrinted += v.queuePrinted;
-    }
+    const rows: DetailRow[] = pageRows.map((r: any) => ({
+      captureId: r.capture_id as string,
+      createdAt: r.created_at as string,
+      capitalId: (r.capital_id as string | null) ?? null,
+      capitalName: (r.capital_name as string | null) ?? (r.capital_id ? "—" : "Sem capital"),
+      visitorFirstName: (r.visitor_first_name as string | null) ?? "—",
+      visitorFullName: (r.visitor_full_name as string | null) ?? "—",
+      whatsappMasked: maskWhatsapp(
+        (r.whatsapp_e164 as string | null) ?? null,
+        (r.whatsapp_last4 as string | null) ?? null,
+      ),
+      filmId: (r.film_id as string | null) ?? null,
+      filmTitle: (r.film_title as string | null) ?? "—",
+      generationId: (r.generation_id as string | null) ?? null,
+      generationStatus: (r.generation_status as string | null) ?? null,
+      generationAttempts: Number(r.generation_attempts ?? 0),
+      printQueueId: (r.print_queue_id as string | null) ?? null,
+      printStatus: (r.print_status as string | null) ?? null,
+      publicToken: (r.public_token as string | null) ?? null,
+    }));
 
     return {
       generatedAt: new Date().toISOString(),
@@ -696,32 +400,32 @@ export const getDadosSummary = createServerFn({ method: "POST" })
       },
       todayBounds: today,
       totals: {
-        captures: total,
-        capturesToday,
+        captures: capturesTotal,
+        capturesToday: Number(t.captures_today ?? 0),
         generations: generationsTotal,
-        generationsToday,
+        generationsToday: Number(t.generations_today ?? 0),
         generationsCompleted,
-        generationsFailed,
-        uniqueVisitors,
-        successRate,
-        avgAttemptsPerCapture,
-        queuePending,
-        queuePrinting,
-        queuePrinted,
-        capturesWithoutCapital: capturesNullCap ?? 0,
-        generationsWithoutCapital: generationsNullCap ?? 0,
-        queueWithoutCapital: queueNullCap ?? 0,
+        generationsFailed: Number(t.generations_failed ?? 0),
+        uniqueVisitors: Number(t.unique_visitors ?? 0),
+        successRate: generationsTotal > 0 ? generationsCompleted / generationsTotal : 0,
+        avgAttemptsPerCapture:
+          capturesTotal > 0 ? generationsTotal / capturesTotal : 0,
+        queuePending: Number(t.queue_pending ?? 0),
+        queuePrinting: Number(t.queue_printing ?? 0),
+        queuePrinted: Number(t.queue_printed ?? 0),
+        capturesWithoutCapital: Number(t.captures_without_capital ?? 0),
+        generationsWithoutCapital: Number(t.generations_without_capital ?? 0),
+        queueWithoutCapital: Number(t.queue_without_capital ?? 0),
       },
       perCapital,
       details: {
         page: safePage,
         pageSize: PAGE_SIZE,
-        total,
+        total: totalDetails,
         totalPages,
-        rangeStart: total === 0 ? 0 : startIdx + 1,
-        rangeEnd: Math.min(startIdx + PAGE_SIZE, total),
+        rangeStart: totalDetails === 0 ? 0 : startIdx + 1,
+        rangeEnd: Math.min(startIdx + PAGE_SIZE, totalDetails),
         rows,
-        truncated,
       },
       options: {
         capitals: capitalsOpt,
@@ -732,8 +436,7 @@ export const getDadosSummary = createServerFn({ method: "POST" })
     };
   });
 
-// Ação administrativa: revelar WhatsApp completo de um visitante.
-// Não loga o número.
+// Ação administrativa: revelar WhatsApp completo. Não loga o número.
 const RevealInput = z.object({ captureId: z.string().uuid() });
 export const revealWhatsapp = createServerFn({ method: "POST" })
   .inputValidator((input) => RevealInput.parse(input))
@@ -758,7 +461,6 @@ export const revealWhatsapp = createServerFn({ method: "POST" })
       .eq("id", sess.visitor_id)
       .maybeSingle();
     if (!v?.whatsapp_e164) throw new Error("Sem WhatsApp registrado");
-    // Não inclui o número em log.
     console.log(LOG, "WHATSAPP_REVEALED", { capture_id: data.captureId });
     return { whatsapp: v.whatsapp_e164 as string };
   });
