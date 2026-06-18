@@ -31,7 +31,7 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
 
     const { data: gen, error: gErr } = await supabaseAdmin
       .from("pipoca_generations")
-      .select("id, session_id, final_image_path, public_token, status")
+      .select("id, session_id, capture_id, capital_id, final_image_path, public_token, status")
       .eq("public_token", data.publicToken)
       .eq("status", "completed")
       .maybeSingle();
@@ -76,6 +76,36 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
     }
     console.log(`${LOG} visitante localizado`);
 
+    // Resolve + validate capital. generation/capture/print must agree.
+    let captureCapitalId: string | null = null;
+    if (gen.capture_id) {
+      const { data: cap } = await supabaseAdmin
+        .from("pipoca_captures")
+        .select("capital_id")
+        .eq("id", gen.capture_id)
+        .maybeSingle();
+      captureCapitalId = (cap?.capital_id as string | null) ?? null;
+    }
+    const genCapitalId = (gen.capital_id as string | null) ?? null;
+    if (genCapitalId && captureCapitalId && genCapitalId !== captureCapitalId) {
+      console.warn("[PIPOCA_PRINT_CAPITAL]", "PRINT_CAPITAL_MISMATCH", {
+        generation_id: gen.id,
+        generation_capital_id: genCapitalId,
+        capture_capital_id: captureCapitalId,
+      });
+      throw new Error("PRINT_CAPITAL_MISMATCH");
+    }
+    let resolvedCapitalId = genCapitalId ?? captureCapitalId;
+    if (!resolvedCapitalId) {
+      const { data: unknown } = await supabaseAdmin
+        .from("pipoca_capitals")
+        .select("id")
+        .eq("slug", "capital-desconhecida")
+        .maybeSingle();
+      resolvedCapitalId = (unknown?.id as string | null) ?? null;
+    }
+    if (!resolvedCapitalId) throw new Error("Capital indisponível");
+
     // Existing active request?
     const { data: existing } = await supabaseAdmin
       .from("pipoca_print_queue")
@@ -99,6 +129,7 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
         visitor_id: visitor.id,
         generation_id: gen.id,
         status: "pending",
+        capital_id: resolvedCapitalId,
       })
       .select("id, status")
       .single();
@@ -128,6 +159,11 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
     }
 
     console.log(`${LOG} item criado na fila`, { queueId: inserted.id });
+    console.log("[PIPOCA_PRINT_CAPITAL]", "PRINT_CAPITAL_ATTACHED", {
+      queue_id: inserted.id,
+      generation_id: gen.id,
+      capital_id: resolvedCapitalId,
+    });
     return {
       success: true as const,
       alreadyRequested: false as const,
@@ -181,6 +217,7 @@ const ListInput = z.object({
   status: z
     .enum(["pending", "printing", "printed", "failed", "cleared", "cancelled", "active", "all"])
     .optional(),
+  capitalId: z.string().uuid().optional(),
 });
 
 export type PrintQueueItem = {
@@ -195,6 +232,8 @@ export type PrintQueueItem = {
   visitorFullName: string;
   visitorWhatsappLast4: string;
   thumbnailUrl: string | null;
+  capitalId: string | null;
+  capitalName: string;
 };
 
 export const listPrintQueue = createServerFn({ method: "POST" })
@@ -206,7 +245,7 @@ export const listPrintQueue = createServerFn({ method: "POST" })
     let q = supabaseAdmin
       .from("pipoca_print_queue")
       .select(
-        "id, status, requested_at, printing_started_at, printed_at, generation_id, visitor_id",
+        "id, status, requested_at, printing_started_at, printed_at, generation_id, visitor_id, capital_id",
       )
       .order("requested_at", { ascending: false })
       .limit(200);
@@ -217,6 +256,9 @@ export const listPrintQueue = createServerFn({ method: "POST" })
     } else if (statusFilter !== "all") {
       q = q.eq("status", statusFilter);
     }
+    if (data.capitalId) {
+      q = q.eq("capital_id", data.capitalId);
+    }
 
     const { data: rows, error } = await q;
     if (error) throw new Error("Falha ao listar fila");
@@ -224,8 +266,9 @@ export const listPrintQueue = createServerFn({ method: "POST" })
 
     const visitorIds = [...new Set(rows.map((r) => r.visitor_id))];
     const generationIds = [...new Set(rows.map((r) => r.generation_id))];
+    const capitalIds = [...new Set(rows.map((r) => r.capital_id).filter(Boolean) as string[])];
 
-    const [{ data: visitors }, { data: gens }] = await Promise.all([
+    const [{ data: visitors }, { data: gens }, { data: caps }] = await Promise.all([
       supabaseAdmin
         .from("pipoca_visitors")
         .select("id, first_name, full_name, whatsapp_last4")
@@ -234,6 +277,9 @@ export const listPrintQueue = createServerFn({ method: "POST" })
         .from("pipoca_generations")
         .select("id, final_image_path, film_id")
         .in("id", generationIds),
+      capitalIds.length > 0
+        ? supabaseAdmin.from("pipoca_capitals").select("id, name").in("id", capitalIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
     ]);
 
     const filmIds = [...new Set((gens ?? []).map((g) => g.film_id).filter(Boolean))];
@@ -245,6 +291,7 @@ export const listPrintQueue = createServerFn({ method: "POST" })
     const vMap = new Map((visitors ?? []).map((v) => [v.id, v]));
     const gMap = new Map((gens ?? []).map((g) => [g.id, g]));
     const fMap = new Map((films ?? []).map((f) => [f.id, f.title as string]));
+    const cMap = new Map((caps ?? []).map((c) => [c.id as string, c.name as string]));
 
     // Sign thumbnails in parallel.
     const items: PrintQueueItem[] = await Promise.all(
@@ -264,6 +311,7 @@ export const listPrintQueue = createServerFn({ method: "POST" })
           const hay = `${v?.full_name ?? ""} ${v?.first_name ?? ""} ${v?.whatsapp_last4 ?? ""}`.toLowerCase();
           if (!hay.includes(filtered)) return null as unknown as PrintQueueItem;
         }
+        const capId = (r.capital_id as string | null) ?? null;
         return {
           id: r.id,
           status: r.status,
@@ -276,12 +324,43 @@ export const listPrintQueue = createServerFn({ method: "POST" })
           visitorFullName: v?.full_name ?? "—",
           visitorWhatsappLast4: v?.whatsapp_last4 ?? "—",
           thumbnailUrl,
+          capitalId: capId,
+          capitalName: (capId && cMap.get(capId)) || "Capital desconhecida",
         } satisfies PrintQueueItem;
       }),
     );
 
     return { items: items.filter(Boolean) };
   });
+
+// Capitais que aparecem na fila (para popular o filtro).
+export const listPrintQueueCapitals = createServerFn({ method: "GET" }).handler(
+  async (): Promise<{ capitals: Array<{ id: string; name: string; isSystem: boolean }> }> => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("pipoca_print_queue")
+      .select("capital_id")
+      .not("capital_id", "is", null);
+    if (error) throw new Error("Falha ao listar capitais da fila");
+    const ids = [...new Set((rows ?? []).map((r) => r.capital_id as string))];
+    if (ids.length === 0) return { capitals: [] };
+    const { data: caps } = await supabaseAdmin
+      .from("pipoca_capitals")
+      .select("id, name, is_system, display_order")
+      .in("id", ids)
+      .order("is_system", { ascending: true })
+      .order("display_order", { ascending: true })
+      .order("name", { ascending: true });
+    return {
+      capitals: (caps ?? []).map((c) => ({
+        id: c.id as string,
+        name: c.name as string,
+        isSystem: Boolean(c.is_system),
+      })),
+    };
+  },
+);
 
 // ─── Admin: actions ──────────────────────────────────────────────────────
 const QueueIdInput = z.object({ queueId: z.string().uuid() });
