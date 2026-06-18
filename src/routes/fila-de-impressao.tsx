@@ -8,12 +8,15 @@ import {
   logoutPrintQueue,
   checkPrintQueueSession,
   listPrintQueue,
+  listPrintQueueCapitals,
   markPrintedItem,
   cancelPrintItem,
   clearPrintQueue,
   countActivePrintQueue,
   type PrintQueueItem,
 } from "@/lib/pipoca/print-queue.functions";
+
+type QueueCapitalOption = { id: string; name: string; isSystem: boolean };
 
 export const Route = createFileRoute("/fila-de-impressao")({
   head: () => ({
@@ -123,6 +126,7 @@ function getPageNumbers(current: number, total: number): Array<number | "…"> {
 
 function QueueView({ onSignOut }: { onSignOut: () => void }) {
   const list = useServerFn(listPrintQueue);
+  const listCaps = useServerFn(listPrintQueueCapitals);
   const markFn = useServerFn(markPrintedItem);
   const cancelFn = useServerFn(cancelPrintItem);
   const clearFn = useServerFn(clearPrintQueue);
@@ -130,6 +134,8 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   const logout = useServerFn(logoutPrintQueue);
 
   const [items, setItems] = useState<PrintQueueItem[]>([]);
+  const [capitalOptions, setCapitalOptions] = useState<QueueCapitalOption[]>([]);
+  const [capitalFilter, setCapitalFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [loading, setLoading] = useState(true);
@@ -142,7 +148,13 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await list({ data: { search: search || undefined, status: statusFilter } });
+      const r = await list({
+        data: {
+          search: search || undefined,
+          status: statusFilter,
+          capitalId: capitalFilter !== "all" ? capitalFilter : undefined,
+        },
+      });
       setItems(r.items);
       const c = await countFn({});
       setActiveCount(c.count);
@@ -155,13 +167,33 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [list, countFn, search, statusFilter, onSignOut]);
+  }, [list, countFn, search, statusFilter, capitalFilter, onSignOut]);
 
   useEffect(() => {
     void refresh();
     const t = window.setInterval(refresh, 10_000);
     return () => window.clearInterval(t);
   }, [refresh]);
+
+  // Carrega capitais que existem na fila (uma vez, com refresh periódico leve).
+  useEffect(() => {
+    let alive = true;
+    async function loadCaps() {
+      try {
+        const r = await listCaps({});
+        if (!alive) return;
+        setCapitalOptions(r.capitals);
+      } catch {
+        /* noop */
+      }
+    }
+    void loadCaps();
+    const t = window.setInterval(loadCaps, 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [listCaps]);
 
   async function handleSignOut() {
     try { await logout({}); } catch { /* noop */ }
