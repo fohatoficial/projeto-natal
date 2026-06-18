@@ -59,7 +59,9 @@ async function composePrintImage(
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    const barHeight = Math.round(CANVAS_W * (bar.naturalHeight / bar.naturalWidth));
+    const naturalBarHeight = Math.round(CANVAS_W * (bar.naturalHeight / bar.naturalWidth));
+    const maxBarHeight = Math.round(CANVAS_H * 0.2);
+    const barHeight = Math.min(naturalBarHeight, maxBarHeight);
     const photoHeight = CANVAS_H - barHeight;
 
     // object-fit: cover, object-position: center for the photo area
