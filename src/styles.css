@@ -165,12 +165,6 @@
     transition: none !important;
     will-change: auto !important;
   }
-    position: relative;
-    display: block;
-    margin: 0;
-    padding: 0;
-    flex: none;
-  }
   .pipoca-film-card-btn {
     position: relative;
     display: block;
