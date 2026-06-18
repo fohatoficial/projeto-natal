@@ -409,21 +409,21 @@ function QueueRow({
         </p>
         <p className="text-[11px] text-white/45 mt-0.5">{requested}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {(item.status === "pending" || item.status === "failed") && (
+          {(item.status === "pending" || item.status === "printing" || item.status === "failed") && (
             <button
               onClick={() => onPrint(item)}
               disabled={busy}
               className="bg-gold text-[#000C20] font-semibold uppercase text-xs tracking-wider px-3 py-1.5 rounded-md disabled:opacity-60"
             >
-              {busy ? "Abrindo…" : "Imprimir"}
+              {busy ? "Preparando impressão…" : "Imprimir"}
             </button>
           )}
-          {(item.status === "printing" || item.status === "pending") && (
+          {(item.status === "printing" || item.status === "pending" || item.status === "failed") && (
             <button
               onClick={() => onMarkPrinted(item)}
               className="border border-white/30 uppercase text-xs tracking-wider px-3 py-1.5 rounded-md hover:bg-white/5"
             >
-              Marcar como entregue
+              Marcar como impresso
             </button>
           )}
           {(item.status === "pending" || item.status === "printing") && (
