@@ -233,12 +233,14 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
         </button>
       </div>
 
-      <div className="px-4 pb-10 flex flex-col gap-3">
+      <div
+        className="px-4 pb-10 grid w-full min-w-0 gap-4 sm:gap-6 items-start grid-cols-1 [grid-template-columns:repeat(auto-fill,minmax(280px,1fr))]"
+      >
         {loading && items.length === 0 && (
-          <p className="text-white/60 text-sm">Carregando…</p>
+          <p className="text-white/60 text-sm col-span-full">Carregando…</p>
         )}
         {!loading && filteredCount === 0 && (
-          <p className="text-white/60 text-sm">Nada na fila no momento.</p>
+          <p className="text-white/60 text-sm col-span-full">Nada na fila no momento.</p>
         )}
         {items.map((item) => (
           <QueueRow
