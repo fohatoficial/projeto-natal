@@ -707,7 +707,9 @@ function Choose({
   }, [page, safePage]);
 
   // ---- Adaptive film grid (measure real available area) ----
-  const BANNER_ASPECT = 16 / 9;
+  // Posters use vertical aspect 2:3 (W:H). We try candidate (cols x rows)
+  // layouts and pick the one that maximizes card width within the box.
+  const POSTER_ASPECT = 2 / 3; // width / height
   const gridWrapRef = useRef<HTMLDivElement | null>(null);
   const [gridBox, setGridBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
@@ -737,26 +739,40 @@ function Choose({
 
   const layout = useMemo(() => {
     const count = Math.max(1, visibleCount);
-    let cols = 2;
-    let rows = 2;
-    if (count === 1) { cols = 1; rows = 1; }
-    else if (count === 2) { cols = 2; rows = 1; }
-    else { cols = 2; rows = 2; } // 3 or 4: 2x2 grid (3rd item spans row 2)
 
-    // Fallback dims until first measurement returns.
-    const w = gridBox.w > 0 ? gridBox.w : 600;
-    const h = gridBox.h > 0 ? gridBox.h : 420;
+    // Fallback dims until first measurement returns: assume portrait 2x2.
+    const w = gridBox.w > 0 ? gridBox.w : 360;
+    const h = gridBox.h > 0 ? gridBox.h : 560;
+    const isPortrait = h >= w;
 
-    // Progressive gap: shrink first when space is tight.
-    const gap = Math.max(6, Math.min(24, Math.floor(Math.min(w, h) * 0.025)));
+    // Candidate (cols, rows) per count.
+    let candidates: Array<{ cols: number; rows: number }>;
+    if (count === 1) candidates = [{ cols: 1, rows: 1 }];
+    else if (count === 2) {
+      candidates = isPortrait
+        ? [{ cols: 2, rows: 1 }, { cols: 1, rows: 2 }]
+        : [{ cols: 2, rows: 1 }];
+    } else if (count === 3) {
+      candidates = [{ cols: 2, rows: 2 }];
+    } else {
+      // 4: portrait → only 2x2; landscape → pick best of 2x2 / 4x1.
+      candidates = isPortrait
+        ? [{ cols: 2, rows: 2 }]
+        : [{ cols: 4, rows: 1 }, { cols: 2, rows: 2 }];
+    }
 
-    const cardW_byW = (w - gap * (cols - 1)) / cols;
-    const cardH_byH = (h - gap * (rows - 1)) / rows;
-    const cardW_byH = cardH_byH * BANNER_ASPECT;
-    const cardW = Math.max(120, Math.floor(Math.min(cardW_byW, cardW_byH)));
-    const cardH = Math.max(70, Math.floor(cardW / BANNER_ASPECT));
+    const gap = Math.max(6, Math.min(20, Math.floor(Math.min(w, h) * 0.018)));
 
-    return { cols, rows, cardW, cardH, gap };
+    let best = { cols: candidates[0].cols, rows: candidates[0].rows, cardW: 0, cardH: 0, gap };
+    for (const c of candidates) {
+      const cardW_byW = (w - gap * (c.cols - 1)) / c.cols;
+      const cardH_byH = (h - gap * (c.rows - 1)) / c.rows;
+      const cardW_byH = cardH_byH * POSTER_ASPECT;
+      const cardW = Math.max(100, Math.floor(Math.min(cardW_byW, cardW_byH)));
+      const cardH = Math.floor(cardW / POSTER_ASPECT);
+      if (cardW > best.cardW) best = { cols: c.cols, rows: c.rows, cardW, cardH, gap };
+    }
+    return best;
   }, [gridBox.w, gridBox.h, visibleCount]);
 
   // Temporary diagnostic log — no PII.
@@ -773,7 +789,7 @@ function Choose({
       calculated_card_width: layout.cardW,
       calculated_card_height: layout.cardH,
       gap: layout.gap,
-      banner_aspect_ratio: BANNER_ASPECT,
+      poster_aspect_ratio: POSTER_ASPECT,
       has_vertical_overflow:
         document.documentElement.scrollHeight > document.documentElement.clientHeight,
       has_horizontal_overflow:
@@ -925,16 +941,16 @@ function PosterCard({
     >
       <div
         className="pipoca-film-cover-wrap"
-        style={cardHeight ? { height: cardHeight, aspectRatio: "auto" } : undefined}
+        style={cardHeight ? { height: cardHeight } : undefined}
       >
         <img
           src={movie.posterUrl}
           alt={movie.title}
           className="pipoca-film-cover transition-transform duration-700 group-hover:scale-110"
         />
-        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
-        <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 z-10">
-          <h3 className="font-display text-xl sm:text-2xl md:text-3xl leading-tight text-white">
+        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3 z-10">
+          <h3 className="font-display text-base sm:text-lg md:text-xl leading-tight text-white drop-shadow-lg">
             {movie.title}
           </h3>
         </div>
