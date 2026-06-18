@@ -154,7 +154,7 @@ export type DadosSummary = {
   filters: DadosFilters;
   todayBounds: { startISO: string; endISO: string };
   totals: {
-    captures: number;
+    captures: number | null;
     capturesToday: number;
     generations: number;
     generationsToday: number;
