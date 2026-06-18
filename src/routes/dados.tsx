@@ -1,5 +1,5 @@
 // /dados — Painel executivo visual (modo apresentação) para o cliente.
-// Sem filtros, sem dados pessoais, sem rolagem. Slides navegáveis.
+// Sem filtros, sem dados pessoais. Dashboard vertical contínuo.
 // Reutiliza a server function getDadosSummary (RPC pipoca_dados_summary),
 // usando apenas os agregados (totals + perCapital). Detalhes/PII são
 // ignorados no frontend.
@@ -309,24 +309,24 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
         ) : (
           <>
             <Section id="sec-overview" title="Visão geral">
-              <SlideOverview data={data} />
+              <SectionOverview data={data} />
             </Section>
 
             <Section id="sec-captures" title="Experiências por capital">
               <ChartFrame>
-                <SlideCaptures real={split.real} unknown={split.unknown} />
+                <SectionCaptures real={split.real} unknown={split.unknown} />
               </ChartFrame>
             </Section>
 
             <Section id="sec-generations" title="Fotos geradas por capital">
               <ChartFrame>
-                <SlideGenerations real={split.real} unknown={split.unknown} />
+                <SectionGenerations real={split.real} unknown={split.unknown} />
               </ChartFrame>
             </Section>
 
             <Section id="sec-prints" title="Impressões por capital">
               <ChartFrame>
-                <SlidePrints real={split.real} unknown={split.unknown} data={data} />
+                <SectionPrints real={split.real} unknown={split.unknown} data={data} />
               </ChartFrame>
             </Section>
 
@@ -467,8 +467,8 @@ function Kpi({
   );
 }
 
-// ───────────────────────────── Slide 1: Overview ─────────────────────────────
-function SlideOverview({ data }: { data: DadosSummary }) {
+// ───────────────────────────── Section: Visão geral ─────────────────────────────
+function SectionOverview({ data }: { data: DadosSummary }) {
   const t = data.totals;
   const pct = Math.round(t.successRate * 1000) / 10;
   return (
@@ -513,8 +513,8 @@ function SlideOverview({ data }: { data: DadosSummary }) {
   );
 }
 
-// ───────────────────────────── Slide 2: Capturas por capital ─────────────────────────────
-function SlideCaptures({
+// ───────────────────────────── Section: Capturas por capital ─────────────────────────────
+function SectionCaptures({
   real,
   unknown,
 }: {
@@ -591,8 +591,8 @@ const tooltipStyle: React.CSSProperties = {
   fontSize: 12,
 };
 
-// ───────────────────────────── Slide 3: Gerações por capital ─────────────────────────────
-function SlideGenerations({
+// ───────────────────────────── Section: Gerações por capital ─────────────────────────────
+function SectionGenerations({
   real,
   unknown,
 }: {
@@ -648,8 +648,8 @@ function SlideGenerations({
   );
 }
 
-// ───────────────────────────── Slide 4: Impressões ─────────────────────────────
-function SlidePrints({
+// ───────────────────────────── Section: Impressões ─────────────────────────────
+function SectionPrints({
   real,
   unknown,
   data,
@@ -719,22 +719,6 @@ function SlidePrints({
   );
 }
 
-// ───────────────────────────── Slide 5: Cards por capital ─────────────────────────────
-function SlideCards({ items }: { items: CapitalIndicators[] }) {
-  const cols =
-    items.length <= 1
-      ? "grid-cols-1"
-      : items.length === 2
-        ? "grid-cols-1 sm:grid-cols-2"
-        : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
-  return (
-    <div className={`h-full w-full grid ${cols} gap-3 sm:gap-4 min-h-0`}>
-      {items.map((c) => (
-        <CapitalCard key={c.capitalId} c={c} />
-      ))}
-    </div>
-  );
-}
 
 function CapitalCard({ c }: { c: CapitalIndicators }) {
   const isUnknown = c.isSystem;
