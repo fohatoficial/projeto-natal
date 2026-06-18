@@ -719,22 +719,6 @@ function SectionPrints({
   );
 }
 
-// ───────────────────────────── Slide 5: Cards por capital ─────────────────────────────
-function SlideCards({ items }: { items: CapitalIndicators[] }) {
-  const cols =
-    items.length <= 1
-      ? "grid-cols-1"
-      : items.length === 2
-        ? "grid-cols-1 sm:grid-cols-2"
-        : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4";
-  return (
-    <div className={`h-full w-full grid ${cols} gap-3 sm:gap-4 min-h-0`}>
-      {items.map((c) => (
-        <CapitalCard key={c.capitalId} c={c} />
-      ))}
-    </div>
-  );
-}
 
 function CapitalCard({ c }: { c: CapitalIndicators }) {
   const isUnknown = c.isSystem;
