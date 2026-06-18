@@ -462,6 +462,9 @@ function QueueRow({
           {item.filmTitle} · WhatsApp ****{item.visitorWhatsappLast4}
         </p>
         <p className="text-[11px] text-white/45 mt-0.5">{requested}</p>
+        <p className="text-[11px] text-white/55 mt-0.5">
+          Capital: <span className="text-white/80">{item.capitalName}</span>
+        </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {(item.status === "pending" || item.status === "printing" || item.status === "failed") && (
             <button
