@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
   listActiveCapitals,
@@ -149,13 +149,12 @@ function ConfigurarCapitalPage() {
               >
                 {submitting ? "Abrindo experiência…" : "Salvar e abrir experiência"}
               </button>
-              <Link
-                to="/"
-                search={{ resetCapital: "1" } as never}
+              <a
+                href="/?resetCapital=1"
                 className="text-xs text-white/60 underline"
               >
                 Limpar capital salva
-              </Link>
+              </a>
             </div>
           </>
         )}
