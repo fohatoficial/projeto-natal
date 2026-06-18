@@ -1202,7 +1202,7 @@ function OrientAppearance({
           style={{ animation: "step-back-pulse 1.4s ease-in-out infinite" }}
         >
           <svg viewBox="0 0 24 24" className="w-14 h-14 sm:w-20 sm:h-20" fill="none" stroke="#F8BA32" strokeWidth="2">
-            <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M12 5v14M5 12l7 7 7-7" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
         <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl text-white leading-[0.95] animate-fade-up text-center">
