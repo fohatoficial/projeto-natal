@@ -29,6 +29,28 @@ function Index() {
 
   useEffect(() => {
     const search = window.location.search ?? "";
+    const params = new URLSearchParams(search);
+
+    // ?resetCapital=1 limpa a seleção e força o gate novamente.
+    if (params.get("resetCapital") === "1") {
+      try {
+        window.localStorage.removeItem("pipoca_selected_capital");
+      } catch {
+        /* noop */
+      }
+      console.log("[PIPOCA_CAPITAL]", "CAPITAL_SELECTION_EXPIRED", {
+        reason: "manual_reset",
+      });
+      params.delete("resetCapital");
+      const cleaned = params.toString();
+      const nextSearch = cleaned ? `?${cleaned}` : "";
+      // Mantém ?display=totem e demais params técnicos.
+      window.history.replaceState({}, "", `/${nextSearch}`);
+      setForwardSearch(nextSearch);
+      setReady(true);
+      return;
+    }
+
     setForwardSearch(search);
     const stored = readValidStoredCapital();
     if (stored) {
@@ -39,6 +61,10 @@ function Index() {
       window.location.replace(`/experiencia/${stored.capital_slug}${search}`);
       return;
     }
+    // Sem capital válida — pode ser primeira vez OU dia trocou.
+    console.log("[PIPOCA_CAPITAL]", "CAPITAL_SELECTION_EXPIRED", {
+      reason: "missing_or_expired",
+    });
     setReady(true);
   }, []);
 
