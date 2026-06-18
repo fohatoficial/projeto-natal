@@ -438,7 +438,7 @@ function Kpi({
   accent = false,
 }: {
   label: string;
-  value: number | string;
+  value: number | string | null;
   suffix?: string;
   size?: "lg" | "sm";
   accent?: boolean;
@@ -460,7 +460,7 @@ function Kpi({
         }`}
         style={{ color: accent ? COLOR_GOLD : "white" }}
       >
-        {value}
+        {value == null ? "—" : value}
         {suffix && <span className="text-white/60 text-base ml-1">{suffix}</span>}
       </div>
     </div>

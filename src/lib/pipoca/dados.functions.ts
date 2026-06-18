@@ -154,7 +154,7 @@ export type DadosSummary = {
   filters: DadosFilters;
   todayBounds: { startISO: string; endISO: string };
   totals: {
-    captures: number;
+    captures: number | null;
     capturesToday: number;
     generations: number;
     generationsToday: number;
@@ -276,6 +276,29 @@ export const getDadosSummary = createServerFn({ method: "POST" })
       totals: Record<string, number | string | null>;
       per_capital: Array<Record<string, any>>;
     };
+
+    // Debug: totais brutos (sem dados pessoais) — diagnóstico do KPI Capturas.
+    const _rawT = summary.totals ?? {};
+    const _capturesRaw = _rawT.captures;
+    const _capturesTodayRaw = _rawT.captures_today;
+    console.log(LOG, "DADOS_SUMMARY_TOTALS_DEBUG", {
+      captures: _capturesRaw,
+      captures_today: _capturesTodayRaw,
+      generations: _rawT.generations,
+      unique_visitors: _rawT.unique_visitors,
+      totals_keys: Object.keys(_rawT),
+    });
+    if (
+      _capturesRaw != null &&
+      _capturesTodayRaw != null &&
+      Number(_capturesTodayRaw) > Number(_capturesRaw)
+    ) {
+      console.warn(LOG, "DADOS_CAPTURE_TOTAL_INCONSISTENT", {
+        captures: Number(_capturesRaw),
+        captures_today: Number(_capturesTodayRaw),
+      });
+    }
+    
     
 
     // hasRecords: para cada capital (lista curta, ≤ ~10), uma head-count em
@@ -334,12 +357,16 @@ export const getDadosSummary = createServerFn({ method: "POST" })
     // ── totals
     const t = summary.totals ?? {};
     const generationsTotal = Number(t.generations ?? 0);
-    const capturesTotal = Number(t.captures ?? 0);
+    // Não mascarar ausência de dado como 0: se a RPC não retornar a chave
+    // `captures`, mantemos null para que a UI exiba "—" em vez de zerar.
+    const capturesTotal: number | null =
+      t.captures == null ? null : Number(t.captures);
     const generationsCompleted = Number(t.generations_completed ?? 0);
 
     // ── details
+    const capturesForDetails = capturesTotal ?? 0;
     const totalDetails =
-      pageRows.length > 0 ? Number((pageRows[0] as any).total ?? 0) : capturesTotal;
+      pageRows.length > 0 ? Number((pageRows[0] as any).total ?? 0) : capturesForDetails;
     const totalPages = Math.max(1, Math.ceil(totalDetails / PAGE_SIZE));
     const safePage = Math.min(page, totalPages);
     const startIdx = (safePage - 1) * PAGE_SIZE;
@@ -388,7 +415,7 @@ export const getDadosSummary = createServerFn({ method: "POST" })
         uniqueVisitors: Number(t.unique_visitors ?? 0),
         successRate: generationsTotal > 0 ? generationsCompleted / generationsTotal : 0,
         avgAttemptsPerCapture:
-          capturesTotal > 0 ? generationsTotal / capturesTotal : 0,
+          capturesTotal != null && capturesTotal > 0 ? generationsTotal / capturesTotal : 0,
         queuePending: Number(t.queue_pending ?? 0),
         queuePrinting: Number(t.queue_printing ?? 0),
         queuePrinted: Number(t.queue_printed ?? 0),
