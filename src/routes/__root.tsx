@@ -7,10 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
-
-import { initDisplayMode, isTotemDebug } from "../lib/pipoca/displayMode";
-
+import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -132,51 +129,8 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <DisplayModeBoot />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
   );
 }
-
-function DisplayModeBoot() {
-  const [debug, setDebug] = useState(false);
-  const [box, setBox] = useState({ vw: 0, vh: 0, rw: 0, rh: 0, cw: 0, ch: 0 });
-
-  useEffect(() => {
-    initDisplayMode();
-    const dbg = isTotemDebug();
-    setDebug(dbg);
-    if (!dbg) return;
-    const measure = () => {
-      const root = document.body.firstElementChild as HTMLElement | null;
-      const choose = document.querySelector(".pipoca-film-choose-screen") as HTMLElement | null;
-      setBox({
-        vw: window.innerWidth,
-        vh: window.innerHeight,
-        rw: root?.clientWidth ?? 0,
-        rh: root?.clientHeight ?? 0,
-        cw: choose?.clientWidth ?? 0,
-        ch: choose?.clientHeight ?? 0,
-      });
-    };
-    measure();
-    const id = window.setInterval(measure, 500);
-    window.addEventListener("resize", measure);
-    return () => {
-      window.clearInterval(id);
-      window.removeEventListener("resize", measure);
-    };
-  }, []);
-
-  if (!debug) return null;
-  return (
-    <div className="pipoca-totem-debug-badge">
-      {`TOTEM MODE
-viewport: ${box.vw} × ${box.vh}
-root: ${box.rw} × ${box.rh}
-choose: ${box.cw} × ${box.ch}`}
-    </div>
-  );
-}
-
