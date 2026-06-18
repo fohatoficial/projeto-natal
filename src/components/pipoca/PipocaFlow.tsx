@@ -941,16 +941,16 @@ function PosterCard({
     >
       <div
         className="pipoca-film-cover-wrap"
-        style={cardHeight ? { height: cardHeight, aspectRatio: "auto" } : undefined}
+        style={cardHeight ? { height: cardHeight } : undefined}
       >
         <img
           src={movie.posterUrl}
           alt={movie.title}
           className="pipoca-film-cover transition-transform duration-700 group-hover:scale-110"
         />
-        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
-        <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 z-10">
-          <h3 className="font-display text-xl sm:text-2xl md:text-3xl leading-tight text-white">
+        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3 z-10">
+          <h3 className="font-display text-base sm:text-lg md:text-xl leading-tight text-white drop-shadow-lg">
             {movie.title}
           </h3>
         </div>
