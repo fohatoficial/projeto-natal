@@ -98,6 +98,70 @@
   .text-brand-blue { color: #2E5BE5; }
   .bg-brand-blue { background-color: #2E5BE5; }
 
+  /* ---------- Pipoca film selection (shared by tablet + totem) ---------- */
+  .pipoca-film-choose-screen { display: flex; flex-direction: column; width: 100%; }
+
+  .pipoca-film-grid-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .pipoca-film-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(16px, 2vw, 28px);
+    width: min(92vw, 900px);
+    margin: 0 auto;
+    align-items: stretch;
+  }
+  .pipoca-film-grid[data-count="1"] {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(92vw, 460px);
+  }
+  .pipoca-film-grid[data-count="1"] .pipoca-film-card {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: min(100%, 420px);
+  }
+  .pipoca-film-grid[data-count="3"] .pipoca-film-card:nth-child(3) {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: min(100%, 420px);
+  }
+  .pipoca-film-card {
+    width: 100%;
+    max-width: 420px;
+    min-width: 0;
+    margin: 0 auto;
+  }
+
+  /* ---------- Print queue list (shared across desktop/tablet/mobile) ---------- */
+  .pipoca-print-queue-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 24px;
+    width: 100%;
+    min-width: 0;
+    align-items: start;
+  }
+  @media (max-width: 640px) {
+    .pipoca-print-queue-grid {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+  }
+  .pipoca-print-queue-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
   .brand-pattern {
     background-image: url("/__l5e/assets-v1/c6d609ea-ed2f-42a5-a99f-1b967cf5f49f/pattern_brand.svg");
     background-size: 900px auto;
