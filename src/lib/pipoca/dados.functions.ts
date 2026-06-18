@@ -357,12 +357,16 @@ export const getDadosSummary = createServerFn({ method: "POST" })
     // ── totals
     const t = summary.totals ?? {};
     const generationsTotal = Number(t.generations ?? 0);
-    const capturesTotal = Number(t.captures ?? 0);
+    // Não mascarar ausência de dado como 0: se a RPC não retornar a chave
+    // `captures`, mantemos null para que a UI exiba "—" em vez de zerar.
+    const capturesTotal: number | null =
+      t.captures == null ? null : Number(t.captures);
     const generationsCompleted = Number(t.generations_completed ?? 0);
 
     // ── details
+    const capturesForDetails = capturesTotal ?? 0;
     const totalDetails =
-      pageRows.length > 0 ? Number((pageRows[0] as any).total ?? 0) : capturesTotal;
+      pageRows.length > 0 ? Number((pageRows[0] as any).total ?? 0) : capturesForDetails;
     const totalPages = Math.max(1, Math.ceil(totalDetails / PAGE_SIZE));
     const safePage = Math.min(page, totalPages);
     const startIdx = (safePage - 1) * PAGE_SIZE;
