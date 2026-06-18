@@ -197,7 +197,17 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
     await refresh();
   }
 
-  const filteredCount = items.length;
+  // Sort: most recent first (stable by id desc as tiebreaker)
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const dateA = new Date(a.requestedAt).getTime();
+      const dateB = new Date(b.requestedAt).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+      return String(b.id).localeCompare(String(a.id));
+    });
+  }, [items]);
+
+  const filteredCount = sortedItems.length;
   const totalPages = Math.max(1, Math.ceil(filteredCount / PRINT_QUEUE_PAGE_SIZE));
 
   // Reset to page 1 when filter/search changes
@@ -211,9 +221,10 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   }, [currentPage, totalPages]);
 
   const startIndex = (currentPage - 1) * PRINT_QUEUE_PAGE_SIZE;
-  const visibleQueueItems = items.slice(startIndex, startIndex + PRINT_QUEUE_PAGE_SIZE);
+  const visibleQueueItems = sortedItems.slice(startIndex, startIndex + PRINT_QUEUE_PAGE_SIZE);
   const rangeStart = filteredCount === 0 ? 0 : startIndex + 1;
   const rangeEnd = Math.min(startIndex + PRINT_QUEUE_PAGE_SIZE, filteredCount);
+
 
   function goToPage(p: number) {
     const next = Math.min(Math.max(1, p), totalPages);
