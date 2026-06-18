@@ -867,7 +867,7 @@ function Choose({
                 return (
                   <div
                     key={m.id}
-                    className="pipoca-film-card animate-slide-in"
+                    className="pipoca-film-card"
                     style={{
                       width: layout.cardW,
                       animationDelay: `${i * 70}ms`,
