@@ -56,6 +56,26 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
       routing_match: true,
     });
 
+    // Resolve capital from slug (required for new captures). Historical
+    // records without capital_id stay valid because the column is nullable
+    // in the DB; the application requires a slug going forward.
+    let capitalId: string | null = null;
+    if (data.capitalSlug) {
+      const { data: capital } = await supabaseAdmin
+        .from("pipoca_capitals")
+        .select("id, active")
+        .eq("slug", data.capitalSlug)
+        .maybeSingle();
+      if (!capital || !capital.active) {
+        console.warn(`${LOG} CAPITAL_INVALID`, { capital_slug: data.capitalSlug });
+        throw new Error("Capital inválida — selecione novamente.");
+      }
+      capitalId = capital.id as string;
+    } else {
+      console.warn(`${LOG} CAPITAL_SELECTION_REQUIRED — capture sem capital_slug`);
+      throw new Error("Capital não selecionada. Volte para a tela inicial.");
+    }
+
     // If a visitorId was provided, ensure the visitor exists and granted
     // experience consent before linking it to the session.
     let linkedVisitorId: string | null = null;
@@ -78,6 +98,7 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
         scene_pack_id: scenePack.id,
         status: "photo_step",
         visitor_id: linkedVisitorId,
+        capital_id: capitalId,
       })
       .select("id")
       .single();
@@ -88,10 +109,17 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
       .insert({
         session_id: session.id,
         validation_status: "pending",
+        capital_id: capitalId,
       })
       .select("id")
       .single();
     if (captureError || !capture) throw new Error("Falha ao criar captura");
+
+    console.log(`${LOG} CAPTURE_CAPITAL_ATTACHED`, {
+      capital_id: capitalId,
+      capital_slug: data.capitalSlug,
+      capture_id: capture.id,
+    });
 
     const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
     const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;
