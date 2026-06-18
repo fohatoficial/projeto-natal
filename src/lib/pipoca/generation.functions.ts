@@ -541,18 +541,32 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
 
     const { data: session, error: sErr } = await supabaseAdmin
       .from("pipoca_sessions")
-      .select("id, selected_film_id, scene_pack_id, status")
+      .select("id, selected_film_id, scene_pack_id, status, capital_id")
       .eq("id", data.sessionId)
       .maybeSingle();
     if (sErr || !session) throw new Error("Sessão não encontrada");
 
     const { data: capture, error: cErr } = await supabaseAdmin
       .from("pipoca_captures")
-      .select("id, session_id")
+      .select("id, session_id, capital_id")
       .eq("id", data.captureId)
       .maybeSingle();
     if (cErr || !capture) throw new Error("Captura não encontrada");
     if (capture.session_id !== session.id) throw new Error("Captura inválida");
+
+    // Capital integrity: capture and session must agree. Historical records
+    // without capital_id are tolerated; new ones must match.
+    const sessionCapitalId = (session as any).capital_id as string | null;
+    const captureCapitalId = (capture as any).capital_id as string | null;
+    if (sessionCapitalId && captureCapitalId && sessionCapitalId !== captureCapitalId) {
+      console.warn(`${GEN_LOG} GENERATION_CAPITAL_MISMATCH`, {
+        session_capital_id: sessionCapitalId,
+        capture_capital_id: captureCapitalId,
+        capture_id: capture.id,
+      });
+      throw new Error("GENERATION_CAPITAL_MISMATCH");
+    }
+    const resolvedCapitalId = captureCapitalId ?? sessionCapitalId ?? null;
 
     if (!session.scene_pack_id || !session.selected_film_id) {
       throw new Error("Sessão sem filme/scene pack");
@@ -708,10 +722,19 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         status: "queued",
         provider: "replicate",
         attempt_number: attemptNumber,
+        capital_id: resolvedCapitalId,
       })
       .select("id")
       .single();
     if (genErr || !generation) throw new Error("Falha ao criar registro de geração");
+
+    if (resolvedCapitalId) {
+      console.log(`${GEN_LOG} GENERATION_CAPITAL_ATTACHED`, {
+        capital_id: resolvedCapitalId,
+        generation_id: generation.id,
+        capture_id: capture.id,
+      });
+    }
 
     console.log(`${GEN_LOG} geração usando referências`, {
       generationId: generation.id,
