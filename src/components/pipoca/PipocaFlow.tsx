@@ -953,7 +953,7 @@ function PosterCard({
   return (
     <button
       onClick={() => onPick(movie)}
-      className="bg-card text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl group border border-white/10 pipoca-film-card-btn"
+      className="bg-card text-left shadow-2xl group border border-white/10 pipoca-film-card-btn"
     >
       <div
         className="pipoca-film-cover-wrap"
@@ -962,7 +962,7 @@ function PosterCard({
         <img
           src={movie.posterUrl}
           alt={movie.title}
-          className="pipoca-film-cover transition-transform duration-700 group-hover:scale-110"
+          className="pipoca-film-cover"
         />
         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none" />
         <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3 z-10">
