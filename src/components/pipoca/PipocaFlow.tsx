@@ -713,19 +713,34 @@ function Choose({
   const gridWrapRef = useRef<HTMLDivElement | null>(null);
   const [gridBox, setGridBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
 
+  const resizeCountRef = useRef(0);
   useEffect(() => {
     const el = gridWrapRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
+    const apply = (w: number, h: number) => {
+      setGridBox((prev) => {
+        if (
+          prev.w > 0 &&
+          prev.h > 0 &&
+          Math.abs(w - prev.w) <= 2 &&
+          Math.abs(h - prev.h) <= 2
+        ) {
+          return prev;
+        }
+        resizeCountRef.current += 1;
+        return { w, h };
+      });
+    };
     const ro = new ResizeObserver((entries) => {
       for (const e of entries) {
         const cr = e.contentRect;
-        setGridBox({ w: cr.width, h: cr.height });
+        apply(cr.width, cr.height);
       }
     });
     ro.observe(el);
     const onChange = () => {
       const r = el.getBoundingClientRect();
-      setGridBox({ w: r.width, h: r.height });
+      apply(r.width, r.height);
     };
     window.addEventListener("orientationchange", onChange);
     window.addEventListener("fullscreenchange", onChange);
