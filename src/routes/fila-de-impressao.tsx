@@ -123,7 +123,6 @@ function getPageNumbers(current: number, total: number): Array<number | "…"> {
 
 function QueueView({ onSignOut }: { onSignOut: () => void }) {
   const list = useServerFn(listPrintQueue);
-  const startFn = useServerFn(startPrintingItem);
   const markFn = useServerFn(markPrintedItem);
   const cancelFn = useServerFn(cancelPrintItem);
   const clearFn = useServerFn(clearPrintQueue);
