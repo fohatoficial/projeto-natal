@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ResultadoRouteImport } from './routes/resultado'
 import { Route as FilaDeImpressaoRouteImport } from './routes/fila-de-impressao'
+import { Route as DadosRouteImport } from './routes/dados'
 import { Route as ConfigurarCapitalRouteImport } from './routes/configurar-capital'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ResultadoPublicTokenRouteImport } from './routes/resultado.$publicToken'
@@ -25,6 +26,11 @@ const ResultadoRoute = ResultadoRouteImport.update({
 const FilaDeImpressaoRoute = FilaDeImpressaoRouteImport.update({
   id: '/fila-de-impressao',
   path: '/fila-de-impressao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DadosRoute = DadosRouteImport.update({
+  id: '/dados',
+  path: '/dados',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConfigurarCapitalRoute = ConfigurarCapitalRouteImport.update({
@@ -56,6 +62,7 @@ const ExperienciaCapitalSlugRoute = ExperienciaCapitalSlugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/configurar-capital': typeof ConfigurarCapitalRoute
+  '/dados': typeof DadosRoute
   '/fila-de-impressao': typeof FilaDeImpressaoRoute
   '/resultado': typeof ResultadoRouteWithChildren
   '/experiencia/$capitalSlug': typeof ExperienciaCapitalSlugRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/configurar-capital': typeof ConfigurarCapitalRoute
+  '/dados': typeof DadosRoute
   '/fila-de-impressao': typeof FilaDeImpressaoRoute
   '/resultado': typeof ResultadoRouteWithChildren
   '/experiencia/$capitalSlug': typeof ExperienciaCapitalSlugRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/configurar-capital': typeof ConfigurarCapitalRoute
+  '/dados': typeof DadosRoute
   '/fila-de-impressao': typeof FilaDeImpressaoRoute
   '/resultado': typeof ResultadoRouteWithChildren
   '/experiencia/$capitalSlug': typeof ExperienciaCapitalSlugRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/configurar-capital'
+    | '/dados'
     | '/fila-de-impressao'
     | '/resultado'
     | '/experiencia/$capitalSlug'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/configurar-capital'
+    | '/dados'
     | '/fila-de-impressao'
     | '/resultado'
     | '/experiencia/$capitalSlug'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/configurar-capital'
+    | '/dados'
     | '/fila-de-impressao'
     | '/resultado'
     | '/experiencia/$capitalSlug'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConfigurarCapitalRoute: typeof ConfigurarCapitalRoute
+  DadosRoute: typeof DadosRoute
   FilaDeImpressaoRoute: typeof FilaDeImpressaoRoute
   ResultadoRoute: typeof ResultadoRouteWithChildren
   ExperienciaCapitalSlugRoute: typeof ExperienciaCapitalSlugRoute
@@ -134,6 +147,13 @@ declare module '@tanstack/react-router' {
       path: '/fila-de-impressao'
       fullPath: '/fila-de-impressao'
       preLoaderRoute: typeof FilaDeImpressaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dados': {
+      id: '/dados'
+      path: '/dados'
+      fullPath: '/dados'
+      preLoaderRoute: typeof DadosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/configurar-capital': {
@@ -189,6 +209,7 @@ const ResultadoRouteWithChildren = ResultadoRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfigurarCapitalRoute: ConfigurarCapitalRoute,
+  DadosRoute: DadosRoute,
   FilaDeImpressaoRoute: FilaDeImpressaoRoute,
   ResultadoRoute: ResultadoRouteWithChildren,
   ExperienciaCapitalSlugRoute: ExperienciaCapitalSlugRoute,
