@@ -87,6 +87,21 @@
     overflow: auto !important;
     height: auto !important;
   }
+
+  /* /dados — unlock natural page scroll only while that route is mounted */
+  html.pipoca-dados-page,
+  body.pipoca-dados-page {
+    height: auto !important;
+    min-height: 100%;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: auto;
+  }
+  body.pipoca-dados-page #root {
+    height: auto !important;
+    min-height: 100vh;
+    overflow: visible !important;
+  }
 }
 
 @layer utilities {
