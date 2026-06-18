@@ -707,16 +707,18 @@ function Choose({
   }, [page, safePage]);
 
   // ---- Adaptive film grid (measure real available area) ----
-  const BANNER_ASPECT = 16 / 9;
+  // Vertical poster aspect ratio (width / height).
+  const POSTER_ASPECT = 2 / 3;
   const gridWrapRef = useRef<HTMLDivElement | null>(null);
   const [gridBox, setGridBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
 
   useEffect(() => {
     const el = gridWrapRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver((entries) => {
-      for (const e of entries) {
-        const cr = e.contentRect;
+      for (const entry of entries) {
+        const cr = entry.contentRect;
         setGridBox({ w: cr.width, h: cr.height });
       }
     });
@@ -725,6 +727,7 @@ function Choose({
       const r = el.getBoundingClientRect();
       setGridBox({ w: r.width, h: r.height });
     };
+    onChange();
     window.addEventListener("orientationchange", onChange);
     window.addEventListener("fullscreenchange", onChange);
     if (document.fonts?.ready) document.fonts.ready.then(onChange).catch(() => {});
@@ -737,11 +740,6 @@ function Choose({
 
   const layout = useMemo(() => {
     const count = Math.max(1, visibleCount);
-    let cols = 2;
-    let rows = 2;
-    if (count === 1) { cols = 1; rows = 1; }
-    else if (count === 2) { cols = 2; rows = 1; }
-    else { cols = 2; rows = 2; } // 3 or 4: 2x2 grid (3rd item spans row 2)
 
     // Fallback dims until first measurement returns.
     const w = gridBox.w > 0 ? gridBox.w : 600;
@@ -750,13 +748,28 @@ function Choose({
     // Progressive gap: shrink first when space is tight.
     const gap = Math.max(6, Math.min(24, Math.floor(Math.min(w, h) * 0.025)));
 
-    const cardW_byW = (w - gap * (cols - 1)) / cols;
-    const cardH_byH = (h - gap * (rows - 1)) / rows;
-    const cardW_byH = cardH_byH * BANNER_ASPECT;
-    const cardW = Math.max(120, Math.floor(Math.min(cardW_byW, cardW_byH)));
-    const cardH = Math.max(70, Math.floor(cardW / BANNER_ASPECT));
+    // Candidate (cols x rows) layouts per count. Choose the one that maximizes cardW.
+    const candidates: Array<{ cols: number; rows: number }> = (() => {
+      if (count === 1) return [{ cols: 1, rows: 1 }];
+      if (count === 2) return [{ cols: 2, rows: 1 }, { cols: 1, rows: 2 }];
+      if (count === 3) return [{ cols: 2, rows: 2 }, { cols: 3, rows: 1 }, { cols: 1, rows: 3 }];
+      // count >= 4: prefer 2x2 (portrait) or 4x1 (wide desktop); pick whichever fits larger.
+      return [{ cols: 2, rows: 2 }, { cols: 4, rows: 1 }, { cols: 1, rows: 4 }];
+    })();
 
-    return { cols, rows, cardW, cardH, gap };
+    let best = { cols: 2, rows: 2, cardW: 0, cardH: 0 };
+    for (const c of candidates) {
+      const cardW_byW = (w - gap * (c.cols - 1)) / c.cols;
+      const cardH_byH = (h - gap * (c.rows - 1)) / c.rows;
+      const cardW_byH = cardH_byH * POSTER_ASPECT;
+      const cardW = Math.floor(Math.min(cardW_byW, cardW_byH));
+      const cardH = Math.floor(cardW / POSTER_ASPECT);
+      if (cardW > best.cardW) best = { cols: c.cols, rows: c.rows, cardW, cardH };
+    }
+
+    const cardW = Math.max(80, best.cardW);
+    const cardH = Math.max(120, best.cardH);
+    return { cols: best.cols, rows: best.rows, cardW, cardH, gap };
   }, [gridBox.w, gridBox.h, visibleCount]);
 
   // Temporary diagnostic log — no PII.
@@ -773,7 +786,7 @@ function Choose({
       calculated_card_width: layout.cardW,
       calculated_card_height: layout.cardH,
       gap: layout.gap,
-      banner_aspect_ratio: BANNER_ASPECT,
+      poster_aspect_ratio: POSTER_ASPECT,
       has_vertical_overflow:
         document.documentElement.scrollHeight > document.documentElement.clientHeight,
       has_horizontal_overflow:
