@@ -689,34 +689,38 @@ function Choose({
   onPick: (m: Movie) => void;
 }) {
   const [page, setPage] = useState(0);
-  const totalPages = Math.max(1, Math.ceil(movies.length / PAGE_SIZE));
-  // Clamp page when films list changes
-  useEffect(() => {
-    if (page > totalPages - 1) setPage(0);
-  }, [totalPages, page]);
-  const safePage = Math.min(page, totalPages - 1);
-  const start = safePage * PAGE_SIZE;
-  const slice = movies.slice(start, start + PAGE_SIZE);
-  const visibleCount = slice.length;
+  const activeFilms = useMemo(
+    () => movies.filter((film) => film.active !== false),
+    [movies],
+  );
+  const totalPages = Math.max(1, Math.ceil(activeFilms.length / PAGE_SIZE));
+  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+  const visibleFilms = activeFilms.slice(
+    safePage * PAGE_SIZE,
+    safePage * PAGE_SIZE + PAGE_SIZE,
+  );
+  const visibleCount = visibleFilms.length;
 
-  let gridStyle: React.CSSProperties = {};
-  let gridClass = "";
-  if (visibleCount === 1) {
-    gridStyle = { gridTemplateColumns: "minmax(0, 430px)" };
-    gridClass = "justify-center";
-  } else if (visibleCount === 2) {
-    gridStyle = { gridTemplateColumns: "repeat(2, minmax(0, 1fr))", maxWidth: 900 };
-    gridClass = "justify-center mx-auto";
-  } else {
-    gridStyle = {
-      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-      gridTemplateRows: "repeat(2, minmax(0, 1fr))",
-    };
-    gridClass = "max-w-3xl";
-  }
+  // Only correct the page if it falls out of range (no setState during render).
+  useEffect(() => {
+    if (page !== safePage) setPage(safePage);
+  }, [page, safePage]);
+
+  // Temporary diagnostic log — no PII.
+  useEffect(() => {
+    console.log("[PIPOCA_FILMS_RENDER]", {
+      films_count: movies.length,
+      active_films_count: activeFilms.length,
+      current_page: page,
+      safe_page: safePage,
+      total_pages: totalPages,
+      visible_films_count: visibleCount,
+      visible_film_slugs: visibleFilms.map((f) => f.slug),
+    });
+  }, [movies.length, activeFilms.length, page, safePage, totalPages, visibleCount, visibleFilms]);
 
   return (
-    <Screen aurora>
+    <Screen aurora className="pipoca-film-choose-screen">
       <Header />
 
       {/* CENTER */}
@@ -745,25 +749,22 @@ function Choose({
         </div>
 
         {/* Grid */}
-        <div className="mt-4 sm:mt-5 lg:mt-6 w-full flex-1 min-h-0 flex items-center justify-center">
+        <div className="pipoca-film-grid-wrap mt-4 sm:mt-5 lg:mt-6">
           {loading ? (
             <p className="text-base text-white/70 tracking-wide animate-pulse-soft">
               Carregando filmes…
             </p>
           ) : error ? (
             <p className="text-base text-white/85 max-w-md">{error}</p>
-          ) : movies.length === 0 ? (
+          ) : activeFilms.length === 0 ? (
             <p className="text-base text-white/70">Nenhum filme disponível.</p>
           ) : (
-            <div
-              className={`h-full w-full grid items-center [gap:clamp(18px,2dvh,32px)] ${gridClass}`}
-              style={gridStyle}
-            >
-              {slice.map((m, i) => (
+            <div className="pipoca-film-grid" data-count={visibleCount}>
+              {visibleFilms.map((m, i) => (
                 <div
                   key={m.id}
-                  className="min-h-0 min-w-0 w-full mx-auto animate-slide-in"
-                  style={{ animationDelay: `${i * 70}ms`, maxWidth: 430 }}
+                  className="pipoca-film-card animate-slide-in"
+                  style={{ animationDelay: `${i * 70}ms` }}
                 >
                   <PosterCard movie={m} onPick={onPick} />
                 </div>

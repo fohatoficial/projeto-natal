@@ -233,9 +233,7 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
         </button>
       </div>
 
-      <div
-        className="px-4 pb-10 grid w-full min-w-0 gap-4 sm:gap-6 items-start grid-cols-1 [grid-template-columns:repeat(auto-fill,minmax(280px,1fr))]"
-      >
+      <div className="pipoca-print-queue-grid px-4 pb-10">
         {loading && items.length === 0 && (
           <p className="text-white/60 text-sm col-span-full">Carregando…</p>
         )}
@@ -302,7 +300,8 @@ function QueueRow({
     [item.requestedAt],
   );
   return (
-    <div className="border border-white/15 rounded-xl p-3 flex gap-3 items-start bg-white/[0.02]">
+    <div className="pipoca-print-queue-card border border-white/15 rounded-xl p-3 bg-white/[0.02]">
+      <div className="flex gap-3 items-start">
       <div className="w-16 h-20 rounded-md overflow-hidden bg-black/60 shrink-0">
         {item.thumbnailUrl ? (
           <img src={item.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -344,6 +343,7 @@ function QueueRow({
             </button>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
