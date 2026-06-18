@@ -912,16 +912,21 @@ function MarqueeBadge({ color, text }: { color: string; text: string }) {
 function PosterCard({
   movie,
   onPick,
+  cardHeight,
 }: {
   movie: Movie;
   onPick: (m: Movie) => void;
+  cardHeight?: number;
 }) {
   return (
     <button
       onClick={() => onPick(movie)}
       className="bg-card text-left active:scale-[0.98] hover:scale-[1.02] transition-transform shadow-2xl group border border-white/10 pipoca-film-card-btn"
     >
-      <div className="pipoca-film-cover-wrap">
+      <div
+        className="pipoca-film-cover-wrap"
+        style={cardHeight ? { height: cardHeight, aspectRatio: "auto" } : undefined}
+      >
         <img
           src={movie.posterUrl}
           alt={movie.title}
