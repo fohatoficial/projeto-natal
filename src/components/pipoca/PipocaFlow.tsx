@@ -870,7 +870,6 @@ function Choose({
                     className="pipoca-film-card"
                     style={{
                       width: layout.cardW,
-                      animationDelay: `${i * 70}ms`,
                       ...(isThirdOfThree
                         ? { gridColumn: "1 / -1", justifySelf: "center" }
                         : null),
