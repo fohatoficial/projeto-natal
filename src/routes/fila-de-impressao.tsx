@@ -245,7 +245,7 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   // Reset to page 1 when filter/search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, capitalFilter]);
 
   // Clamp page if it no longer exists after data refresh
   useEffect(() => {
@@ -308,6 +308,19 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
           <option value="cleared">Zerados</option>
           <option value="cancelled">Cancelados</option>
           <option value="all">Todos</option>
+        </select>
+        <select
+          value={capitalFilter}
+          onChange={(e) => setCapitalFilter(e.target.value)}
+          className="bg-black/40 border border-white/20 rounded-md px-3 py-2 text-sm"
+          aria-label="Filtrar por capital"
+        >
+          <option value="all">Todas as capitais</option>
+          {capitalOptions.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
         </select>
         <button
           onClick={refresh}
