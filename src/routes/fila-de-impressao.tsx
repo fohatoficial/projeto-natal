@@ -8,7 +8,6 @@ import {
   logoutPrintQueue,
   checkPrintQueueSession,
   listPrintQueue,
-  startPrintingItem,
   markPrintedItem,
   cancelPrintItem,
   clearPrintQueue,
@@ -124,7 +123,6 @@ function getPageNumbers(current: number, total: number): Array<number | "…"> {
 
 function QueueView({ onSignOut }: { onSignOut: () => void }) {
   const list = useServerFn(listPrintQueue);
-  const startFn = useServerFn(startPrintingItem);
   const markFn = useServerFn(markPrintedItem);
   const cancelFn = useServerFn(cancelPrintItem);
   const clearFn = useServerFn(clearPrintQueue);
@@ -171,13 +169,14 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   }
 
   async function handleStart(item: PrintQueueItem) {
+    // Do NOT mutate status here. "Imprimir" only opens the print window;
+    // status changes exclusively via "Marcar como impresso".
     setPrintingId(item.id);
     try {
-      await startFn({ data: { queueId: item.id } });
-      // open print window
       window.open(`/imprimir/${item.id}`, "_blank", "noopener,width=900,height=700");
-      await refresh();
     } finally {
+      // Re-enable the button as soon as the window is dispatched so the
+      // operator can reprint immediately if needed.
       setPrintingId(null);
     }
   }
@@ -408,21 +407,21 @@ function QueueRow({
         </p>
         <p className="text-[11px] text-white/45 mt-0.5">{requested}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {(item.status === "pending" || item.status === "failed") && (
+          {(item.status === "pending" || item.status === "printing" || item.status === "failed") && (
             <button
               onClick={() => onPrint(item)}
               disabled={busy}
               className="bg-gold text-[#000C20] font-semibold uppercase text-xs tracking-wider px-3 py-1.5 rounded-md disabled:opacity-60"
             >
-              {busy ? "Abrindo…" : "Imprimir"}
+              {busy ? "Preparando impressão…" : "Imprimir"}
             </button>
           )}
-          {(item.status === "printing" || item.status === "pending") && (
+          {(item.status === "printing" || item.status === "pending" || item.status === "failed") && (
             <button
               onClick={() => onMarkPrinted(item)}
               className="border border-white/30 uppercase text-xs tracking-wider px-3 py-1.5 rounded-md hover:bg-white/5"
             >
-              Marcar como entregue
+              Marcar como impresso
             </button>
           )}
           {(item.status === "pending" || item.status === "printing") && (
