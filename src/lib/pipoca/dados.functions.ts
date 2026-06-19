@@ -622,6 +622,7 @@ export const getDadosSummary = createServerFn({ method: "POST" })
         queueWithoutCapital: Number(t.queue_without_capital ?? 0),
       },
       perCapital,
+      topFilms,
       details: {
         page: safePage,
         pageSize: PAGE_SIZE,
