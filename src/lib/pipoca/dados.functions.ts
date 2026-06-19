@@ -559,6 +559,37 @@ export const getDadosSummary = createServerFn({ method: "POST" })
       publicToken: (r.public_token as string | null) ?? null,
     }));
 
+    // ── Top films (ranking de filmes mais escolhidos para a foto, geral).
+    // Conta capturas agrupando por sessions.selected_film_id. Volume previsto
+    // baixo (~centenas), então agregamos em memória sem RPC dedicada.
+    let topFilms: Array<{ filmId: string; title: string; captures: number }> = [];
+    try {
+      const { data: capFilmRows } = await supabaseAdmin
+        .from("pipoca_captures")
+        .select("id, pipoca_sessions!inner(selected_film_id)")
+        .limit(10000);
+      const counts = new Map<string, number>();
+      for (const r of (capFilmRows ?? []) as any[]) {
+        const fid = r?.pipoca_sessions?.selected_film_id as string | null | undefined;
+        if (!fid) continue;
+        counts.set(fid, (counts.get(fid) ?? 0) + 1);
+      }
+      const titleById = new Map(filmsOpt.map((f) => [f.id, f.title]));
+      topFilms = Array.from(counts.entries())
+        .map(([filmId, captures]) => ({
+          filmId,
+          title: titleById.get(filmId) ?? "—",
+          captures,
+        }))
+        .sort((a, b) => b.captures - a.captures)
+        .slice(0, 10);
+    } catch (e) {
+      console.warn(LOG, "DADOS_TOP_FILMS_FAILED", {
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+
+
     return {
       generatedAt: new Date().toISOString(),
       filters: {
