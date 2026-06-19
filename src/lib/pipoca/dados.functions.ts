@@ -171,6 +171,7 @@ export type DadosSummary = {
     queueWithoutCapital: number;
   };
   perCapital: CapitalIndicators[];
+  topFilms: Array<{ filmId: string; title: string; captures: number }>;
   details: {
     page: number;
     pageSize: number;
