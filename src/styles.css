@@ -88,18 +88,26 @@
     height: auto !important;
   }
 
-  /* /dados — unlock natural page scroll only while that route is mounted */
-  html.pipoca-dados-page,
-  body.pipoca-dados-page {
+  /* /dados — unlock natural page scroll only while that route is mounted.
+     Mobile-safe: only the document element scrolls; body/#root are visible
+     so nested overflow:hidden ancestors never trap the scroll on iOS. */
+  html.pipoca-dados-page {
     height: auto !important;
     min-height: 100%;
     overflow-x: hidden !important;
     overflow-y: auto !important;
     overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  body.pipoca-dados-page {
+    height: auto !important;
+    min-height: 100%;
+    overflow: visible !important;
+    position: static !important;
   }
   body.pipoca-dados-page #root {
     height: auto !important;
-    min-height: 100vh;
+    min-height: 100dvh;
     overflow: visible !important;
   }
 }
