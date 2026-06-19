@@ -488,7 +488,7 @@ function SectionOverview({ data }: { data: DadosSummary }) {
       </section>
 
       <section
-        className="rounded-2xl border border-white/10 p-4 sm:p-6 min-h-0 flex flex-col justify-center"
+        className="rounded-2xl border border-white/10 p-4 sm:p-6 min-h-0 flex flex-col justify-center gap-3"
         style={{
           background:
             "linear-gradient(135deg, rgba(248,186,50,0.08), rgba(255,255,255,0.02))",
@@ -497,15 +497,33 @@ function SectionOverview({ data }: { data: DadosSummary }) {
         <div className="text-[11px] uppercase tracking-[0.3em] text-white/50">
           Tela Brasil · Pipoca &amp; Cena
         </div>
-        <div className="mt-2 text-base sm:text-xl text-white/85 leading-relaxed max-w-3xl">
+        <div className="text-base sm:text-xl text-white/85 leading-relaxed max-w-3xl">
           Um panorama em tempo real da experiência itinerante por todo o país.
           Cada captura representa uma pessoa que viveu o cinema brasileiro
           através da Pipoca &amp; Cena.
         </div>
-        <div className="mt-3 text-xs text-white/45">
+        {data.topFilms.length > 0 && (
+          <div className="mt-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-[10px] uppercase tracking-[0.3em] text-white/50">
+              Filme mais escolhido
+            </span>
+            <span
+              className="text-base sm:text-lg font-semibold"
+              style={{ color: COLOR_GOLD }}
+            >
+              {data.topFilms[0].title}
+            </span>
+            <span className="text-xs text-white/60">
+              {data.topFilms[0].captures}{" "}
+              {data.topFilms[0].captures === 1 ? "captura" : "capturas"}
+            </span>
+          </div>
+        )}
+        <div className="text-xs text-white/45">
           Atualizado em {spTimeLabel(data.generatedAt)} (horário de Brasília)
         </div>
       </section>
+
     </div>
   );
 }
