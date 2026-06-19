@@ -473,21 +473,18 @@ function SectionOverview({ data }: { data: DadosSummary }) {
   const pct = Math.round(t.successRate * 1000) / 10;
   return (
     <div className="h-full w-full grid grid-rows-[auto_auto_1fr] gap-3 sm:gap-4">
-      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 min-h-0">
-        <Kpi label="Capturas" value={t.captures} accent />
-        <Kpi label="Visitantes únicos" value={t.uniqueVisitors} />
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 min-h-0">
+        <Kpi label="Visitantes únicos" value={t.uniqueVisitors} accent />
         <Kpi label="Gerações" value={t.generations} />
         <Kpi label="Concluídas" value={t.generationsCompleted} />
-        <Kpi label="Taxa de sucesso" value={pct} suffix="%" accent />
-        <Kpi label="Fotos impressas" value={t.queuePrinted} />
+        <Kpi label="Impressões" value={t.queuePrinted} accent />
       </section>
 
-      <section className="grid grid-cols-2 md:grid-cols-5 gap-2 sm:gap-3 min-h-0">
-        <Kpi label="Capturas hoje" value={t.capturesToday} size="sm" />
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 min-h-0">
         <Kpi label="Gerações hoje" value={t.generationsToday} size="sm" />
         <Kpi label="Pendentes" value={t.queuePending} size="sm" />
         <Kpi label="Em impressão" value={t.queuePrinting} size="sm" />
-        <Kpi label="Impressas" value={t.queuePrinted} size="sm" />
+        <Kpi label="Taxa de sucesso" value={pct} suffix="%" size="sm" />
       </section>
 
       <section
