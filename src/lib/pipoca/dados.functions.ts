@@ -254,7 +254,7 @@ export const getDadosSummary = createServerFn({ method: "POST" })
         }),
         supabaseAdmin
           .from("pipoca_capitals")
-          .select("id, name, is_system, selectable, active, display_order")
+          .select("id, name, slug, is_system, selectable, active, display_order")
           .order("is_system", { ascending: true })
           .order("display_order", { ascending: true })
           .order("name", { ascending: true }),
