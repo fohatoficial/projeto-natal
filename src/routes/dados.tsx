@@ -470,7 +470,8 @@ function Kpi({
 // ───────────────────────────── Section: Visão geral ─────────────────────────────
 function SectionOverview({ data }: { data: DadosSummary }) {
   const t = data.totals;
-  const pct = Math.round(t.successRate * 1000) / 10;
+  const impressPct =
+    t.generations > 0 ? Math.round((t.queuePrinted / t.generations) * 1000) / 10 : 0;
   return (
     <div className="h-full w-full grid grid-rows-[auto_auto_1fr] gap-3 sm:gap-4">
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 min-h-0">
@@ -484,7 +485,7 @@ function SectionOverview({ data }: { data: DadosSummary }) {
         <Kpi label="Gerações hoje" value={t.generationsToday} size="sm" />
         <Kpi label="Pendentes" value={t.queuePending} size="sm" />
         <Kpi label="Em impressão" value={t.queuePrinting} size="sm" />
-        <Kpi label="Taxa de sucesso" value={pct} suffix="%" size="sm" />
+        <Kpi label="Impressão / geração" value={impressPct} suffix="%" size="sm" />
       </section>
 
       <section
