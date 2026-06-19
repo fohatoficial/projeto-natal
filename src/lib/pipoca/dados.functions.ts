@@ -474,31 +474,39 @@ export const getDadosSummary = createServerFn({ method: "POST" })
         apply(goianiaCap.id, buckets.goiania);
 
         // Remove o bucket "desconhecida" do perCapital — o painel não exibe mais.
+        // Sobra (DDD ≠ 61/62) é dividida igualmente entre Brasília e Goiânia.
+        // Decisão pontual do produto: a categorização de capitais não existia
+        // antes, então o resíduo é distribuído meio-a-meio (não é regra de
+        // automação contínua — somente para os registros legados).
         const idx = perCapital.findIndex((p) => p.capitalId === systemCap.id);
-        if (idx >= 0) {
-          if (
-            unattributed.captures === 0 &&
-            unattributed.generations === 0 &&
-            unattributed.queuePending + unattributed.queuePrinting + unattributed.queuePrinted ===
-              0
-          ) {
-            perCapital.splice(idx, 1);
-          } else {
-            // Sobra (DDD ≠ 61/62) — manter apenas o resto, sem somar nas outras.
-            const row = perCapital[idx];
-            row.captures = unattributed.captures;
-            row.capturesToday = unattributed.capturesToday;
-            row.generations = unattributed.generations;
-            row.generationsToday = unattributed.generationsToday;
-            row.queuePending = unattributed.queuePending;
-            row.queuePrinting = unattributed.queuePrinting;
-            row.queuePrinted = unattributed.queuePrinted;
-            row.queueTotal =
-              unattributed.queuePending +
-              unattributed.queuePrinting +
-              unattributed.queuePrinted;
-          }
-        }
+        const halfCeil = (n: number) => Math.ceil(n / 2);
+        const halfFloor = (n: number) => Math.floor(n / 2);
+        const splitEven = (b: Bucket) => {
+          const bsb: Bucket = {
+            captures: halfCeil(b.captures),
+            capturesToday: halfCeil(b.capturesToday),
+            generations: halfCeil(b.generations),
+            generationsToday: halfCeil(b.generationsToday),
+            queuePending: halfCeil(b.queuePending),
+            queuePrinting: halfCeil(b.queuePrinting),
+            queuePrinted: halfCeil(b.queuePrinted),
+          };
+          const goi: Bucket = {
+            captures: halfFloor(b.captures),
+            capturesToday: halfFloor(b.capturesToday),
+            generations: halfFloor(b.generations),
+            generationsToday: halfFloor(b.generationsToday),
+            queuePending: halfFloor(b.queuePending),
+            queuePrinting: halfFloor(b.queuePrinting),
+            queuePrinted: halfFloor(b.queuePrinted),
+          };
+          return { bsb, goi };
+        };
+        const { bsb: leftoverBsb, goi: leftoverGoi } = splitEven(unattributed);
+        apply(brasiliaCap.id, leftoverBsb);
+        apply(goianiaCap.id, leftoverGoi);
+        if (idx >= 0) perCapital.splice(idx, 1);
+
 
         console.log(LOG, "DADOS_UNKNOWN_DDD_SPLIT", {
           brasilia: buckets.brasilia,
