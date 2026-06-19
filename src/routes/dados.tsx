@@ -393,7 +393,7 @@ function ChartFrame({ children }: { children: React.ReactNode }) {
 // ───────────────────────────── Estados ─────────────────────────────
 function LoadingState() {
   return (
-    <div className="h-full w-full grid grid-rows-[auto_1fr] gap-4">
+    <div className="w-full min-h-[240px] grid grid-rows-[auto_1fr] gap-4">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="h-20 rounded-xl bg-white/[0.04] border border-white/10 animate-pulse" />
@@ -405,7 +405,7 @@ function LoadingState() {
 }
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="h-full w-full grid place-items-center">
+    <div className="w-full min-h-[240px] grid place-items-center">
       <div className="max-w-sm text-center flex flex-col items-center gap-4">
         <p className="text-red-200">{message}</p>
         <button
@@ -421,7 +421,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 }
 function EmptyState() {
   return (
-    <div className="h-full w-full grid place-items-center">
+    <div className="w-full min-h-[240px] grid place-items-center">
       <p className="text-white/60 text-center max-w-md">
         Ainda não há dados suficientes para este painel.
       </p>
@@ -473,7 +473,7 @@ function SectionOverview({ data }: { data: DadosSummary }) {
   const impressPct =
     t.generations > 0 ? Math.round((t.queuePrinted / t.generations) * 1000) / 10 : 0;
   return (
-    <div className="h-full w-full grid grid-rows-[auto_auto_1fr] gap-3 sm:gap-4">
+    <div className="w-full flex flex-col gap-3 sm:gap-4">
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 min-h-0">
         <Kpi label="Visitantes únicos" value={t.uniqueVisitors} accent />
         <Kpi label="Gerações" value={t.generations} />
