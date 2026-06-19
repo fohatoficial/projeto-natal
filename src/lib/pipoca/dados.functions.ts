@@ -354,6 +354,164 @@ export const getDadosSummary = createServerFn({ method: "POST" })
         Number(r.queue_printed ?? 0),
     }));
 
+    // ── Reatribuição da "capital desconhecida" por DDD do WhatsApp.
+    // Regra do produto: tudo que tem DDD 61 vai para Brasília; DDD 62 vai
+    // para Goiânia. O painel não deve mais exibir bucket "desconhecida".
+    try {
+      const systemCap = (capsAll ?? []).find(
+        (c: any) =>
+          Boolean(c.is_system) || /capital[-\s]?desconhecid/i.test(c.slug ?? c.name ?? ""),
+      );
+      const brasiliaCap = (capsAll ?? []).find(
+        (c: any) => /brasilia/i.test(c.slug ?? "") || /bras[íi]lia/i.test(c.name ?? ""),
+      );
+      const goianiaCap = (capsAll ?? []).find(
+        (c: any) => /goiania/i.test(c.slug ?? "") || /goi[âa]nia/i.test(c.name ?? ""),
+      );
+
+      if (systemCap && brasiliaCap && goianiaCap) {
+        const dddOf = (e164?: string | null): string | null => {
+          if (!e164) return null;
+          const m = /^\+?(\d{2})(\d{2})/.exec(e164);
+          return m ? m[2] : null;
+        };
+        const bucketFor = (ddd: string | null): "brasilia" | "goiania" | null => {
+          if (ddd === "61") return "brasilia";
+          if (ddd === "62") return "goiania";
+          return null;
+        };
+        const todayStart = today.startISO;
+        const todayEnd = today.endISO;
+
+        const [capsRes, gensRes, queueRes] = await Promise.all([
+          supabaseAdmin
+            .from("pipoca_captures")
+            .select(
+              "id, created_at, pipoca_sessions!inner(pipoca_visitors!inner(whatsapp_e164))",
+            )
+            .eq("capital_id", systemCap.id),
+          supabaseAdmin
+            .from("pipoca_generations")
+            .select(
+              "id, status, created_at, pipoca_captures!inner(pipoca_sessions!inner(pipoca_visitors!inner(whatsapp_e164)))",
+            )
+            .eq("capital_id", systemCap.id),
+          supabaseAdmin
+            .from("pipoca_print_queue")
+            .select(
+              "id, status, pipoca_generations!inner(pipoca_captures!inner(pipoca_sessions!inner(pipoca_visitors!inner(whatsapp_e164))))",
+            )
+            .eq("capital_id", systemCap.id),
+        ]);
+
+        type Bucket = {
+          captures: number;
+          capturesToday: number;
+          generations: number;
+          generationsToday: number;
+          queuePending: number;
+          queuePrinting: number;
+          queuePrinted: number;
+        };
+        const empty = (): Bucket => ({
+          captures: 0,
+          capturesToday: 0,
+          generations: 0,
+          generationsToday: 0,
+          queuePending: 0,
+          queuePrinting: 0,
+          queuePrinted: 0,
+        });
+        const buckets: Record<"brasilia" | "goiania", Bucket> = {
+          brasilia: empty(),
+          goiania: empty(),
+        };
+        let unattributed = empty();
+
+        const isToday = (iso: string | null) =>
+          iso != null && iso >= todayStart && iso < todayEnd;
+
+        for (const r of (capsRes.data ?? []) as any[]) {
+          const e164 = r?.pipoca_sessions?.pipoca_visitors?.whatsapp_e164 ?? null;
+          const b = bucketFor(dddOf(e164));
+          const tgt = b ? buckets[b] : unattributed;
+          tgt.captures += 1;
+          if (isToday(r?.created_at ?? null)) tgt.capturesToday += 1;
+        }
+        for (const r of (gensRes.data ?? []) as any[]) {
+          const e164 =
+            r?.pipoca_captures?.pipoca_sessions?.pipoca_visitors?.whatsapp_e164 ?? null;
+          const b = bucketFor(dddOf(e164));
+          const tgt = b ? buckets[b] : unattributed;
+          tgt.generations += 1;
+          if (isToday(r?.created_at ?? null)) tgt.generationsToday += 1;
+        }
+        for (const r of (queueRes.data ?? []) as any[]) {
+          const e164 =
+            r?.pipoca_generations?.pipoca_captures?.pipoca_sessions?.pipoca_visitors
+              ?.whatsapp_e164 ?? null;
+          const b = bucketFor(dddOf(e164));
+          const tgt = b ? buckets[b] : unattributed;
+          const st = (r?.status ?? "").toString().toLowerCase();
+          if (st === "pending") tgt.queuePending += 1;
+          else if (st === "printing") tgt.queuePrinting += 1;
+          else if (st === "printed") tgt.queuePrinted += 1;
+        }
+
+        const apply = (capId: string, b: Bucket) => {
+          const row = perCapital.find((p) => p.capitalId === capId);
+          if (!row) return;
+          row.captures += b.captures;
+          row.capturesToday += b.capturesToday;
+          row.generations += b.generations;
+          row.generationsToday += b.generationsToday;
+          row.queuePending += b.queuePending;
+          row.queuePrinting += b.queuePrinting;
+          row.queuePrinted += b.queuePrinted;
+          row.queueTotal = row.queuePending + row.queuePrinting + row.queuePrinted;
+        };
+        apply(brasiliaCap.id, buckets.brasilia);
+        apply(goianiaCap.id, buckets.goiania);
+
+        // Remove o bucket "desconhecida" do perCapital — o painel não exibe mais.
+        const idx = perCapital.findIndex((p) => p.capitalId === systemCap.id);
+        if (idx >= 0) {
+          if (
+            unattributed.captures === 0 &&
+            unattributed.generations === 0 &&
+            unattributed.queuePending + unattributed.queuePrinting + unattributed.queuePrinted ===
+              0
+          ) {
+            perCapital.splice(idx, 1);
+          } else {
+            // Sobra (DDD ≠ 61/62) — manter apenas o resto, sem somar nas outras.
+            const row = perCapital[idx];
+            row.captures = unattributed.captures;
+            row.capturesToday = unattributed.capturesToday;
+            row.generations = unattributed.generations;
+            row.generationsToday = unattributed.generationsToday;
+            row.queuePending = unattributed.queuePending;
+            row.queuePrinting = unattributed.queuePrinting;
+            row.queuePrinted = unattributed.queuePrinted;
+            row.queueTotal =
+              unattributed.queuePending +
+              unattributed.queuePrinting +
+              unattributed.queuePrinted;
+          }
+        }
+
+        console.log(LOG, "DADOS_UNKNOWN_DDD_SPLIT", {
+          brasilia: buckets.brasilia,
+          goiania: buckets.goiania,
+          unattributed,
+        });
+      }
+    } catch (e) {
+      console.warn(LOG, "DADOS_UNKNOWN_DDD_SPLIT_FAILED", {
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+
     // ── totals
     const t = summary.totals ?? {};
     const generationsTotal = Number(t.generations ?? 0);
