@@ -466,15 +466,13 @@ function QueueRow({
           Capital: <span className="text-white/80">{item.capitalName}</span>
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {(item.status === "pending" || item.status === "printing" || item.status === "failed") && (
-            <button
-              onClick={() => onPrint(item)}
-              disabled={busy}
-              className="bg-gold text-[#000C20] font-semibold uppercase text-xs tracking-wider px-3 py-1.5 rounded-md disabled:opacity-60"
-            >
-              {busy ? "Preparando impressão…" : "Imprimir"}
-            </button>
-          )}
+          <button
+            onClick={() => onPrint(item)}
+            disabled={busy}
+            className="bg-gold text-[#000C20] font-semibold uppercase text-xs tracking-wider px-3 py-1.5 rounded-md disabled:opacity-60"
+          >
+            {busy ? "Preparando impressão…" : "Imprimir"}
+          </button>
           {(item.status === "printing" || item.status === "pending" || item.status === "failed") && (
             <button
               onClick={() => onMarkPrinted(item)}
