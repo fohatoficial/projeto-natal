@@ -338,35 +338,28 @@ export const listPrintQueueCapitals = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ capitals: Array<{ id: string; name: string; isSystem: boolean }> }> => {
     await requireAdmin();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    // Pagina a leitura porque o PostgREST limita por padrão em 1000 linhas,
-    // o que fazia capitais com itens após esse corte (ex.: Goiânia) sumirem do filtro.
-    const PAGE_SIZE = 1000;
-    const idSet = new Set<string>();
-    for (let offset = 0; ; offset += PAGE_SIZE) {
-      const { data: rows, error } = await supabaseAdmin
-        .from("pipoca_print_queue")
-        .select("capital_id")
-        .not("capital_id", "is", null)
-        .range(offset, offset + PAGE_SIZE - 1);
-      if (error) throw new Error("Falha ao listar capitais da fila");
-      const batch = rows ?? [];
-      for (const r of batch) {
-        const cid = r.capital_id as string | null;
-        if (cid) idSet.add(cid);
-      }
-      if (batch.length < PAGE_SIZE) break;
-    }
-    const ids = [...idSet];
-    if (ids.length === 0) return { capitals: [] };
     const { data: caps } = await supabaseAdmin
       .from("pipoca_capitals")
       .select("id, name, is_system, display_order")
-      .in("id", ids)
       .order("is_system", { ascending: true })
       .order("display_order", { ascending: true })
       .order("name", { ascending: true });
+
+    const capitalsWithItems = await Promise.all(
+      (caps ?? []).map(async (c) => {
+        const { data: row, error } = await supabaseAdmin
+          .from("pipoca_print_queue")
+          .select("id")
+          .eq("capital_id", c.id)
+          .limit(1)
+          .maybeSingle();
+        if (error) throw new Error("Falha ao listar capitais da fila");
+        return row ? c : null;
+      }),
+    );
+
     return {
-      capitals: (caps ?? []).map((c) => ({
+      capitals: capitalsWithItems.filter(Boolean).map((c) => ({
         id: c.id as string,
         name: c.name as string,
         isSystem: Boolean(c.is_system),
