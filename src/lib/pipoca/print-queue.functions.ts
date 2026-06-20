@@ -359,7 +359,7 @@ export const listPrintQueueCapitals = createServerFn({ method: "GET" }).handler(
     );
 
     return {
-      capitals: capitalsWithItems.filter(Boolean).map((c) => ({
+      capitals: capitalsWithItems.filter((c): c is NonNullable<typeof c> => Boolean(c)).map((c) => ({
         id: c.id as string,
         name: c.name as string,
         isSystem: Boolean(c.is_system),
