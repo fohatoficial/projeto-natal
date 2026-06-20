@@ -338,12 +338,25 @@ export const listPrintQueueCapitals = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ capitals: Array<{ id: string; name: string; isSystem: boolean }> }> => {
     await requireAdmin();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rows, error } = await supabaseAdmin
-      .from("pipoca_print_queue")
-      .select("capital_id")
-      .not("capital_id", "is", null);
-    if (error) throw new Error("Falha ao listar capitais da fila");
-    const ids = [...new Set((rows ?? []).map((r) => r.capital_id as string))];
+    // Pagina a leitura porque o PostgREST limita por padrão em 1000 linhas,
+    // o que fazia capitais com itens após esse corte (ex.: Goiânia) sumirem do filtro.
+    const PAGE_SIZE = 1000;
+    const idSet = new Set<string>();
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data: rows, error } = await supabaseAdmin
+        .from("pipoca_print_queue")
+        .select("capital_id")
+        .not("capital_id", "is", null)
+        .range(offset, offset + PAGE_SIZE - 1);
+      if (error) throw new Error("Falha ao listar capitais da fila");
+      const batch = rows ?? [];
+      for (const r of batch) {
+        const cid = r.capital_id as string | null;
+        if (cid) idSet.add(cid);
+      }
+      if (batch.length < PAGE_SIZE) break;
+    }
+    const ids = [...idSet];
     if (ids.length === 0) return { capitals: [] };
     const { data: caps } = await supabaseAdmin
       .from("pipoca_capitals")
