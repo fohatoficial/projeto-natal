@@ -340,13 +340,22 @@ export const listPrintQueueCapitals = createServerFn({ method: "GET" }).handler(
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: caps } = await supabaseAdmin
       .from("pipoca_capitals")
-      .select("id, name, is_system, display_order")
+      .select("id, name, is_system, selectable, active, display_order")
       .order("is_system", { ascending: true })
       .order("display_order", { ascending: true })
       .order("name", { ascending: true });
 
-    const capitalsWithItems = await Promise.all(
-      (caps ?? []).map(async (c) => {
+    // Lista sempre todas as capitais selecionáveis e ativas (mesmo sem itens
+    // ainda na fila), para que o filtro reflita o conjunto fixo do produto.
+    // A "Capital desconhecida" (is_system=true) só aparece se existir item
+    // legado vinculado a ela.
+    const selectable = (caps ?? []).filter(
+      (c: any) => c.selectable === true && c.active === true && c.is_system !== true,
+    );
+    const systemCaps = (caps ?? []).filter((c: any) => c.is_system === true);
+
+    const systemWithItems = await Promise.all(
+      systemCaps.map(async (c: any) => {
         const { data: row, error } = await supabaseAdmin
           .from("pipoca_print_queue")
           .select("id")
@@ -358,8 +367,13 @@ export const listPrintQueueCapitals = createServerFn({ method: "GET" }).handler(
       }),
     );
 
+    const finalList = [
+      ...selectable,
+      ...systemWithItems.filter((c): c is NonNullable<typeof c> => Boolean(c)),
+    ];
+
     return {
-      capitals: capitalsWithItems.filter((c): c is NonNullable<typeof c> => Boolean(c)).map((c) => ({
+      capitals: finalList.map((c: any) => ({
         id: c.id as string,
         name: c.name as string,
         isSystem: Boolean(c.is_system),
@@ -367,6 +381,7 @@ export const listPrintQueueCapitals = createServerFn({ method: "GET" }).handler(
     };
   },
 );
+
 
 // ─── Admin: actions ──────────────────────────────────────────────────────
 const QueueIdInput = z.object({ queueId: z.string().uuid() });
