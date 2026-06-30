@@ -334,6 +334,10 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
               </ChartFrame>
             </Section>
 
+            <Section id="sec-visitors" title="Pessoas (agrupadas por WhatsApp)">
+              <SectionVisitors />
+            </Section>
+
             <Section id="sec-cards" title="Resumo por capital">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {ordered.map((c) => (
