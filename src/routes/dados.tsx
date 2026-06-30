@@ -229,6 +229,7 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
     { id: "sec-captures", label: "Capitais" },
     { id: "sec-generations", label: "Gerações" },
     { id: "sec-prints", label: "Impressões" },
+    { id: "sec-visitors", label: "Pessoas" },
   ];
 
   const ordered = data
