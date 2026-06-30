@@ -554,7 +554,7 @@ function SectionCaptures({
 }) {
   const sorted = [...real].sort((a, b) => b.captures - a.captures);
   const chartData = sorted.map((c) => ({
-    name: c.capitalName,
+    name: capitalLabel(c.capitalName),
     capturas: c.captures,
     hoje: c.capturesToday,
   }));
