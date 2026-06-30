@@ -695,7 +695,7 @@ function SectionPrints({
       (a.queuePending + a.queuePrinting + a.queuePrinted),
   );
   const chartData = sorted.map((c) => ({
-    name: c.capitalName,
+    name: capitalLabel(c.capitalName),
     Pendentes: c.queuePending,
     "Em impressão": c.queuePrinting,
     Impressas: c.queuePrinted,
