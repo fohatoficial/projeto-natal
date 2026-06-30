@@ -769,7 +769,7 @@ function CapitalCard({ c }: { c: CapitalIndicators }) {
           className="font-display text-lg sm:text-xl truncate"
           style={{ color: isUnknown ? "rgba(255,255,255,0.75)" : COLOR_GOLD }}
         >
-          {c.capitalName}
+          {capitalLabel(c.capitalName)}
         </h3>
       </header>
       <div className="grid grid-cols-3 gap-2 flex-1 min-h-0">
