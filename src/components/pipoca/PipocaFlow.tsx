@@ -1685,7 +1685,7 @@ function Result({
   onRestart: () => void;
 }) {
   const SLIDE_0_MS = 10000;
-  const SLIDE_1_MS = 20000;
+  const SLIDE_1_MS = 30000;
   const [slide, setSlide] = useState(0);
   const [progress, setProgress] = useState(0);
 
