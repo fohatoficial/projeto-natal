@@ -49,6 +49,21 @@ const COLOR_GREEN = "#7BD389";
 const COLOR_AMBER = "#F2B544";
 const COLOR_MUTED = "#94A3B8";
 
+const CAPITAL_DDD: Record<string, string> = {
+  Brasília: "61",
+  Goiânia: "62",
+  "Belo Horizonte": "31",
+  "São Paulo": "11",
+  Salvador: "71",
+  "Porto Alegre": "51",
+  "Cinemateca Brasileira": "11",
+};
+
+function capitalLabel(name: string): string {
+  const ddd = CAPITAL_DDD[name];
+  return ddd ? `${name} (${ddd})` : name;
+}
+
 function DadosPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const checkFn = useServerFn(checkPrintQueueSession);
