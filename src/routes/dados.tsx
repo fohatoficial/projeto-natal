@@ -9,14 +9,6 @@ import { useServerFn } from "@tanstack/react-start";
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -56,21 +48,6 @@ const COLOR_BLUE = "#5BA3D0";
 const COLOR_GREEN = "#7BD389";
 const COLOR_AMBER = "#F2B544";
 const COLOR_MUTED = "#94A3B8";
-
-const CAPITAL_DDD: Record<string, string> = {
-  Brasília: "61",
-  Goiânia: "62",
-  "Belo Horizonte": "31",
-  "São Paulo": "11",
-  Salvador: "71",
-  "Porto Alegre": "51",
-  "Cinemateca Brasileira": "11",
-};
-
-function capitalLabel(name: string): string {
-  const ddd = CAPITAL_DDD[name];
-  return ddd ? `${name} (${ddd})` : name;
-}
 
 function DadosPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -249,7 +226,6 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
     { id: "sec-captures", label: "Capitais" },
     { id: "sec-generations", label: "Gerações" },
     { id: "sec-prints", label: "Impressões" },
-    { id: "sec-table", label: "Tabela" },
   ];
 
   const ordered = data
@@ -360,10 +336,6 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
                   <CapitalCard key={c.capitalId} c={c} />
                 ))}
               </div>
-            </Section>
-
-            <Section id="sec-table" title="Dados por capital">
-              <SectionCapitalTable real={split.real} unknown={split.unknown} />
             </Section>
           </>
         )}
@@ -567,7 +539,7 @@ function SectionCaptures({
 }) {
   const sorted = [...real].sort((a, b) => b.captures - a.captures);
   const chartData = sorted.map((c) => ({
-    name: capitalLabel(c.capitalName),
+    name: c.capitalName,
     capturas: c.captures,
     hoje: c.capturesToday,
   }));
@@ -645,7 +617,7 @@ function SectionGenerations({
 }) {
   const sorted = [...real].sort((a, b) => b.captures - a.captures);
   const chartData = sorted.map((c) => ({
-    name: capitalLabel(c.capitalName),
+    name: c.capitalName,
     Capturas: c.captures,
     Gerações: c.generations,
     hoje: c.generationsToday,
@@ -708,7 +680,7 @@ function SectionPrints({
       (a.queuePending + a.queuePrinting + a.queuePrinted),
   );
   const chartData = sorted.map((c) => ({
-    name: capitalLabel(c.capitalName),
+    name: c.capitalName,
     Pendentes: c.queuePending,
     "Em impressão": c.queuePrinting,
     Impressas: c.queuePrinted,
@@ -764,62 +736,6 @@ function SectionPrints({
 }
 
 
-// ───────────────────────────── Section: Tabela por capital ─────────────────────────────
-function SectionCapitalTable({
-  real,
-  unknown,
-}: {
-  real: CapitalIndicators[];
-  unknown: CapitalIndicators | null;
-}) {
-  const rows = [...real].sort((a, b) => b.captures - a.captures);
-  return (
-    <div className="overflow-x-auto rounded-2xl border border-white/10">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-white/10 hover:bg-transparent">
-            <TableHead className="text-white/70 font-semibold whitespace-nowrap">Capital</TableHead>
-            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Capturas</TableHead>
-            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Hoje</TableHead>
-            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Gerações</TableHead>
-            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Hoje</TableHead>
-            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Pendentes</TableHead>
-            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Impressas</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((c) => (
-            <TableRow key={c.capitalId} className="border-white/10">
-              <TableCell className="text-white font-medium whitespace-nowrap">
-                {capitalLabel(c.capitalName)}
-              </TableCell>
-              <TableCell className="text-right text-white/90">{c.captures}</TableCell>
-              <TableCell className="text-right text-white/90">{c.capturesToday}</TableCell>
-              <TableCell className="text-right text-white/90">{c.generations}</TableCell>
-              <TableCell className="text-right text-white/90">{c.generationsToday}</TableCell>
-              <TableCell className="text-right text-white/90">{c.queuePending}</TableCell>
-              <TableCell className="text-right text-white/90">{c.queuePrinted}</TableCell>
-            </TableRow>
-          ))}
-          {unknown && unknown.captures > 0 && (
-            <TableRow className="border-white/10 bg-white/[0.03]">
-              <TableCell className="text-white/60 font-medium whitespace-nowrap">
-                {capitalLabel(unknown.capitalName)}
-              </TableCell>
-              <TableCell className="text-right text-white/60">{unknown.captures}</TableCell>
-              <TableCell className="text-right text-white/60">{unknown.capturesToday}</TableCell>
-              <TableCell className="text-right text-white/60">{unknown.generations}</TableCell>
-              <TableCell className="text-right text-white/60">{unknown.generationsToday}</TableCell>
-              <TableCell className="text-right text-white/60">{unknown.queuePending}</TableCell>
-              <TableCell className="text-right text-white/60">{unknown.queuePrinted}</TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
 function CapitalCard({ c }: { c: CapitalIndicators }) {
   const isUnknown = c.isSystem;
   return (
@@ -838,7 +754,7 @@ function CapitalCard({ c }: { c: CapitalIndicators }) {
           className="font-display text-lg sm:text-xl truncate"
           style={{ color: isUnknown ? "rgba(255,255,255,0.75)" : COLOR_GOLD }}
         >
-          {capitalLabel(c.capitalName)}
+          {c.capitalName}
         </h3>
       </header>
       <div className="grid grid-cols-3 gap-2 flex-1 min-h-0">
