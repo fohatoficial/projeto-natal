@@ -26,11 +26,8 @@ import {
 } from "@/lib/pipoca/print-queue.functions";
 import {
   getDadosSummary,
-  getVisitorsBreakdown,
-  revealVisitorWhatsapp,
   type CapitalIndicators,
   type DadosSummary,
-  type VisitorBreakdownRow,
 } from "@/lib/pipoca/dados.functions";
 
 export const Route = createFileRoute("/dados")({
@@ -229,7 +226,6 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
     { id: "sec-captures", label: "Capitais" },
     { id: "sec-generations", label: "Gerações" },
     { id: "sec-prints", label: "Impressões" },
-    { id: "sec-visitors", label: "Pessoas" },
   ];
 
   const ordered = data
@@ -332,10 +328,6 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
               <ChartFrame>
                 <SectionPrints real={split.real} unknown={split.unknown} data={data} />
               </ChartFrame>
-            </Section>
-
-            <Section id="sec-visitors" title="Pessoas (agrupadas por WhatsApp)">
-              <SectionVisitors />
             </Section>
 
             <Section id="sec-cards" title="Resumo por capital">
@@ -828,176 +820,6 @@ function UnknownStrip({
         <div className="font-display text-lg sm:text-2xl text-white">{value}</div>
         {hint && <div className="text-[10px] text-white/45">{hint}</div>}
       </div>
-    </div>
-  );
-}
-
-// ───────────────────────────── Section: Visitantes (pessoas únicas) ─────────────────────────────
-function SectionVisitors() {
-  const fetchRows = useServerFn(getVisitorsBreakdown);
-  const reveal = useServerFn(revealVisitorWhatsapp);
-  const [rows, setRows] = useState<VisitorBreakdownRow[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const [revealed, setRevealed] = useState<Record<string, string>>({});
-  const PAGE = 25;
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setErr(null);
-    try {
-      const r = await fetchRows({});
-      setRows(r);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Falha ao carregar");
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchRows]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const filtered = useMemo(() => {
-    if (!rows) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(
-      (r) =>
-        r.fullName.toLowerCase().includes(q) ||
-        r.lastCapitalName.toLowerCase().includes(q) ||
-        r.whatsappMasked.toLowerCase().includes(q),
-    );
-  }, [rows, query]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
-  const safePage = Math.min(page, totalPages);
-  const start = (safePage - 1) * PAGE;
-  const pageRows = filtered.slice(start, start + PAGE);
-
-  useEffect(() => {
-    setPage(1);
-  }, [query]);
-
-  async function onReveal(id: string) {
-    try {
-      const r = await reveal({ data: { visitorId: id } });
-      setRevealed((prev) => ({ ...prev, [id]: r.whatsapp }));
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Falha ao revelar");
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2 justify-between">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar por nome, capital ou WhatsApp…"
-          className="flex-1 min-w-[220px] bg-black/40 border border-white/15 rounded-md px-3 py-2 text-sm placeholder:text-white/40"
-        />
-        <div className="text-xs text-white/55">
-          {rows ? `${filtered.length} pessoa${filtered.length === 1 ? "" : "s"}` : "—"}
-          {rows && rows.length !== filtered.length && ` de ${rows.length}`}
-        </div>
-        <button
-          onClick={() => load()}
-          disabled={loading}
-          className="text-xs border border-white/15 rounded-md px-2.5 py-1.5 hover:bg-white/5 disabled:opacity-60"
-        >
-          {loading ? "…" : "Atualizar"}
-        </button>
-      </div>
-
-      {err && <p className="text-red-300 text-sm">{err}</p>}
-
-      <div className="overflow-x-auto rounded-xl border border-white/10">
-        <table className="w-full text-sm min-w-[640px]">
-          <thead className="text-[11px] uppercase tracking-wider text-white/55 bg-white/[0.03]">
-            <tr>
-              <th className="text-left px-3 py-2 font-medium">Pessoa</th>
-              <th className="text-left px-3 py-2 font-medium">WhatsApp</th>
-              <th className="text-left px-3 py-2 font-medium">Capital</th>
-              <th className="text-right px-3 py-2 font-medium">Gerações</th>
-              <th className="text-left px-3 py-2 font-medium">Última geração</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pageRows.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-white/50">
-                  {loading ? "Carregando…" : "Nenhuma pessoa encontrada."}
-                </td>
-              </tr>
-            ) : (
-              pageRows.map((r) => (
-                <tr key={r.visitorId} className="border-t border-white/5 hover:bg-white/[0.02]">
-                  <td className="px-3 py-2">
-                    <div className="text-white">{r.fullName}</div>
-                    <div className="text-[10px] text-white/45">{r.firstName}</div>
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs">
-                    {revealed[r.visitorId] ? (
-                      <span className="text-white">{revealed[r.visitorId]}</span>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-white/80">{r.whatsappMasked}</span>
-                        <button
-                          onClick={() => onReveal(r.visitorId)}
-                          className="text-[10px] uppercase tracking-wider border border-white/15 rounded px-1.5 py-0.5 hover:bg-white/5"
-                        >
-                          revelar
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-white/80">{r.lastCapitalName}</td>
-                  <td className="px-3 py-2 text-right">
-                    <span
-                      className="inline-block font-display text-base"
-                      style={{ color: r.generations > 1 ? COLOR_GOLD : "white" }}
-                    >
-                      {r.generations}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-white/70">
-                    {r.lastGenerationAt ? spTimeLabel(r.lastGenerationAt) : "—"}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-xs text-white/60">
-          <div>
-            Página {safePage} de {totalPages}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={safePage <= 1}
-              className="border border-white/15 rounded-md px-2.5 py-1 hover:bg-white/5 disabled:opacity-40"
-            >
-              ← Anterior
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={safePage >= totalPages}
-              className="border border-white/15 rounded-md px-2.5 py-1 hover:bg-white/5 disabled:opacity-40"
-            >
-              Próxima →
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
