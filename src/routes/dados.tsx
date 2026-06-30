@@ -632,7 +632,7 @@ function SectionGenerations({
 }) {
   const sorted = [...real].sort((a, b) => b.captures - a.captures);
   const chartData = sorted.map((c) => ({
-    name: c.capitalName,
+    name: capitalLabel(c.capitalName),
     Capturas: c.captures,
     Gerações: c.generations,
     hoje: c.generationsToday,
