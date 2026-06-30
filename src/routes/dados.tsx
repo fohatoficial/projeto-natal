@@ -26,8 +26,11 @@ import {
 } from "@/lib/pipoca/print-queue.functions";
 import {
   getDadosSummary,
+  getVisitorsBreakdown,
+  revealVisitorWhatsapp,
   type CapitalIndicators,
   type DadosSummary,
+  type VisitorBreakdownRow,
 } from "@/lib/pipoca/dados.functions";
 
 export const Route = createFileRoute("/dados")({
