@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+const PAGE_SIZE = 6;
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -21,6 +23,14 @@ export function CapitalGate({ forwardSearch = "" }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [page, setPage] = useState(0);
+
+  const totalPages = capitals ? Math.max(1, Math.ceil(capitals.length / PAGE_SIZE)) : 1;
+  const pageCapitals = useMemo(() => {
+    if (!capitals) return [];
+    const start = page * PAGE_SIZE;
+    return capitals.slice(start, start + PAGE_SIZE);
+  }, [capitals, page]);
 
   useEffect(() => {
     console.log(LOG, "CAPITAL_SELECTION_REQUIRED");
@@ -94,7 +104,7 @@ export function CapitalGate({ forwardSearch = "" }: Props) {
         {capitals && capitals.length > 0 && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {capitals.map((c) => {
+              {pageCapitals.map((c) => {
                 const active = selectedSlug === c.slug;
                 return (
                   <button
@@ -115,6 +125,40 @@ export function CapitalGate({ forwardSearch = "" }: Props) {
                 );
               })}
             </div>
+
+            {totalPages > 1 && (
+              <div className="mt-5 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="rounded-md border border-white/20 px-4 py-2 text-sm disabled:opacity-30"
+                >
+                  ← Anterior
+                </button>
+                <div className="flex gap-2">
+                  {Array.from({ length: totalPages }).map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setPage(i)}
+                      aria-label={`Página ${i + 1}`}
+                      className={`h-2 w-2 rounded-full transition-all ${
+                        i === page ? "bg-gold w-6" : "bg-white/30"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="rounded-md border border-white/20 px-4 py-2 text-sm disabled:opacity-30"
+                >
+                  Próxima →
+                </button>
+              </div>
+            )}
 
             <div className="mt-8 flex flex-col items-center gap-3">
               <button
