@@ -49,6 +49,21 @@ const COLOR_GREEN = "#7BD389";
 const COLOR_AMBER = "#F2B544";
 const COLOR_MUTED = "#94A3B8";
 
+const CAPITAL_DDD: Record<string, string> = {
+  Brasília: "61",
+  Goiânia: "62",
+  "Belo Horizonte": "31",
+  "São Paulo": "11",
+  Salvador: "71",
+  "Porto Alegre": "51",
+  "Cinemateca Brasileira": "11",
+};
+
+function capitalLabel(name: string): string {
+  const ddd = CAPITAL_DDD[name];
+  return ddd ? `${name} (${ddd})` : name;
+}
+
 function DadosPage() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const checkFn = useServerFn(checkPrintQueueSession);
@@ -539,7 +554,7 @@ function SectionCaptures({
 }) {
   const sorted = [...real].sort((a, b) => b.captures - a.captures);
   const chartData = sorted.map((c) => ({
-    name: c.capitalName,
+    name: capitalLabel(c.capitalName),
     capturas: c.captures,
     hoje: c.capturesToday,
   }));
@@ -617,7 +632,7 @@ function SectionGenerations({
 }) {
   const sorted = [...real].sort((a, b) => b.captures - a.captures);
   const chartData = sorted.map((c) => ({
-    name: c.capitalName,
+    name: capitalLabel(c.capitalName),
     Capturas: c.captures,
     Gerações: c.generations,
     hoje: c.generationsToday,
@@ -680,7 +695,7 @@ function SectionPrints({
       (a.queuePending + a.queuePrinting + a.queuePrinted),
   );
   const chartData = sorted.map((c) => ({
-    name: c.capitalName,
+    name: capitalLabel(c.capitalName),
     Pendentes: c.queuePending,
     "Em impressão": c.queuePrinting,
     Impressas: c.queuePrinted,
@@ -754,7 +769,7 @@ function CapitalCard({ c }: { c: CapitalIndicators }) {
           className="font-display text-lg sm:text-xl truncate"
           style={{ color: isUnknown ? "rgba(255,255,255,0.75)" : COLOR_GOLD }}
         >
-          {c.capitalName}
+          {capitalLabel(c.capitalName)}
         </h3>
       </header>
       <div className="grid grid-cols-3 gap-2 flex-1 min-h-0">
