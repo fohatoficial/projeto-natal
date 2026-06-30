@@ -9,6 +9,14 @@ import { useServerFn } from "@tanstack/react-start";
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Bar,
   BarChart,
   CartesianGrid,
@@ -241,6 +249,7 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
     { id: "sec-captures", label: "Capitais" },
     { id: "sec-generations", label: "Gerações" },
     { id: "sec-prints", label: "Impressões" },
+    { id: "sec-table", label: "Tabela" },
   ];
 
   const ordered = data
@@ -351,6 +360,10 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
                   <CapitalCard key={c.capitalId} c={c} />
                 ))}
               </div>
+            </Section>
+
+            <Section id="sec-table" title="Dados por capital">
+              <SectionCapitalTable real={split.real} unknown={split.unknown} />
             </Section>
           </>
         )}
@@ -750,6 +763,62 @@ function SectionPrints({
   );
 }
 
+
+// ───────────────────────────── Section: Tabela por capital ─────────────────────────────
+function SectionCapitalTable({
+  real,
+  unknown,
+}: {
+  real: CapitalIndicators[];
+  unknown: CapitalIndicators | null;
+}) {
+  const rows = [...real].sort((a, b) => b.captures - a.captures);
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-white/10">
+      <Table>
+        <TableHeader>
+          <TableRow className="border-white/10 hover:bg-transparent">
+            <TableHead className="text-white/70 font-semibold whitespace-nowrap">Capital</TableHead>
+            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Capturas</TableHead>
+            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Hoje</TableHead>
+            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Gerações</TableHead>
+            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Hoje</TableHead>
+            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Pendentes</TableHead>
+            <TableHead className="text-white/70 font-semibold text-right whitespace-nowrap">Impressas</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((c) => (
+            <TableRow key={c.capitalId} className="border-white/10">
+              <TableCell className="text-white font-medium whitespace-nowrap">
+                {capitalLabel(c.capitalName)}
+              </TableCell>
+              <TableCell className="text-right text-white/90">{c.captures}</TableCell>
+              <TableCell className="text-right text-white/90">{c.capturesToday}</TableCell>
+              <TableCell className="text-right text-white/90">{c.generations}</TableCell>
+              <TableCell className="text-right text-white/90">{c.generationsToday}</TableCell>
+              <TableCell className="text-right text-white/90">{c.queuePending}</TableCell>
+              <TableCell className="text-right text-white/90">{c.queuePrinted}</TableCell>
+            </TableRow>
+          ))}
+          {unknown && unknown.captures > 0 && (
+            <TableRow className="border-white/10 bg-white/[0.03]">
+              <TableCell className="text-white/60 font-medium whitespace-nowrap">
+                {capitalLabel(unknown.capitalName)}
+              </TableCell>
+              <TableCell className="text-right text-white/60">{unknown.captures}</TableCell>
+              <TableCell className="text-right text-white/60">{unknown.capturesToday}</TableCell>
+              <TableCell className="text-right text-white/60">{unknown.generations}</TableCell>
+              <TableCell className="text-right text-white/60">{unknown.generationsToday}</TableCell>
+              <TableCell className="text-right text-white/60">{unknown.queuePending}</TableCell>
+              <TableCell className="text-right text-white/60">{unknown.queuePrinted}</TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
 
 function CapitalCard({ c }: { c: CapitalIndicators }) {
   const isUnknown = c.isSystem;
