@@ -361,6 +361,10 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
                 ))}
               </div>
             </Section>
+
+            <Section id="sec-table" title="Dados por capital">
+              <SectionCapitalTable real={split.real} unknown={split.unknown} />
+            </Section>
           </>
         )}
 
