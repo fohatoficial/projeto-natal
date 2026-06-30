@@ -9,6 +9,14 @@ import { useServerFn } from "@tanstack/react-start";
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Bar,
   BarChart,
   CartesianGrid,
