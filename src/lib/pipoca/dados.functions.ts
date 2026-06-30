@@ -507,3 +507,122 @@ export const revealWhatsapp = createServerFn({ method: "POST" })
     console.log(LOG, "WHATSAPP_REVEALED", { capture_id: data.captureId });
     return { whatsapp: v.whatsapp_e164 as string };
   });
+
+// ────────────────────────── Visitantes (agrupados por WhatsApp) ──────────────────────────
+// Lista de pessoas únicas (chave: whatsapp_e164) com contagem de gerações,
+// capital mais recente e timestamp da última atividade. Sem `.in()` de
+// tamanho proporcional ao conjunto — usamos embeds do PostgREST.
+
+export type VisitorBreakdownRow = {
+  visitorId: string;
+  fullName: string;
+  firstName: string;
+  whatsappMasked: string;
+  generations: number;
+  lastCapitalId: string | null;
+  lastCapitalName: string;
+  lastGenerationAt: string | null;
+};
+
+export const getVisitorsBreakdown = createServerFn({ method: "POST" })
+  .handler(async (): Promise<VisitorBreakdownRow[]> => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: gens, error: gErr }, { data: caps }] = await Promise.all([
+      supabaseAdmin
+        .from("pipoca_generations")
+        .select(
+          "id, capital_id, created_at, pipoca_sessions!inner(visitor_id, pipoca_visitors!inner(id, full_name, first_name, whatsapp_e164, whatsapp_last4))",
+        )
+        .order("created_at", { ascending: false })
+        .limit(50000),
+      supabaseAdmin.from("pipoca_capitals").select("id, name"),
+    ]);
+
+    if (gErr) {
+      console.warn(LOG, "DADOS_VISITORS_LOAD_FAILED", {
+        error_code: gErr.code,
+        error_message: gErr.message,
+      });
+      throw new Error("Não foi possível carregar a lista de visitantes.");
+    }
+
+    const capName = new Map<string, string>(
+      (caps ?? []).map((c: any) => [c.id as string, c.name as string]),
+    );
+
+    type Agg = {
+      visitorId: string;
+      fullName: string;
+      firstName: string;
+      e164: string | null;
+      last4: string | null;
+      count: number;
+      lastCapitalId: string | null;
+      lastAt: string | null;
+    };
+    const map = new Map<string, Agg>();
+    for (const row of (gens ?? []) as any[]) {
+      const sess = row?.pipoca_sessions;
+      const v = sess?.pipoca_visitors;
+      if (!v?.id) continue;
+      const e164 = (v.whatsapp_e164 as string | null) ?? null;
+      const key = e164 ?? `vid:${v.id}`;
+      const existing = map.get(key);
+      const createdAt = (row.created_at as string | null) ?? null;
+      if (existing) {
+        existing.count += 1;
+        if (!existing.lastAt || (createdAt && createdAt > existing.lastAt)) {
+          existing.lastAt = createdAt;
+          existing.lastCapitalId = (row.capital_id as string | null) ?? null;
+        }
+      } else {
+        map.set(key, {
+          visitorId: v.id as string,
+          fullName: (v.full_name as string) ?? "—",
+          firstName: (v.first_name as string) ?? "—",
+          e164,
+          last4: (v.whatsapp_last4 as string | null) ?? null,
+          count: 1,
+          lastCapitalId: (row.capital_id as string | null) ?? null,
+          lastAt: createdAt,
+        });
+      }
+    }
+
+    const rows: VisitorBreakdownRow[] = Array.from(map.values())
+      .map((a) => ({
+        visitorId: a.visitorId,
+        fullName: a.fullName,
+        firstName: a.firstName,
+        whatsappMasked: maskWhatsapp(a.e164, a.last4),
+        generations: a.count,
+        lastCapitalId: a.lastCapitalId,
+        lastCapitalName: a.lastCapitalId
+          ? capName.get(a.lastCapitalId) ?? "—"
+          : "Sem capital",
+        lastGenerationAt: a.lastAt,
+      }))
+      .sort((a, b) => {
+        if (b.generations !== a.generations) return b.generations - a.generations;
+        return (b.lastGenerationAt ?? "").localeCompare(a.lastGenerationAt ?? "");
+      });
+    return rows;
+  });
+
+const RevealVisitorInput = z.object({ visitorId: z.string().uuid() });
+export const revealVisitorWhatsapp = createServerFn({ method: "POST" })
+  .inputValidator((input) => RevealVisitorInput.parse(input))
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: v } = await supabaseAdmin
+      .from("pipoca_visitors")
+      .select("whatsapp_e164")
+      .eq("id", data.visitorId)
+      .maybeSingle();
+    if (!v?.whatsapp_e164) throw new Error("Sem WhatsApp registrado");
+    console.log(LOG, "VISITOR_WHATSAPP_REVEALED", { visitor_id: data.visitorId });
+    return { whatsapp: v.whatsapp_e164 as string };
+  });
