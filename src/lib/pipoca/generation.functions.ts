@@ -283,6 +283,8 @@ type BuiltPrompt = {
   negativePromptText: string;
   diagnostics: PromptDiagnostics;
   shouldApplyNeutralGrayscale: boolean;
+  sectionLabels: string[];
+  extractedNegativeCount: number;
 };
 
 function getReplicateToken(): string {
