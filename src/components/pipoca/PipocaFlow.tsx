@@ -20,6 +20,7 @@ import {
   getPipocaGenerationStatus,
 } from "@/lib/pipoca/generation.functions";
 import { createPipocaVisitor } from "@/lib/pipoca/visitors.functions";
+import { deriveIdentityFaceCrop } from "@/lib/pipoca/faceCrop";
 import {
   PRIVACY_NOTICE_PARAGRAPHS,
   PRIVACY_NOTICE_TITLE,
@@ -263,12 +264,20 @@ export function PipocaFlow({ capitalSlug }: { capitalSlug?: string } = {}) {
       setUploadStatus("uploading");
 
       if (!identityUploadedRef.current) {
+        const faceCrop = await deriveIdentityFaceCrop(identityPhoto.blob);
+        console.log(`${UPLOAD_LOG} face crop derivado`, {
+          face_crop_used: faceCrop.used,
+          face_crop_width: faceCrop.width,
+          face_crop_height: faceCrop.height,
+          original_identity_width: faceCrop.originalWidth,
+          original_identity_height: faceCrop.originalHeight,
+        });
         const { error: upErr } = await supabase.storage
           .from("pipoca-visitor-originals")
           .uploadToSignedUrl(
             current.uploads.identity.path,
             current.uploads.identity.token,
-            identityPhoto.blob,
+            faceCrop.blob,
             { contentType: "image/jpeg" },
           );
         if (upErr) throw upErr;

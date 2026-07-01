@@ -283,6 +283,8 @@ type BuiltPrompt = {
   negativePromptText: string;
   diagnostics: PromptDiagnostics;
   shouldApplyNeutralGrayscale: boolean;
+  sectionLabels: string[];
+  extractedNegativeCount: number;
 };
 
 function getReplicateToken(): string {
@@ -359,29 +361,98 @@ function extractHatUsage(parsedPrompt: unknown): string | null {
   return typeof usage === "string" && usage.trim() ? usage.trim() : null;
 }
 
-function extractPromptFields(parsedPrompt: unknown): string[] {
-  if (typeof parsedPrompt === "string") return parsedPrompt.trim() ? [parsedPrompt.trim()] : [];
-  if (!parsedPrompt || typeof parsedPrompt !== "object" || Array.isArray(parsedPrompt)) return [];
-  const out: string[] = [];
-  const visit = (value: unknown, key = "") => {
-    if (key === "hat_reference_images") return;
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed && !/^https?:\/\//i.test(trimmed)) out.push(trimmed);
-      return;
+type PromptSection = { label: string; body: string };
+type ExtractedPrompt = { sections: PromptSection[]; forbidden: string[] };
+
+const NEGATIVE_KEYS = new Set([
+  "forbidden",
+  "negative",
+  "negative_prompt",
+  "avoid",
+  "prohibited",
+  "exclusions",
+  "do_not",
+  "must_not",
+]);
+const STRUCTURAL_SKIP_KEYS = new Set([
+  "hat_reference_images",
+  "prop_references",
+  "reference_roles",
+  "hat_usage",
+]);
+const SECTION_LABELS: Record<string, string> = {
+  scene: "SCENE",
+  subject: "SUBJECT",
+  wardrobe: "WARDROBE",
+  environment: "ENVIRONMENT",
+  style: "STYLE",
+  composition: "COMPOSITION",
+  final_result: "FINAL RESULT",
+};
+
+function labelFor(key: string): string {
+  return SECTION_LABELS[key] ?? key.replace(/[_-]+/g, " ").toUpperCase();
+}
+
+function pushUnique(list: string[], seen: Set<string>, value: string) {
+  const key = value.toLocaleLowerCase("pt-BR");
+  if (seen.has(key)) return;
+  seen.add(key);
+  list.push(value);
+}
+
+function collectStrings(
+  value: unknown,
+  positive: string[],
+  positiveSeen: Set<string>,
+  negative: string[],
+  negativeSeen: Set<string>,
+  insideNegative: boolean,
+) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || /^https?:\/\//i.test(trimmed)) return;
+    if (insideNegative) pushUnique(negative, negativeSeen, trimmed);
+    else pushUnique(positive, positiveSeen, trimmed);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectStrings(item, positive, positiveSeen, negative, negativeSeen, insideNegative);
     }
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item, key);
-      return;
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (STRUCTURAL_SKIP_KEYS.has(k)) continue;
+      const nextNeg = insideNegative || NEGATIVE_KEYS.has(k);
+      collectStrings(v, positive, positiveSeen, negative, negativeSeen, nextNeg);
     }
-    if (value && typeof value === "object") {
-      for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
-        visit(childValue, childKey);
-      }
+  }
+}
+
+function extractPromptFields(parsedPrompt: unknown): ExtractedPrompt {
+  if (typeof parsedPrompt === "string") {
+    const t = parsedPrompt.trim();
+    return { sections: t ? [{ label: "SCENE PACK", body: t }] : [], forbidden: [] };
+  }
+  if (!parsedPrompt || typeof parsedPrompt !== "object" || Array.isArray(parsedPrompt)) {
+    return { sections: [], forbidden: [] };
+  }
+  const sections: PromptSection[] = [];
+  const forbidden: string[] = [];
+  const forbiddenSeen = new Set<string>();
+
+  for (const [key, value] of Object.entries(parsedPrompt as Record<string, unknown>)) {
+    if (STRUCTURAL_SKIP_KEYS.has(key)) continue;
+    const positive: string[] = [];
+    const posSeen = new Set<string>();
+    collectStrings(value, positive, posSeen, forbidden, forbiddenSeen, NEGATIVE_KEYS.has(key));
+    if (!NEGATIVE_KEYS.has(key) && positive.length > 0) {
+      sections.push({ label: labelFor(key), body: positive.join(" ") });
     }
-  };
-  visit(parsedPrompt);
-  return Array.from(new Set(out));
+  }
+  return { sections, forbidden };
 }
 
 function safeFilenameFromUrl(url: string | null | undefined): string | null {
@@ -493,9 +564,19 @@ function buildPromptText(
     "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Additional prop images, when present, are the lowest priority and must never replace or weaken Images 1, 2 or 3.",
   );
 
+  // Absolute identity conflict rule.
+  parts.push(
+    "When any visual reference conflicts with Image 1, Image 1 always wins for the face, hair, age and identity.",
+  );
+
   // 4. Scene-pack-specific style — only from the resolved scene pack.
-  const scenePackFields = extractPromptFields(parsed);
-  if (scenePackFields.length > 0) parts.push(`SCENE PACK PROMPT: ${scenePackFields.join(" ")}`);
+  const extracted = extractPromptFields(parsed);
+  if (extracted.sections.length > 0) {
+    const sectionBlock = extracted.sections
+      .map((s) => `${s.label}: ${s.body}`)
+      .join("\n");
+    parts.push(`SCENE PACK PROMPT:\n${sectionBlock}`);
+  }
   if (scenePack.visual_style?.trim()) parts.push(`VISUAL STYLE: ${scenePack.visual_style.trim()}.`);
   if (scenePack.color_mode?.trim()) parts.push(`COLOR MODE: ${scenePack.color_mode.trim()}.`);
   if (scenePack.framing?.trim()) parts.push(`SCENE PACK FRAMING: ${scenePack.framing.trim()}.`);
@@ -503,9 +584,22 @@ function buildPromptText(
   if (scenePack.id === CIRCO_SCENE_PACK_ID) parts.push(CIRCO_COLOR_INSTRUCTION);
 
   const positivePromptText = parts.join(" ");
-  const negativeParts = [scenePack.negative_prompt?.trim() ?? ""];
+  const negativeParts: string[] = [];
+  if (scenePack.negative_prompt?.trim()) negativeParts.push(scenePack.negative_prompt.trim());
+  if (extracted.forbidden.length > 0) negativeParts.push(...extracted.forbidden);
   if (scenePack.id === CIRCO_SCENE_PACK_ID) negativeParts.push(...CIRCO_NEGATIVE_PROMPT_ADDITIONS);
-  const negativePromptText = negativeParts.filter(Boolean).join(", ");
+  const seenNeg = new Set<string>();
+  const dedupedNeg: string[] = [];
+  for (const raw of negativeParts) {
+    const chunks = raw.split(/,\s*/).map((c) => c.trim()).filter(Boolean);
+    for (const c of chunks) {
+      const key = c.toLocaleLowerCase("pt-BR");
+      if (seenNeg.has(key)) continue;
+      seenNeg.add(key);
+      dedupedNeg.push(c);
+    }
+  }
+  const negativePromptText = dedupedNeg.join(", ");
   const promptText = negativePromptText
     ? `${positivePromptText} NEGATIVE PROMPT: ${negativePromptText}.`
     : positivePromptText;
@@ -516,9 +610,13 @@ function buildPromptText(
     negativePromptText,
     diagnostics: analyzePrompt(positivePromptText, scenePack.id),
     shouldApplyNeutralGrayscale: containsAny(
-      [scenePack.color_mode, scenePack.visual_style, ...scenePackFields].filter(Boolean).join(" "),
+      [scenePack.color_mode, scenePack.visual_style, ...extracted.sections.map((s) => s.body)]
+        .filter(Boolean)
+        .join(" "),
       ["black and white", "preto e branco", "grayscale", "monochrome", "monocromático", "monocromatico"],
     ),
+    sectionLabels: extracted.sections.map((s) => s.label),
+    extractedNegativeCount: extracted.forbidden.length,
   };
 }
 
@@ -733,6 +831,12 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       scenePack.id === CIRCO_SCENE_PACK_ID && scenePack.reference_image_url !== CIRCO_REFERENCE_IMAGE_URL;
     const promptPreparedFromResolvedScenePack = chosenScenePackId === scenePack.id;
 
+    const referenceRoles = [
+      "identity-face-crop",
+      "appearance-medium",
+      "scene-base",
+      ...(hatRefUsed.length > 0 ? ["hat-front", "hat-side"].slice(0, hatRefUsed.length) : []),
+    ];
     console.log(`[PIPOCA_FINAL_GENERATION_INPUT]`, {
       film_id: session.selected_film_id,
       scene_pack_id: chosenScenePackId,
@@ -742,7 +846,15 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       reference_image_filename: referenceImageFilename,
       base_image_count: 3,
       prop_reference_count: hatRefUsed.length,
+      reference_count: 3 + hatRefUsed.length,
+      reference_roles: referenceRoles,
+      prompt_sections: builtPrompt.sectionLabels,
+      extracted_negative_count: builtPrompt.extractedNegativeCount,
+      prompt_length: builtPrompt.promptText.length,
+      negative_prompt_length: builtPrompt.negativePromptText.length,
       final_prompt_length: builtPrompt.promptText.length,
+      model: REPLICATE_MODEL,
+      scene_pack_version: (scenePack as any).updated_at ?? null,
       contains_monochrome: builtPrompt.diagnostics.contains_monochrome,
       contains_sertao: builtPrompt.diagnostics.contains_sertao,
       contains_cangaco: builtPrompt.diagnostics.contains_cangaco,
