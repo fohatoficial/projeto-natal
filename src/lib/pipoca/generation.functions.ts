@@ -831,6 +831,12 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       scenePack.id === CIRCO_SCENE_PACK_ID && scenePack.reference_image_url !== CIRCO_REFERENCE_IMAGE_URL;
     const promptPreparedFromResolvedScenePack = chosenScenePackId === scenePack.id;
 
+    const referenceRoles = [
+      "identity-face-crop",
+      "appearance-medium",
+      "scene-base",
+      ...(hatRefUsed.length > 0 ? ["hat-front", "hat-side"].slice(0, hatRefUsed.length) : []),
+    ];
     console.log(`[PIPOCA_FINAL_GENERATION_INPUT]`, {
       film_id: session.selected_film_id,
       scene_pack_id: chosenScenePackId,
@@ -840,7 +846,15 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       reference_image_filename: referenceImageFilename,
       base_image_count: 3,
       prop_reference_count: hatRefUsed.length,
+      reference_count: 3 + hatRefUsed.length,
+      reference_roles: referenceRoles,
+      prompt_sections: builtPrompt.sectionLabels,
+      extracted_negative_count: builtPrompt.extractedNegativeCount,
+      prompt_length: builtPrompt.promptText.length,
+      negative_prompt_length: builtPrompt.negativePromptText.length,
       final_prompt_length: builtPrompt.promptText.length,
+      model: REPLICATE_MODEL,
+      scene_pack_version: (scenePack as any).updated_at ?? null,
       contains_monochrome: builtPrompt.diagnostics.contains_monochrome,
       contains_sertao: builtPrompt.diagnostics.contains_sertao,
       contains_cangaco: builtPrompt.diagnostics.contains_cangaco,
