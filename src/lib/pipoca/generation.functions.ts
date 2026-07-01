@@ -359,29 +359,98 @@ function extractHatUsage(parsedPrompt: unknown): string | null {
   return typeof usage === "string" && usage.trim() ? usage.trim() : null;
 }
 
-function extractPromptFields(parsedPrompt: unknown): string[] {
-  if (typeof parsedPrompt === "string") return parsedPrompt.trim() ? [parsedPrompt.trim()] : [];
-  if (!parsedPrompt || typeof parsedPrompt !== "object" || Array.isArray(parsedPrompt)) return [];
-  const out: string[] = [];
-  const visit = (value: unknown, key = "") => {
-    if (key === "hat_reference_images") return;
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (trimmed && !/^https?:\/\//i.test(trimmed)) out.push(trimmed);
-      return;
+type PromptSection = { label: string; body: string };
+type ExtractedPrompt = { sections: PromptSection[]; forbidden: string[] };
+
+const NEGATIVE_KEYS = new Set([
+  "forbidden",
+  "negative",
+  "negative_prompt",
+  "avoid",
+  "prohibited",
+  "exclusions",
+  "do_not",
+  "must_not",
+]);
+const STRUCTURAL_SKIP_KEYS = new Set([
+  "hat_reference_images",
+  "prop_references",
+  "reference_roles",
+  "hat_usage",
+]);
+const SECTION_LABELS: Record<string, string> = {
+  scene: "SCENE",
+  subject: "SUBJECT",
+  wardrobe: "WARDROBE",
+  environment: "ENVIRONMENT",
+  style: "STYLE",
+  composition: "COMPOSITION",
+  final_result: "FINAL RESULT",
+};
+
+function labelFor(key: string): string {
+  return SECTION_LABELS[key] ?? key.replace(/[_-]+/g, " ").toUpperCase();
+}
+
+function pushUnique(list: string[], seen: Set<string>, value: string) {
+  const key = value.toLocaleLowerCase("pt-BR");
+  if (seen.has(key)) return;
+  seen.add(key);
+  list.push(value);
+}
+
+function collectStrings(
+  value: unknown,
+  positive: string[],
+  positiveSeen: Set<string>,
+  negative: string[],
+  negativeSeen: Set<string>,
+  insideNegative: boolean,
+) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || /^https?:\/\//i.test(trimmed)) return;
+    if (insideNegative) pushUnique(negative, negativeSeen, trimmed);
+    else pushUnique(positive, positiveSeen, trimmed);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectStrings(item, positive, positiveSeen, negative, negativeSeen, insideNegative);
     }
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item, key);
-      return;
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (STRUCTURAL_SKIP_KEYS.has(k)) continue;
+      const nextNeg = insideNegative || NEGATIVE_KEYS.has(k);
+      collectStrings(v, positive, positiveSeen, negative, negativeSeen, nextNeg);
     }
-    if (value && typeof value === "object") {
-      for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
-        visit(childValue, childKey);
-      }
+  }
+}
+
+function extractPromptFields(parsedPrompt: unknown): ExtractedPrompt {
+  if (typeof parsedPrompt === "string") {
+    const t = parsedPrompt.trim();
+    return { sections: t ? [{ label: "SCENE PACK", body: t }] : [], forbidden: [] };
+  }
+  if (!parsedPrompt || typeof parsedPrompt !== "object" || Array.isArray(parsedPrompt)) {
+    return { sections: [], forbidden: [] };
+  }
+  const sections: PromptSection[] = [];
+  const forbidden: string[] = [];
+  const forbiddenSeen = new Set<string>();
+
+  for (const [key, value] of Object.entries(parsedPrompt as Record<string, unknown>)) {
+    if (STRUCTURAL_SKIP_KEYS.has(key)) continue;
+    const positive: string[] = [];
+    const posSeen = new Set<string>();
+    collectStrings(value, positive, posSeen, forbidden, forbiddenSeen, NEGATIVE_KEYS.has(key));
+    if (!NEGATIVE_KEYS.has(key) && positive.length > 0) {
+      sections.push({ label: labelFor(key), body: positive.join(" ") });
     }
-  };
-  visit(parsedPrompt);
-  return Array.from(new Set(out));
+  }
+  return { sections, forbidden };
 }
 
 function safeFilenameFromUrl(url: string | null | undefined): string | null {
