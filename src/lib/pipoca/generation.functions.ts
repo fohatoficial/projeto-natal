@@ -562,9 +562,19 @@ function buildPromptText(
     "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Additional prop images, when present, are the lowest priority and must never replace or weaken Images 1, 2 or 3.",
   );
 
+  // Absolute identity conflict rule.
+  parts.push(
+    "When any visual reference conflicts with Image 1, Image 1 always wins for the face, hair, age and identity.",
+  );
+
   // 4. Scene-pack-specific style — only from the resolved scene pack.
-  const scenePackFields = extractPromptFields(parsed);
-  if (scenePackFields.length > 0) parts.push(`SCENE PACK PROMPT: ${scenePackFields.join(" ")}`);
+  const extracted = extractPromptFields(parsed);
+  if (extracted.sections.length > 0) {
+    const sectionBlock = extracted.sections
+      .map((s) => `${s.label}: ${s.body}`)
+      .join("\n");
+    parts.push(`SCENE PACK PROMPT:\n${sectionBlock}`);
+  }
   if (scenePack.visual_style?.trim()) parts.push(`VISUAL STYLE: ${scenePack.visual_style.trim()}.`);
   if (scenePack.color_mode?.trim()) parts.push(`COLOR MODE: ${scenePack.color_mode.trim()}.`);
   if (scenePack.framing?.trim()) parts.push(`SCENE PACK FRAMING: ${scenePack.framing.trim()}.`);
@@ -572,9 +582,22 @@ function buildPromptText(
   if (scenePack.id === CIRCO_SCENE_PACK_ID) parts.push(CIRCO_COLOR_INSTRUCTION);
 
   const positivePromptText = parts.join(" ");
-  const negativeParts = [scenePack.negative_prompt?.trim() ?? ""];
+  const negativeParts: string[] = [];
+  if (scenePack.negative_prompt?.trim()) negativeParts.push(scenePack.negative_prompt.trim());
+  if (extracted.forbidden.length > 0) negativeParts.push(...extracted.forbidden);
   if (scenePack.id === CIRCO_SCENE_PACK_ID) negativeParts.push(...CIRCO_NEGATIVE_PROMPT_ADDITIONS);
-  const negativePromptText = negativeParts.filter(Boolean).join(", ");
+  const seenNeg = new Set<string>();
+  const dedupedNeg: string[] = [];
+  for (const raw of negativeParts) {
+    const chunks = raw.split(/,\s*/).map((c) => c.trim()).filter(Boolean);
+    for (const c of chunks) {
+      const key = c.toLocaleLowerCase("pt-BR");
+      if (seenNeg.has(key)) continue;
+      seenNeg.add(key);
+      dedupedNeg.push(c);
+    }
+  }
+  const negativePromptText = dedupedNeg.join(", ");
   const promptText = negativePromptText
     ? `${positivePromptText} NEGATIVE PROMPT: ${negativePromptText}.`
     : positivePromptText;
@@ -585,9 +608,13 @@ function buildPromptText(
     negativePromptText,
     diagnostics: analyzePrompt(positivePromptText, scenePack.id),
     shouldApplyNeutralGrayscale: containsAny(
-      [scenePack.color_mode, scenePack.visual_style, ...scenePackFields].filter(Boolean).join(" "),
+      [scenePack.color_mode, scenePack.visual_style, ...extracted.sections.map((s) => s.body)]
+        .filter(Boolean)
+        .join(" "),
       ["black and white", "preto e branco", "grayscale", "monochrome", "monocromático", "monocromatico"],
     ),
+    sectionLabels: extracted.sections.map((s) => s.label),
+    extractedNegativeCount: extracted.forbidden.length,
   };
 }
 
