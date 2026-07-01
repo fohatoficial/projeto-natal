@@ -20,6 +20,7 @@ import {
   getPipocaGenerationStatus,
 } from "@/lib/pipoca/generation.functions";
 import { createPipocaVisitor } from "@/lib/pipoca/visitors.functions";
+import { deriveIdentityFaceCrop } from "@/lib/pipoca/faceCrop";
 import {
   PRIVACY_NOTICE_PARAGRAPHS,
   PRIVACY_NOTICE_TITLE,
