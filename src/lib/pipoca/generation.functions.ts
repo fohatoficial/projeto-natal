@@ -543,9 +543,11 @@ function analyzePrompt(positivePromptText: string, scenePackId: string): PromptD
 function buildPromptText(
   scenePack: ScenePackForGeneration,
   hasHatRef = false,
+  filmSlug: string | null = null,
 ): BuiltPrompt {
   const parsed = parseScenePackPrompt(scenePack.prompt);
   const parts: string[] = [];
+  const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
 
   // 1. Reference role declaration — strict visual priority
   parts.push(
@@ -564,7 +566,7 @@ function buildPromptText(
     "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it only for the selected scene pack environment, composition, lighting direction and atmosphere.",
   );
 
-  if (hasHatRef) {
+  if (hasHatRef && !isDeusEDiabo) {
     parts.push(
       "Images 4 and 5 are low-priority prop design and fit references only, used only when the selected scene pack explicitly provides them.",
     );
@@ -591,8 +593,14 @@ function buildPromptText(
     "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
   );
 
+  // Film-specific hardening for "Deus e o Diabo na Terra do Sol".
+  if (isDeusEDiabo) {
+    for (const rule of DEUS_E_DIABO_IDENTITY_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_WARDROBE_RULES) parts.push(rule);
+  }
+
   const hatUsage = extractHatUsage(parsed);
-  if (hatUsage) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
+  if (hatUsage && !isDeusEDiabo) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
 
   // 3. Neutral composition
   parts.push(
@@ -629,6 +637,7 @@ function buildPromptText(
   if (scenePack.negative_prompt?.trim()) negativeParts.push(scenePack.negative_prompt.trim());
   if (extracted.forbidden.length > 0) negativeParts.push(...extracted.forbidden);
   if (scenePack.id === CIRCO_SCENE_PACK_ID) negativeParts.push(...CIRCO_NEGATIVE_PROMPT_ADDITIONS);
+  if (isDeusEDiabo) negativeParts.push(...DEUS_E_DIABO_NEGATIVE_ADDITIONS);
   const seenNeg = new Set<string>();
   const dedupedNeg: string[] = [];
   for (const raw of negativeParts) {
@@ -664,8 +673,9 @@ function buildPromptText(
 export function __buildPipocaPromptInputForTests(
   scenePack: ScenePackForGeneration,
   hasHatRef = false,
+  filmSlug: string | null = null,
 ): BuiltPrompt {
-  return buildPromptText(scenePack, hasHatRef);
+  return buildPromptText(scenePack, hasHatRef, filmSlug);
 }
 
 /* ---------- Replicate helpers ---------- */
