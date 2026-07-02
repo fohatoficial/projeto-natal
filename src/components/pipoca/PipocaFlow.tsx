@@ -114,6 +114,7 @@ type Prepared = {
   captureId: string;
   uploads: {
     identity: { path: string; token: string };
+    identityRaw: { path: string; token: string };
     appearance: { path: string; token: string };
   };
 };
