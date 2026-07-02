@@ -1149,7 +1149,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           attempt: attemptNumber,
           identity_photo_path: identityPath,
           appearance_photo_path: appearancePath,
-          input_image_count: 3 + hatRefUsed.length,
+          input_image_count: totalReferenceCount,
           scene_pack_id: chosenScenePackId,
           hat_reference_count_available: hatReferenceUrls.length,
           hat_reference_count_used: hatRefUsed.length,
