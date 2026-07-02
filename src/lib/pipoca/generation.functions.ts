@@ -864,17 +864,45 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
 
     const parsedScenePrompt = parseScenePackPrompt(scenePack.prompt);
-    // Prop references are now strictly scene-pack-driven. No global toggle,
-    // no film_id/slug guess, no fixed fallback URL. A scene pack without
-    // `prop_references.hat_reference_images` (or with an empty array) sends
-    // exactly 3 base images.
+
+    // Resolve film slug (needed for film-specific surgical rules — e.g.
+    // "Deus e o Diabo na Terra do Sol" identity/wardrobe hardening).
+    let filmSlug: string | null = null;
+    try {
+      const { data: filmRow } = await supabaseAdmin
+        .from("pipoca_films")
+        .select("slug")
+        .eq("id", session.selected_film_id)
+        .maybeSingle();
+      filmSlug = (filmRow?.slug as string | null) ?? null;
+    } catch {
+      filmSlug = null;
+    }
+    const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
+
+    // Prop references are scene-pack-driven. For "Deus e o Diabo na Terra do
+    // Sol" we temporarily disable hat visual references to prioritize facial
+    // fidelity (the hat remains only as a low-priority textual cue).
     const hatReferenceUrls: string[] = extractHatReferenceUrls(parsedScenePrompt);
-    const hatRefUsed: string[] = hatReferenceUrls.slice(0, 2);
+    const hatRefUsed: string[] = isDeusEDiabo ? [] : hatReferenceUrls.slice(0, 2);
     console.log(`${GEN_LOG} prop references resolved from scene pack`, {
       scene_pack_id: chosenScenePackId,
       hat_reference_count: hatRefUsed.length,
+      hat_refs_disabled_for_film: isDeusEDiabo,
     });
-    const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0);
+    const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0, filmSlug);
+
+    if (isDeusEDiabo) {
+      console.log(`${GEN_LOG} DEUS_E_DIABO_STRICT_IDENTITY_MODE`, {
+        film_slug: filmSlug,
+        scene_pack_id: chosenScenePackId,
+        reference_count: 3 + hatRefUsed.length,
+        face_crop_used: true,
+        hat_refs_disabled: true,
+        strict_clothing_replacement: true,
+      });
+    }
+
     const sceneImageUrl = scenePack.reference_image_url;
     const referenceImageFilename = safeFilenameFromUrl(scenePack.reference_image_url);
     const image3MatchesScenePack = sceneImageUrl === scenePack.reference_image_url;
