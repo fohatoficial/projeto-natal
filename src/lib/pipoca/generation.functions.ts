@@ -738,19 +738,20 @@ export function __buildPipocaPromptInputForTests(
 async function createReplicatePrediction(input: {
   prompt: string;
   identityUrl: string;
+  identityRawUrl?: string | null;
   appearanceUrl: string;
   sceneImageUrl: string;
   hatReferenceUrls: string[];
 }): Promise<ReplicatePrediction> {
   const token = getReplicateToken();
-  // Send both hat references when available: front (image 4) and side (image 5).
+  // Send both hat references when available: front and side.
   const hatRefs = input.hatReferenceUrls.slice(0, 2);
-  const inputImages = [
-    input.identityUrl,
-    input.appearanceUrl,
-    input.sceneImageUrl,
-    ...hatRefs,
-  ];
+  // Order (default): identity, appearance, scene, then up to 2 hat refs.
+  // Order (Deus e o Diabo w/ identity raw): identity (face crop), identity
+  // raw (secondary), appearance, scene, hat front, hat side.
+  const inputImages = input.identityRawUrl
+    ? [input.identityUrl, input.identityRawUrl, input.appearanceUrl, input.sceneImageUrl, ...hatRefs]
+    : [input.identityUrl, input.appearanceUrl, input.sceneImageUrl, ...hatRefs];
   const body = {
     input: {
       prompt: input.prompt,
