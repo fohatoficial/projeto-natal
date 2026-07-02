@@ -40,6 +40,47 @@ const CIRCO_FORBIDDEN_POSITIVE_TERMS = [
   "Glauber Rocha",
 ];
 
+// Correção cirúrgica para "Deus e o Diabo na Terra do Sol":
+// - Desativa referências visuais de chapéu (usa apenas 3 imagens).
+// - Reforça identidade facial e preservação feminina.
+// - Exige troca total da roupa real.
+const DEUS_E_DIABO_FILM_SLUG = "deus-e-o-diabo-na-terra-do-sol";
+const DEUS_E_DIABO_IDENTITY_RULES = [
+  "STRICT IDENTITY MODE for this scene. Image 1 is the ONLY source of truth for the face, identity, hair, age, gender presentation and ethnicity. Do not redesign the face. Do not blend, average or invent facial features. Do not replace the visitor with a similar-looking person.",
+  "Preserve face shape, jawline, eyes, eyebrows, nose, mouth, skin tone, hairline and hairstyle exactly as they appear in Image 1.",
+  "Do not masculinize feminine facial structure. Do not age the person up or down. Do not harden or squareify the jawline.",
+  "Preserve the subject's gender presentation from Image 1. If the visitor is a woman, keep clearly feminine facial identity and hair; do not convert the subject into a masculine cangaceiro archetype. The person must still remain unmistakably herself.",
+  "When any reference or style cue conflicts with Image 1, Image 1 must always win for face, hair, age, gender and identity.",
+];
+const DEUS_E_DIABO_WARDROBE_RULES = [
+  "WARDROBE: fully replace the visitor's real-world clothing with film-appropriate sertão / cangaço / rural Brazilian northeastern wardrobe. Do NOT preserve the visitor's original clothes. Modern clothing must not remain visible in the final image.",
+  "No t-shirt, blouse, jacket, hoodie, dress shirt, jeans or casual contemporary outfit from the source image may survive. The final clothing must look like it belongs to the film scene — rustic, worn leather and cloth textures, earthy tones.",
+  "A traditional cangaceiro leather hat MAY appear as a subtle textual cue, but only if it does not harm facial fidelity. The hat must never cover the face. The hat is optional — better no hat than a wrong face. If any conflict arises between hat accuracy and facial fidelity, prioritize facial fidelity.",
+];
+const DEUS_E_DIABO_NEGATIVE_ADDITIONS = [
+  "wrong face",
+  "altered identity",
+  "masculine face on a female visitor",
+  "extra people",
+  "duplicated person",
+  "extra faces",
+  "modern clothing",
+  "preserved source clothing",
+  "cowboy hat",
+  "western clothing",
+  "fashion editorial",
+  "costume-like theatrical exaggeration",
+  "oversized hat",
+  "face covered by hat",
+  "distorted face",
+  "deformed hands",
+  "extra limbs",
+  "cartoon",
+  "text",
+  "logo",
+  "watermark",
+];
+
 // Prop references (e.g. cangaceiro hats) are scene-pack-driven via the
 // `prop_references.hat_reference_images` array in the scene pack `prompt`
 // JSON. There is no global toggle and no film-wide fallback URL — a scene
@@ -502,9 +543,11 @@ function analyzePrompt(positivePromptText: string, scenePackId: string): PromptD
 function buildPromptText(
   scenePack: ScenePackForGeneration,
   hasHatRef = false,
+  filmSlug: string | null = null,
 ): BuiltPrompt {
   const parsed = parseScenePackPrompt(scenePack.prompt);
   const parts: string[] = [];
+  const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
 
   // 1. Reference role declaration — strict visual priority
   parts.push(
@@ -523,7 +566,7 @@ function buildPromptText(
     "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it only for the selected scene pack environment, composition, lighting direction and atmosphere.",
   );
 
-  if (hasHatRef) {
+  if (hasHatRef && !isDeusEDiabo) {
     parts.push(
       "Images 4 and 5 are low-priority prop design and fit references only, used only when the selected scene pack explicitly provides them.",
     );
@@ -550,8 +593,14 @@ function buildPromptText(
     "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
   );
 
+  // Film-specific hardening for "Deus e o Diabo na Terra do Sol".
+  if (isDeusEDiabo) {
+    for (const rule of DEUS_E_DIABO_IDENTITY_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_WARDROBE_RULES) parts.push(rule);
+  }
+
   const hatUsage = extractHatUsage(parsed);
-  if (hatUsage) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
+  if (hatUsage && !isDeusEDiabo) parts.push(`Hat usage notes from scene pack: ${hatUsage}.`);
 
   // 3. Neutral composition
   parts.push(
@@ -588,6 +637,7 @@ function buildPromptText(
   if (scenePack.negative_prompt?.trim()) negativeParts.push(scenePack.negative_prompt.trim());
   if (extracted.forbidden.length > 0) negativeParts.push(...extracted.forbidden);
   if (scenePack.id === CIRCO_SCENE_PACK_ID) negativeParts.push(...CIRCO_NEGATIVE_PROMPT_ADDITIONS);
+  if (isDeusEDiabo) negativeParts.push(...DEUS_E_DIABO_NEGATIVE_ADDITIONS);
   const seenNeg = new Set<string>();
   const dedupedNeg: string[] = [];
   for (const raw of negativeParts) {
@@ -623,8 +673,9 @@ function buildPromptText(
 export function __buildPipocaPromptInputForTests(
   scenePack: ScenePackForGeneration,
   hasHatRef = false,
+  filmSlug: string | null = null,
 ): BuiltPrompt {
-  return buildPromptText(scenePack, hasHatRef);
+  return buildPromptText(scenePack, hasHatRef, filmSlug);
 }
 
 /* ---------- Replicate helpers ---------- */
@@ -813,17 +864,45 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
 
     const parsedScenePrompt = parseScenePackPrompt(scenePack.prompt);
-    // Prop references are now strictly scene-pack-driven. No global toggle,
-    // no film_id/slug guess, no fixed fallback URL. A scene pack without
-    // `prop_references.hat_reference_images` (or with an empty array) sends
-    // exactly 3 base images.
+
+    // Resolve film slug (needed for film-specific surgical rules — e.g.
+    // "Deus e o Diabo na Terra do Sol" identity/wardrobe hardening).
+    let filmSlug: string | null = null;
+    try {
+      const { data: filmRow } = await supabaseAdmin
+        .from("pipoca_films")
+        .select("slug")
+        .eq("id", session.selected_film_id)
+        .maybeSingle();
+      filmSlug = (filmRow?.slug as string | null) ?? null;
+    } catch {
+      filmSlug = null;
+    }
+    const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
+
+    // Prop references are scene-pack-driven. For "Deus e o Diabo na Terra do
+    // Sol" we temporarily disable hat visual references to prioritize facial
+    // fidelity (the hat remains only as a low-priority textual cue).
     const hatReferenceUrls: string[] = extractHatReferenceUrls(parsedScenePrompt);
-    const hatRefUsed: string[] = hatReferenceUrls.slice(0, 2);
+    const hatRefUsed: string[] = isDeusEDiabo ? [] : hatReferenceUrls.slice(0, 2);
     console.log(`${GEN_LOG} prop references resolved from scene pack`, {
       scene_pack_id: chosenScenePackId,
       hat_reference_count: hatRefUsed.length,
+      hat_refs_disabled_for_film: isDeusEDiabo,
     });
-    const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0);
+    const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0, filmSlug);
+
+    if (isDeusEDiabo) {
+      console.log(`${GEN_LOG} DEUS_E_DIABO_STRICT_IDENTITY_MODE`, {
+        film_slug: filmSlug,
+        scene_pack_id: chosenScenePackId,
+        reference_count: 3 + hatRefUsed.length,
+        face_crop_used: true,
+        hat_refs_disabled: true,
+        strict_clothing_replacement: true,
+      });
+    }
+
     const sceneImageUrl = scenePack.reference_image_url;
     const referenceImageFilename = safeFilenameFromUrl(scenePack.reference_image_url);
     const image3MatchesScenePack = sceneImageUrl === scenePack.reference_image_url;
