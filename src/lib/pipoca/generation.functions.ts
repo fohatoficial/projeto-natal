@@ -53,25 +53,34 @@ const DEUS_E_DIABO_IDENTITY_RULES = [
   "When any reference or style cue conflicts with Image 1, Image 1 must always win for face, hair, age, gender and identity.",
 ];
 const DEUS_E_DIABO_WARDROBE_RULES = [
-  "WARDROBE: fully replace the visitor's real-world clothing with film-appropriate sertão / cangaço / rural Brazilian northeastern wardrobe. Do NOT preserve the visitor's original clothes. Modern clothing must not remain visible in the final image.",
-  "No t-shirt, blouse, jacket, hoodie, dress shirt, jeans or casual contemporary outfit from the source image may survive. The final clothing must look like it belongs to the film scene — rustic, worn leather and cloth textures, earthy tones.",
-  "A traditional cangaceiro leather hat MAY appear as a subtle textual cue, but only if it does not harm facial fidelity. The hat must never cover the face. The hat is optional — better no hat than a wrong face. If any conflict arises between hat accuracy and facial fidelity, prioritize facial fidelity.",
+  "WARDROBE: fully replace the visitor's real-world clothing with film-appropriate sertão / cangaço / rural Brazilian northeastern wardrobe. Do NOT preserve the visitor's original clothes. Modern clothing must not remain visible in the final image. No t-shirt, polo, contemporary blouse, hoodie, jacket, dress shirt, jeans or casual contemporary outfit from the source image may survive.",
+  "For men: rustic sertão clothing, rough cotton shirt, weathered fabric, leather vest or rustic leather elements when appropriate, simple belt, utilitarian styling, arid and worn look.",
+  "For women: preserve feminine facial identity and do not masculinize the face. Use a female cangaceira / sertaneja-inspired wardrobe — rustic dress or blouse/skirt composition compatible with the cangaço universe, worn natural fabrics, subtle leather details when appropriate. The final result must remain clearly the same woman.",
+];
+const DEUS_E_DIABO_HAT_RULES = [
+  "HAT (MANDATORY for this film): the visitor MUST wear an authentic Brazilian cangaceiro leather hat with the characteristic half-moon / crescent silhouette, upward-curved side flaps, structured leather body, visible cangaço-style metallic ornaments / stars / decorative details, and leather straps. The hat must fit naturally on the head with correct scale proportional to the head — never too small, never oversized, never cartoonish, never theatrical fantasy, never a cowboy / western / peão / generic rural hat.",
+  "Images 4 and 5 are prop references used ONLY for the design and fit of the cangaceiro hat (Image 4 = front view, Image 5 = side view). They must never alter the visitor's face, hairstyle, expression, age, or gender presentation, and must never change body, clothing, pose, framing or environment.",
+  "The cangaceiro hat is mandatory in this film, but it must never hide, cover or distort the face. If any conflict arises between hat placement and facial fidelity, prioritize facial fidelity while still keeping the hat visible.",
 ];
 const DEUS_E_DIABO_NEGATIVE_ADDITIONS = [
   "wrong face",
   "altered identity",
-  "masculine face on a female visitor",
   "extra people",
   "duplicated person",
   "extra faces",
   "modern clothing",
   "preserved source clothing",
+  "polo shirt",
+  "contemporary blouse",
+  "modern fashion",
   "cowboy hat",
-  "western clothing",
-  "fashion editorial",
-  "costume-like theatrical exaggeration",
+  "western hat",
+  "peão hat",
+  "generic rural hat",
+  "small hat",
   "oversized hat",
   "face covered by hat",
+  "masculine face on a female visitor",
   "distorted face",
   "deformed hands",
   "extra limbs",
@@ -566,7 +575,7 @@ function buildPromptText(
     "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it only for the selected scene pack environment, composition, lighting direction and atmosphere.",
   );
 
-  if (hasHatRef && !isDeusEDiabo) {
+  if (hasHatRef) {
     parts.push(
       "Images 4 and 5 are low-priority prop design and fit references only, used only when the selected scene pack explicitly provides them.",
     );
@@ -597,6 +606,7 @@ function buildPromptText(
   if (isDeusEDiabo) {
     for (const rule of DEUS_E_DIABO_IDENTITY_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_WARDROBE_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_HAT_RULES) parts.push(rule);
   }
 
   const hatUsage = extractHatUsage(parsed);
@@ -881,25 +891,25 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
 
     // Prop references are scene-pack-driven. For "Deus e o Diabo na Terra do
-    // Sol" we temporarily disable hat visual references to prioritize facial
-    // fidelity (the hat remains only as a low-priority textual cue).
+    // Sol" we re-enable hat visual references (hybrid cangaço mode) — face
+    // priority is enforced through the strict identity rules in the prompt.
     const hatReferenceUrls: string[] = extractHatReferenceUrls(parsedScenePrompt);
-    const hatRefUsed: string[] = isDeusEDiabo ? [] : hatReferenceUrls.slice(0, 2);
+    const hatRefUsed: string[] = hatReferenceUrls.slice(0, 2);
     console.log(`${GEN_LOG} prop references resolved from scene pack`, {
       scene_pack_id: chosenScenePackId,
       hat_reference_count: hatRefUsed.length,
-      hat_refs_disabled_for_film: isDeusEDiabo,
     });
     const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0, filmSlug);
 
     if (isDeusEDiabo) {
-      console.log(`${GEN_LOG} DEUS_E_DIABO_STRICT_IDENTITY_MODE`, {
+      console.log(`${GEN_LOG} DEUS_E_DIABO_HYBRID_CANGACO_MODE`, {
         film_slug: filmSlug,
         scene_pack_id: chosenScenePackId,
         reference_count: 3 + hatRefUsed.length,
         face_crop_used: true,
-        hat_refs_disabled: true,
+        hat_reference_count: hatRefUsed.length,
         strict_clothing_replacement: true,
+        identity_priority_mode: "strict",
       });
     }
 
