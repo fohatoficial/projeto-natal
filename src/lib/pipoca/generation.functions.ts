@@ -68,7 +68,11 @@ const DEUS_E_DIABO_HAT_RULES = [
   "The face must remain the main visual focal point. The hat is required, but must remain secondary to identity. Do not let the hat overpower the face. Do not let the hat dominate the framing. Do not crop or compose the image in a way that makes the hat more important than the face. If any conflict arises between hat placement and facial fidelity, prioritize facial fidelity while still keeping the hat visible.",
 ];
 const DEUS_E_DIABO_FRAMING_RULES = [
-  "FRAMING: prefer a medium shot or medium close-up where the face is clearly visible, the wardrobe is visible, the hat is visible, and the face remains the focal point. Avoid extreme close-ups dominated by the hat, and avoid any composition where the hat's presence overwhelms the face.",
+  "REQUIRED FRAMING: waist-up portrait. The visitor must appear from approximately the waist up. The full cangaceiro hat must be entirely visible (never cropped at the top or sides). The face must be clearly visible. The upper body, torso and waist area must be visible. Enough of the wardrobe must be visible to communicate the character.",
+  "Do NOT use close-up framing. Do NOT use extreme close-up framing. Do NOT crop at the shoulders or chest. Do NOT push the camera too close to the face. Do NOT let the face fill most of the frame. Do NOT sacrifice the environment to prioritize the face. Do NOT produce a portrait-only composition.",
+  "COMPOSITION AND ENVIRONMENT: preserve facial identity strongly, but keep the composition faithful to the scene pack. Identity must be preserved without collapsing the framing into a close portrait. The scene must still look like a cinematic still from the film. The visitor must feel naturally inserted into the environment, not cut out from it.",
+  "The cross must remain visible in the composition. The arid sertão landscape / background must remain visible and readable. The image must preserve a sense of place, not just a portrait. The result must still read clearly as a scene from Deus e o Diabo na Terra do Sol — a cinematic sertão portrait, not a facial close-up.",
+  "REFERENCE HIERARCHY FOR COMPOSITION: Images 1 and 2 control identity and recognizability. Image 3 controls body and overall appearance. Image 4 controls the environmental composition and scene integration and MUST remain strong enough to preserve the intended cinematic waist-up framing, the visible cross and the visible sertão background. Images 5 and 6 control ONLY the hat design. Do not let identity preservation override the scene composition to the point that the result becomes a close-up portrait.",
 ];
 const DEUS_E_DIABO_NEGATIVE_ADDITIONS = [
   "wrong person",
@@ -98,7 +102,19 @@ const DEUS_E_DIABO_NEGATIVE_ADDITIONS = [
   "text",
   "logo",
   "watermark",
+  "close-up portrait",
+  "extreme close-up",
+  "tight crop",
+  "cropped hat",
+  "cropped torso",
+  "cropped waist",
+  "missing background",
+  "missing cross",
+  "weak environmental context",
+  "portrait-only composition",
+  "over-zoomed framing",
 ];
+
 
 // Prop references (e.g. cangaceiro hats) are scene-pack-driven via the
 // `prop_references.hat_reference_images` array in the scene pack `prompt`
