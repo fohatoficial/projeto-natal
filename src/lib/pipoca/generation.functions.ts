@@ -575,7 +575,7 @@ function buildPromptText(
     "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it only for the selected scene pack environment, composition, lighting direction and atmosphere.",
   );
 
-  if (hasHatRef && !isDeusEDiabo) {
+  if (hasHatRef) {
     parts.push(
       "Images 4 and 5 are low-priority prop design and fit references only, used only when the selected scene pack explicitly provides them.",
     );
