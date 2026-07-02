@@ -6,6 +6,7 @@ const ORIGINALS_BUCKET = "pipoca-visitor-originals";
 const MIN_VALID_BYTES = 2048;
 
 const IDENTITY_NAME = "identity-close.jpg";
+const IDENTITY_RAW_NAME = "identity-raw.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
 
 const PrepareInput = z.object({
