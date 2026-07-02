@@ -11,6 +11,7 @@ const SIGNED_REF_TTL = 60 * 30;
 const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/, "");
 
 const IDENTITY_NAME = "identity-close.jpg";
+const IDENTITY_RAW_NAME = "identity-raw.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
 const CIRCO_SCENE_PACK_ID = "407b5a71-6f4d-4fb0-b14a-e8cccab25001";
 const CIRCO_REFERENCE_IMAGE_URL =
