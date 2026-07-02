@@ -40,6 +40,47 @@ const CIRCO_FORBIDDEN_POSITIVE_TERMS = [
   "Glauber Rocha",
 ];
 
+// Correção cirúrgica para "Deus e o Diabo na Terra do Sol":
+// - Desativa referências visuais de chapéu (usa apenas 3 imagens).
+// - Reforça identidade facial e preservação feminina.
+// - Exige troca total da roupa real.
+const DEUS_E_DIABO_FILM_SLUG = "deus-e-o-diabo-na-terra-do-sol";
+const DEUS_E_DIABO_IDENTITY_RULES = [
+  "STRICT IDENTITY MODE for this scene. Image 1 is the ONLY source of truth for the face, identity, hair, age, gender presentation and ethnicity. Do not redesign the face. Do not blend, average or invent facial features. Do not replace the visitor with a similar-looking person.",
+  "Preserve face shape, jawline, eyes, eyebrows, nose, mouth, skin tone, hairline and hairstyle exactly as they appear in Image 1.",
+  "Do not masculinize feminine facial structure. Do not age the person up or down. Do not harden or squareify the jawline.",
+  "Preserve the subject's gender presentation from Image 1. If the visitor is a woman, keep clearly feminine facial identity and hair; do not convert the subject into a masculine cangaceiro archetype. The person must still remain unmistakably herself.",
+  "When any reference or style cue conflicts with Image 1, Image 1 must always win for face, hair, age, gender and identity.",
+];
+const DEUS_E_DIABO_WARDROBE_RULES = [
+  "WARDROBE: fully replace the visitor's real-world clothing with film-appropriate sertão / cangaço / rural Brazilian northeastern wardrobe. Do NOT preserve the visitor's original clothes. Modern clothing must not remain visible in the final image.",
+  "No t-shirt, blouse, jacket, hoodie, dress shirt, jeans or casual contemporary outfit from the source image may survive. The final clothing must look like it belongs to the film scene — rustic, worn leather and cloth textures, earthy tones.",
+  "A traditional cangaceiro leather hat MAY appear as a subtle textual cue, but only if it does not harm facial fidelity. The hat must never cover the face. The hat is optional — better no hat than a wrong face. If any conflict arises between hat accuracy and facial fidelity, prioritize facial fidelity.",
+];
+const DEUS_E_DIABO_NEGATIVE_ADDITIONS = [
+  "wrong face",
+  "altered identity",
+  "masculine face on a female visitor",
+  "extra people",
+  "duplicated person",
+  "extra faces",
+  "modern clothing",
+  "preserved source clothing",
+  "cowboy hat",
+  "western clothing",
+  "fashion editorial",
+  "costume-like theatrical exaggeration",
+  "oversized hat",
+  "face covered by hat",
+  "distorted face",
+  "deformed hands",
+  "extra limbs",
+  "cartoon",
+  "text",
+  "logo",
+  "watermark",
+];
+
 // Prop references (e.g. cangaceiro hats) are scene-pack-driven via the
 // `prop_references.hat_reference_images` array in the scene pack `prompt`
 // JSON. There is no global toggle and no film-wide fallback URL — a scene
