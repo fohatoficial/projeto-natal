@@ -891,25 +891,25 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
 
     // Prop references are scene-pack-driven. For "Deus e o Diabo na Terra do
-    // Sol" we temporarily disable hat visual references to prioritize facial
-    // fidelity (the hat remains only as a low-priority textual cue).
+    // Sol" we re-enable hat visual references (hybrid cangaço mode) — face
+    // priority is enforced through the strict identity rules in the prompt.
     const hatReferenceUrls: string[] = extractHatReferenceUrls(parsedScenePrompt);
-    const hatRefUsed: string[] = isDeusEDiabo ? [] : hatReferenceUrls.slice(0, 2);
+    const hatRefUsed: string[] = hatReferenceUrls.slice(0, 2);
     console.log(`${GEN_LOG} prop references resolved from scene pack`, {
       scene_pack_id: chosenScenePackId,
       hat_reference_count: hatRefUsed.length,
-      hat_refs_disabled_for_film: isDeusEDiabo,
     });
     const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0, filmSlug);
 
     if (isDeusEDiabo) {
-      console.log(`${GEN_LOG} DEUS_E_DIABO_STRICT_IDENTITY_MODE`, {
+      console.log(`${GEN_LOG} DEUS_E_DIABO_HYBRID_CANGACO_MODE`, {
         film_slug: filmSlug,
         scene_pack_id: chosenScenePackId,
         reference_count: 3 + hatRefUsed.length,
         face_crop_used: true,
-        hat_refs_disabled: true,
+        hat_reference_count: hatRefUsed.length,
         strict_clothing_replacement: true,
+        identity_priority_mode: "strict",
       });
     }
 
