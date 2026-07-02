@@ -667,12 +667,14 @@ function buildPromptText(
       : "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
   );
 
-  // Film-specific hardening for "Deus e o Diabo na Terra do Sol".
+  // Film-specific hardening for "Deus e o Diabo na Terra do Sol" (DEUS_LEGACY_MODE).
   if (isDeusEDiabo) {
     for (const rule of DEUS_E_DIABO_IDENTITY_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_APPEARANCE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_FEMALE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_WARDROBE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_HAT_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_STYLE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_FRAMING_RULES) parts.push(rule);
   }
 
