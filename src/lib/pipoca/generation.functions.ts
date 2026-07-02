@@ -606,6 +606,7 @@ function buildPromptText(
   if (isDeusEDiabo) {
     for (const rule of DEUS_E_DIABO_IDENTITY_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_WARDROBE_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_HAT_RULES) parts.push(rule);
   }
 
   const hatUsage = extractHatUsage(parsed);
