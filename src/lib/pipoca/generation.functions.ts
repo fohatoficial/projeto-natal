@@ -742,7 +742,7 @@ function buildPromptText(
     positivePromptText,
     negativePromptText,
     diagnostics: analyzePrompt(positivePromptText, scenePack.id),
-    shouldApplyNeutralGrayscale: containsAny(
+    shouldApplyNeutralGrayscale: isDeusEDiabo || containsAny(
       [scenePack.color_mode, scenePack.visual_style, ...extracted.sections.map((s) => s.body)]
         .filter(Boolean)
         .join(" "),
