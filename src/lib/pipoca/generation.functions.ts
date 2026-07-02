@@ -1016,6 +1016,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
 
     const referenceRoles = [
       "identity-face-crop",
+      ...(hasSecondaryIdentity ? ["identity-raw"] : []),
       "appearance-medium",
       "scene-base",
       ...(hatRefUsed.length > 0 ? ["hat-front", "hat-side"].slice(0, hatRefUsed.length) : []),
@@ -1027,9 +1028,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       visual_style: scenePack.visual_style,
       color_mode: scenePack.color_mode,
       reference_image_filename: referenceImageFilename,
-      base_image_count: 3,
+      base_image_count: baseImageCount,
       prop_reference_count: hatRefUsed.length,
-      reference_count: 3 + hatRefUsed.length,
+      reference_count: totalReferenceCount,
       reference_roles: referenceRoles,
       prompt_sections: builtPrompt.sectionLabels,
       extracted_negative_count: builtPrompt.extractedNegativeCount,
@@ -1097,13 +1098,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       attempt: attemptNumber,
       hatReferenceAvailable: hatReferenceUrls.length,
       hatReferenceUsed: hatRefUsed.length,
-      order: [
-        "identity-close",
-        "appearance-medium",
-        "scene-base",
-        "hat-front",
-        "hat-side",
-      ].slice(0, 3 + hatRefUsed.length),
+      order: referenceRoles,
     });
     if (hatRefUsed.length > 0) {
       console.log(`${GEN_LOG} usando chapéu como referência secundária`);
@@ -1111,9 +1106,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     console.log(`[PIPOCA_GENERATION_REFERENCES]`, {
       film_id: session.selected_film_id ?? null,
       scene_pack_id: chosenScenePackId,
-      base_image_count: 3,
+      base_image_count: baseImageCount,
       prop_reference_count: hatRefUsed.length,
-      total_image_count: 3 + hatRefUsed.length,
+      total_image_count: totalReferenceCount,
       prop_roles: hatRefUsed.length > 0
         ? ["hat-front", "hat-side"].slice(0, hatRefUsed.length)
         : [],
@@ -1126,6 +1121,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       prediction = await createReplicatePrediction({
         prompt: builtPrompt.promptText,
         identityUrl: signedIdentity.signedUrl,
+        identityRawUrl: signedIdentityRawUrl,
         appearanceUrl: signedAppearance.signedUrl,
         sceneImageUrl,
         hatReferenceUrls: hatRefUsed,
