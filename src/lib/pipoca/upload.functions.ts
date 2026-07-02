@@ -123,6 +123,7 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
     });
 
     const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
+    const identityRawPath = `${session.id}/${capture.id}/${IDENTITY_RAW_NAME}`;
     const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;
 
     // We still record identity-close.jpg in `original_photo_path` for backward
@@ -138,12 +139,19 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
       .createSignedUploadUrl(identityPath);
     if (sIdErr || !signedIdentity) throw new Error("Falha ao criar URL de upload (identidade)");
 
+    const { data: signedIdentityRaw, error: sIdRawErr } = await supabaseAdmin.storage
+      .from(ORIGINALS_BUCKET)
+      .createSignedUploadUrl(identityRawPath);
+    if (sIdRawErr || !signedIdentityRaw) {
+      throw new Error("Falha ao criar URL de upload (identidade original)");
+    }
+
     const { data: signedAppearance, error: sApErr } = await supabaseAdmin.storage
       .from(ORIGINALS_BUCKET)
       .createSignedUploadUrl(appearancePath);
     if (sApErr || !signedAppearance) throw new Error("Falha ao criar URL de upload (aparência)");
 
-    console.log(`${LOG} dois uploads assinados criados`, {
+    console.log(`${LOG} três uploads assinados criados`, {
       sessionId: session.id,
       captureId: capture.id,
     });
@@ -153,6 +161,7 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
       captureId: capture.id as string,
       uploads: {
         identity: { path: identityPath, token: signedIdentity.token },
+        identityRaw: { path: identityRawPath, token: signedIdentityRaw.token },
         appearance: { path: appearancePath, token: signedAppearance.token },
       },
     };
