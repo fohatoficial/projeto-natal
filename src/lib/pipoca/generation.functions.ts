@@ -965,74 +965,40 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
     const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
 
-    // Deus e o Diabo — try to resolve the secondary identity reference (the
-    // uncropped identity photo). Best-effort: if the file is missing (older
-    // captures / upload failure), fall back to the 3+prop layout for this
-    // generation and log the fallback flag.
-    let signedIdentityRawUrl: string | null = null;
-    let identityRawResolved = false;
-    if (isDeusEDiabo) {
-      const identityRawPath = `${session.id}/${capture.id}/${IDENTITY_RAW_NAME}`;
-      try {
-        const folder = `${session.id}/${capture.id}`;
-        const { data: listing } = await supabaseAdmin.storage
-          .from(ORIGINALS_BUCKET)
-          .list(folder, { limit: 100 });
-        const rawEntry = listing?.find((f: any) => f.name === IDENTITY_RAW_NAME);
-        const rawSize = (rawEntry?.metadata as { size?: number } | undefined)?.size ?? 0;
-        if (rawEntry && rawSize >= 2048) {
-          const { data: signedRaw } = await supabaseAdmin.storage
-            .from(ORIGINALS_BUCKET)
-            .createSignedUrl(identityRawPath, SIGNED_REF_TTL);
-          if (signedRaw?.signedUrl) {
-            signedIdentityRawUrl = signedRaw.signedUrl;
-            identityRawResolved = true;
-          }
-        }
-      } catch {
-        signedIdentityRawUrl = null;
-        identityRawResolved = false;
-      }
-      if (!identityRawResolved) {
-        console.warn(`${GEN_LOG} DEUS_E_DIABO_IDENTITY_RAW_MISSING`, {
-          film_slug: filmSlug,
-          scene_pack_id: session.scene_pack_id,
-          capture_id: capture.id,
-          fallback_reference_layout: "3+prop",
-        });
-      }
-    }
+    // DEUS_LEGACY_MODE: this film uses the classic 3-base + prop layout.
+    // The uncropped identity photo is intentionally NOT sent — Image 1
+    // (face crop) is the single source of truth for facial identity.
+    const signedIdentityRawUrl: string | null = null;
 
-    // Prop references are scene-pack-driven. For "Deus e o Diabo na Terra do
-    // Sol" we keep the cangaceiro hat references (Images 5 & 6 when the
-    // secondary identity is available, otherwise 4 & 5) — facial fidelity is
-    // enforced through the strict identity rules in the prompt.
+    // Prop references are scene-pack-driven (cangaceiro hat front/side).
     const hatReferenceUrls: string[] = extractHatReferenceUrls(parsedScenePrompt);
     const hatRefUsed: string[] = hatReferenceUrls.slice(0, 2);
     console.log(`${GEN_LOG} prop references resolved from scene pack`, {
       scene_pack_id: chosenScenePackId,
       hat_reference_count: hatRefUsed.length,
     });
-    const hasSecondaryIdentity = isDeusEDiabo && identityRawResolved;
+    const hasSecondaryIdentity = false;
     const builtPrompt = buildPromptText(
       scenePack,
       hatRefUsed.length > 0,
       filmSlug,
       hasSecondaryIdentity,
     );
-    const baseImageCount = hasSecondaryIdentity ? 4 : 3;
+    const baseImageCount = 3;
     const totalReferenceCount = baseImageCount + hatRefUsed.length;
 
     if (isDeusEDiabo) {
-      console.log(`${GEN_LOG} DEUS_E_DIABO_IDENTITY_RECOVERY_MODE`, {
+      console.log(`${GEN_LOG} DEUS_LEGACY_MODE`, {
         film_slug: filmSlug,
         scene_pack_id: chosenScenePackId,
         reference_count: totalReferenceCount,
-        identity_reference_count: hasSecondaryIdentity ? 2 : 1,
+        identity_reference_count: 1,
         hat_reference_count: hatRefUsed.length,
         strict_face_identity_mode: true,
         female_identity_protection_enabled: true,
-        secondary_identity_available: hasSecondaryIdentity,
+        wardrobe_full_replacement: true,
+        forced_black_and_white: true,
+        secondary_identity_available: false,
       });
     }
 
