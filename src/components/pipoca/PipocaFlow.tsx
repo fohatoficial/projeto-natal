@@ -284,6 +284,27 @@ export function PipocaFlow({ capitalSlug }: { capitalSlug?: string } = {}) {
         if (upErr) throw upErr;
         identityUploadedRef.current = true;
         console.log(`${UPLOAD_LOG} identidade enviada`);
+
+        // Also upload the pre-crop original identity photo as a secondary
+        // identity reference (used only by films that opt-in, e.g. "Deus e o
+        // Diabo na Terra do Sol"). Non-fatal — if this upload fails, the
+        // pipeline continues without a secondary identity reference.
+        try {
+          const { error: rawErr } = await supabase.storage
+            .from("pipoca-visitor-originals")
+            .uploadToSignedUrl(
+              current.uploads.identityRaw.path,
+              current.uploads.identityRaw.token,
+              identityPhoto.blob,
+              { contentType: "image/jpeg" },
+            );
+          if (rawErr) throw rawErr;
+          console.log(`${UPLOAD_LOG} identidade original (pre-crop) enviada`);
+        } catch (rawErr) {
+          console.warn(`${UPLOAD_LOG} falha ao enviar identidade original (pre-crop)`, {
+            reason: rawErr instanceof Error ? rawErr.message : "erro desconhecido",
+          });
+        }
       }
 
       if (!appearanceUploadedRef.current) {
