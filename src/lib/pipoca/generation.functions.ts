@@ -41,57 +41,84 @@ const CIRCO_FORBIDDEN_POSITIVE_TERMS = [
   "Glauber Rocha",
 ];
 
-// Correção cirúrgica para "Deus e o Diabo na Terra do Sol":
-// - Modo IDENTITY RECOVERY: 6 referências.
-// - Image 1 = face crop, Image 2 = foto original de identidade (sem crop),
-//   Image 3 = appearance, Image 4 = scene, Image 5/6 = chapéu (frontal/lateral).
-// - Images 1 e 2 mandam juntas na identidade. Preserva feminilidade e idade.
+// Correção cirúrgica para "Deus e o Diabo na Terra do Sol": DEUS_LEGACY_MODE.
+// - Layout de referências: 3 base + até 2 chapéus (sem identity-raw).
+// - Image 1 = identidade facial (única fonte de verdade da face).
+// - Image 2 = aparência geral (proporção, pose, cabelo, óculos, brincos, idade)
+//   — nunca preserva a roupa atual da pessoa.
+// - Image 3 = cenário (sertão + cruz).
+// - Images 4/5 = chapéu de cangaceiro (design/formato apenas).
+// - Preto e branco garantido (grayscale pós-processado + prompt) e estética Cinema Novo.
 const DEUS_E_DIABO_FILM_SLUG = "deus-e-o-diabo-na-terra-do-sol";
 const DEUS_E_DIABO_IDENTITY_RULES = [
-  "STRICT IDENTITY RECOVERY MODE for this scene. Image 1 is the PRIMARY identity reference (close face crop of the visitor) and Image 2 is the SECONDARY identity reference (the original, uncropped identity photo showing full-head shape, hair, age and overall recognizability). Images 1 and 2 together are the ONLY source of truth for face, identity, hair, apparent age, gender presentation and ethnicity.",
-  "Preserve the same person, not a similar person. Preserve the same apparent age, the same gender presentation, face shape, jawline, cheek volume, eye spacing, eyebrow shape, nose shape, mouth shape, lip shape, skin tone, hairline and hairstyle exactly as they appear in Images 1 and 2.",
-  "Do not age the face. Do not harden the face. Do not make the face more severe than the reference. Do not exaggerate wrinkles, under-eye hollows, smile lines or facial severity. Do not reinterpret the person as a different person. Do not blend, average or invent facial features. Do not blend facial traits from Images 3, 4, 5 or 6 into the face.",
-  "When any visual reference conflicts with Images 1 and 2, Images 1 and 2 always win for face, identity, age, gender presentation, hair and recognizability.",
-  "Exactly one person in the final image, unmistakably the same visitor from Images 1 and 2.",
+  "DEUS_LEGACY_MODE — STRICT IDENTITY. Image 1 is the ONLY source of truth for the face and identity. Preserve exactly the visitor from Image 1: face shape, jawline, eye shape, eye spacing, eyebrow shape, nose shape, mouth shape, lip shape, skin tone, ethnicity and overall recognizable identity.",
+  "Do not reinterpret or redesign the face. Do not generate a similar person. Do not blend, average or invent facial features. Do not blend facial features from Images 2, 3, 4 or 5 into the face. When any reference conflicts with Image 1, Image 1 always wins for the face and identity.",
+  "Do not age up or age down the person. Do not masculinize or feminize the face. Keep the person clearly recognizable as the same real visitor. Exactly one person in the final image.",
+];
+const DEUS_E_DIABO_APPEARANCE_RULES = [
+  "APPEARANCE (Image 2): use Image 2 ONLY for body proportions, posture, hair shape, glasses if present, small accessories (earrings), and approximate age range. Do NOT preserve the visitor's real-world clothing from Image 2. Image 2 must never override the face from Image 1.",
 ];
 const DEUS_E_DIABO_FEMALE_RULES = [
-  "FEMALE IDENTITY PROTECTION: if the visitor is a woman, she must remain clearly recognizable as the same woman. Preserve feminine facial identity. Do not masculinize female visitors. Do not age female visitors. Do not create a harsher, gaunter or more angular face. Keep a natural female sertão / cangaceira interpretation without changing who she is.",
+  "FEMALE IDENTITY PROTECTION: if the visitor is a woman, she must remain clearly recognizable as the same woman. Preserve feminine facial identity. Do not masculinize female visitors. Do not age female visitors. Do not create a harsher, gaunter or more angular face.",
 ];
 const DEUS_E_DIABO_WARDROBE_RULES = [
-  "WARDROBE: fully replace the visitor's real-world clothing with film-appropriate sertão / cangaço / rural Brazilian northeastern wardrobe. Do NOT preserve the visitor's original clothes. Modern clothing must not remain visible in the final image. No t-shirt, polo, contemporary blouse, hoodie, jacket, dress shirt, jeans or casual contemporary outfit from the source image may survive.",
-  "For men: rustic sertão clothing, rough cotton shirt, weathered fabric, leather vest or rustic leather elements when appropriate, simple belt, utilitarian styling, arid and worn look.",
-  "For women: rustic feminine sertão / cangaceira-inspired wardrobe — rustic dress or blouse/skirt composition compatible with the cangaço universe, worn natural fabrics, subtle leather details when appropriate. Preserve identity and femininity. No over-costuming. No caricature.",
+  "WARDROBE: completely replace the visitor's current clothing. Do NOT preserve any jacket, coat, hoodie, sweater, heavy blouse, t-shirt, polo, dress shirt, jeans or any modern clothing visible in the source photo. Wardrobe must become authentic cangaceiro / sertão / rural Brazilian northeastern clothing from the film universe: rustic, worn, natural, period-appropriate.",
+  "If the visitor is a woman, keep feminine cangaceira clothing (rustic dress or blouse/skirt with worn natural fabrics, subtle leather details when appropriate). If the visitor is a man, keep masculine cangaceiro clothing (rough cotton shirt, weathered fabric, leather vest or rustic leather elements when appropriate, simple belt).",
 ];
 const DEUS_E_DIABO_HAT_RULES = [
-  "HAT (MANDATORY for this film): the visitor MUST wear an authentic Brazilian cangaceiro leather hat with the characteristic half-moon / crescent silhouette, upward-curved side flaps, structured leather body, visible cangaço-style metallic ornaments / stars / decorative details, and leather straps. The hat must fit naturally on the head with correct scale proportional to the head — never too small, never oversized, never cartoonish, never theatrical fantasy, never a cowboy / western / peão / generic rural hat.",
-  "Images 5 and 6 are prop references used ONLY for the design and fit of the cangaceiro hat (Image 5 = front view, Image 6 = side view). They must never alter the visitor's face, age, gender presentation, hairstyle, expression or facial structure, and must never change body, clothing, pose, framing or environment.",
-  "The face must remain the main visual focal point. The hat is required, but must remain secondary to identity. Do not let the hat overpower the face. Do not let the hat dominate the framing. Do not crop or compose the image in a way that makes the hat more important than the face. If any conflict arises between hat placement and facial fidelity, prioritize facial fidelity while still keeping the hat visible.",
+  "HAT: the visitor MUST wear a proper cangaceiro leather hat — half-moon / crescent silhouette, upward-curved side flaps, structured leather body, visible metallic ornaments / stars / decorative details, leather straps. Never a cowboy, western, peão or generic rural hat.",
+  "Images 4 and 5 are prop references used ONLY to define the design, format, proportion and ornamentation of the cangaceiro hat. They must never override the face, must never alter identity, age, gender presentation, hair or the scene, and must never distort head size or facial proportions. The face remains the focal point; the hat is required but secondary to the face.",
+];
+const DEUS_E_DIABO_STYLE_RULES = [
+  "SCENE (Image 3): dry sertão landscape, wooden cross visible in the composition, the environment and atmosphere of \"Deus e o Diabo na Terra do Sol\". Naturally integrate the visitor into this environment.",
+  "STYLE: final image MUST be black and white. High contrast, Cinema Novo visual language, harsh natural sertão light, film-still feel. Avoid modern look. Avoid color output. Avoid muted color tints and warm sepia colorization that break the intended black-and-white result.",
 ];
 const DEUS_E_DIABO_FRAMING_RULES = [
-  "FRAMING: prefer a medium shot or medium close-up where the face is clearly visible, the wardrobe is visible, the hat is visible, and the face remains the focal point. Avoid extreme close-ups dominated by the hat, and avoid any composition where the hat's presence overwhelms the face.",
+  "FRAMING: medium shot or medium close-up where the face is clearly visible, wardrobe is visible and the hat is visible, with the face as the focal point. Avoid extreme close-ups dominated by the hat.",
 ];
 const DEUS_E_DIABO_NEGATIVE_ADDITIONS = [
-  "wrong person",
-  "different person",
-  "altered identity",
-  "aged face",
-  "older face",
-  "harsher face",
-  "gaunt face",
-  "masculine female face",
-  "feminized male face",
-  "distorted face",
-  "extra people",
-  "extra faces",
-  "duplicated person",
-  "modern clothing",
-  "preserved source clothing",
+  "color image",
+  "colored photo",
+  "muted color tint",
+  "warm sepia colorization",
+  "sepia tint that breaks black and white",
+  "preserved modern clothing",
+  "jacket from original photo",
+  "coat from original photo",
+  "hoodie",
+  "sweater",
+  "modern t-shirt",
+  "modern polo",
+  "modern dress shirt",
+  "jeans",
+  "contemporary blouse",
+  "western cowboy look",
   "cowboy hat",
-  "western hat",
+  "generic cowboy hat",
   "generic hat",
   "oversized hat",
   "hat dominating the image",
   "face hidden by hat",
+  "fashion editorial styling",
+  "face drift",
+  "altered identity",
+  "different person",
+  "wrong person",
+  "similar person",
+  "aged face",
+  "older face",
+  "harsher face",
+  "gaunt face",
+  "masculinized female face",
+  "feminized male face",
+  "extra people",
+  "extra faces",
+  "duplicated person",
+  "distorted face",
+  "wrong hat",
+  "missing cross",
+  "missing sertão",
+  "missing sertao",
   "deformed hands",
   "extra limbs",
   "cartoon",
@@ -640,12 +667,14 @@ function buildPromptText(
       : "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
   );
 
-  // Film-specific hardening for "Deus e o Diabo na Terra do Sol".
+  // Film-specific hardening for "Deus e o Diabo na Terra do Sol" (DEUS_LEGACY_MODE).
   if (isDeusEDiabo) {
     for (const rule of DEUS_E_DIABO_IDENTITY_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_APPEARANCE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_FEMALE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_WARDROBE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_HAT_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_STYLE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_FRAMING_RULES) parts.push(rule);
   }
 
@@ -713,7 +742,7 @@ function buildPromptText(
     positivePromptText,
     negativePromptText,
     diagnostics: analyzePrompt(positivePromptText, scenePack.id),
-    shouldApplyNeutralGrayscale: containsAny(
+    shouldApplyNeutralGrayscale: isDeusEDiabo || containsAny(
       [scenePack.color_mode, scenePack.visual_style, ...extracted.sections.map((s) => s.body)]
         .filter(Boolean)
         .join(" "),
@@ -936,74 +965,40 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
     const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
 
-    // Deus e o Diabo — try to resolve the secondary identity reference (the
-    // uncropped identity photo). Best-effort: if the file is missing (older
-    // captures / upload failure), fall back to the 3+prop layout for this
-    // generation and log the fallback flag.
-    let signedIdentityRawUrl: string | null = null;
-    let identityRawResolved = false;
-    if (isDeusEDiabo) {
-      const identityRawPath = `${session.id}/${capture.id}/${IDENTITY_RAW_NAME}`;
-      try {
-        const folder = `${session.id}/${capture.id}`;
-        const { data: listing } = await supabaseAdmin.storage
-          .from(ORIGINALS_BUCKET)
-          .list(folder, { limit: 100 });
-        const rawEntry = listing?.find((f: any) => f.name === IDENTITY_RAW_NAME);
-        const rawSize = (rawEntry?.metadata as { size?: number } | undefined)?.size ?? 0;
-        if (rawEntry && rawSize >= 2048) {
-          const { data: signedRaw } = await supabaseAdmin.storage
-            .from(ORIGINALS_BUCKET)
-            .createSignedUrl(identityRawPath, SIGNED_REF_TTL);
-          if (signedRaw?.signedUrl) {
-            signedIdentityRawUrl = signedRaw.signedUrl;
-            identityRawResolved = true;
-          }
-        }
-      } catch {
-        signedIdentityRawUrl = null;
-        identityRawResolved = false;
-      }
-      if (!identityRawResolved) {
-        console.warn(`${GEN_LOG} DEUS_E_DIABO_IDENTITY_RAW_MISSING`, {
-          film_slug: filmSlug,
-          scene_pack_id: session.scene_pack_id,
-          capture_id: capture.id,
-          fallback_reference_layout: "3+prop",
-        });
-      }
-    }
+    // DEUS_LEGACY_MODE: this film uses the classic 3-base + prop layout.
+    // The uncropped identity photo is intentionally NOT sent — Image 1
+    // (face crop) is the single source of truth for facial identity.
+    const signedIdentityRawUrl: string | null = null;
 
-    // Prop references are scene-pack-driven. For "Deus e o Diabo na Terra do
-    // Sol" we keep the cangaceiro hat references (Images 5 & 6 when the
-    // secondary identity is available, otherwise 4 & 5) — facial fidelity is
-    // enforced through the strict identity rules in the prompt.
+    // Prop references are scene-pack-driven (cangaceiro hat front/side).
     const hatReferenceUrls: string[] = extractHatReferenceUrls(parsedScenePrompt);
     const hatRefUsed: string[] = hatReferenceUrls.slice(0, 2);
     console.log(`${GEN_LOG} prop references resolved from scene pack`, {
       scene_pack_id: chosenScenePackId,
       hat_reference_count: hatRefUsed.length,
     });
-    const hasSecondaryIdentity = isDeusEDiabo && identityRawResolved;
+    const hasSecondaryIdentity = false;
     const builtPrompt = buildPromptText(
       scenePack,
       hatRefUsed.length > 0,
       filmSlug,
       hasSecondaryIdentity,
     );
-    const baseImageCount = hasSecondaryIdentity ? 4 : 3;
+    const baseImageCount = 3;
     const totalReferenceCount = baseImageCount + hatRefUsed.length;
 
     if (isDeusEDiabo) {
-      console.log(`${GEN_LOG} DEUS_E_DIABO_IDENTITY_RECOVERY_MODE`, {
+      console.log(`${GEN_LOG} DEUS_LEGACY_MODE`, {
         film_slug: filmSlug,
         scene_pack_id: chosenScenePackId,
         reference_count: totalReferenceCount,
-        identity_reference_count: hasSecondaryIdentity ? 2 : 1,
+        identity_reference_count: 1,
         hat_reference_count: hatRefUsed.length,
         strict_face_identity_mode: true,
         female_identity_protection_enabled: true,
-        secondary_identity_available: hasSecondaryIdentity,
+        wardrobe_full_replacement: true,
+        forced_black_and_white: true,
+        secondary_identity_available: false,
       });
     }
 
