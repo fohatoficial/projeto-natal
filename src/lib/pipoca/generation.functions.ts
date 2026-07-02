@@ -11,6 +11,7 @@ const SIGNED_REF_TTL = 60 * 30;
 const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/, "");
 
 const IDENTITY_NAME = "identity-close.jpg";
+const IDENTITY_RAW_NAME = "identity-raw.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
 const CIRCO_SCENE_PACK_ID = "407b5a71-6f4d-4fb0-b14a-e8cccab25001";
 const CIRCO_REFERENCE_IMAGE_URL =
@@ -41,47 +42,56 @@ const CIRCO_FORBIDDEN_POSITIVE_TERMS = [
 ];
 
 // Correção cirúrgica para "Deus e o Diabo na Terra do Sol":
-// - Desativa referências visuais de chapéu (usa apenas 3 imagens).
-// - Reforça identidade facial e preservação feminina.
-// - Exige troca total da roupa real.
+// - Modo IDENTITY RECOVERY: 6 referências.
+// - Image 1 = face crop, Image 2 = foto original de identidade (sem crop),
+//   Image 3 = appearance, Image 4 = scene, Image 5/6 = chapéu (frontal/lateral).
+// - Images 1 e 2 mandam juntas na identidade. Preserva feminilidade e idade.
 const DEUS_E_DIABO_FILM_SLUG = "deus-e-o-diabo-na-terra-do-sol";
 const DEUS_E_DIABO_IDENTITY_RULES = [
-  "STRICT IDENTITY MODE for this scene. Image 1 is the ONLY source of truth for the face, identity, hair, age, gender presentation and ethnicity. Do not redesign the face. Do not blend, average or invent facial features. Do not replace the visitor with a similar-looking person.",
-  "Preserve face shape, jawline, eyes, eyebrows, nose, mouth, skin tone, hairline and hairstyle exactly as they appear in Image 1.",
-  "Do not masculinize feminine facial structure. Do not age the person up or down. Do not harden or squareify the jawline.",
-  "Preserve the subject's gender presentation from Image 1. If the visitor is a woman, keep clearly feminine facial identity and hair; do not convert the subject into a masculine cangaceiro archetype. The person must still remain unmistakably herself.",
-  "When any reference or style cue conflicts with Image 1, Image 1 must always win for face, hair, age, gender and identity.",
+  "STRICT IDENTITY RECOVERY MODE for this scene. Image 1 is the PRIMARY identity reference (close face crop of the visitor) and Image 2 is the SECONDARY identity reference (the original, uncropped identity photo showing full-head shape, hair, age and overall recognizability). Images 1 and 2 together are the ONLY source of truth for face, identity, hair, apparent age, gender presentation and ethnicity.",
+  "Preserve the same person, not a similar person. Preserve the same apparent age, the same gender presentation, face shape, jawline, cheek volume, eye spacing, eyebrow shape, nose shape, mouth shape, lip shape, skin tone, hairline and hairstyle exactly as they appear in Images 1 and 2.",
+  "Do not age the face. Do not harden the face. Do not make the face more severe than the reference. Do not exaggerate wrinkles, under-eye hollows, smile lines or facial severity. Do not reinterpret the person as a different person. Do not blend, average or invent facial features. Do not blend facial traits from Images 3, 4, 5 or 6 into the face.",
+  "When any visual reference conflicts with Images 1 and 2, Images 1 and 2 always win for face, identity, age, gender presentation, hair and recognizability.",
+  "Exactly one person in the final image, unmistakably the same visitor from Images 1 and 2.",
+];
+const DEUS_E_DIABO_FEMALE_RULES = [
+  "FEMALE IDENTITY PROTECTION: if the visitor is a woman, she must remain clearly recognizable as the same woman. Preserve feminine facial identity. Do not masculinize female visitors. Do not age female visitors. Do not create a harsher, gaunter or more angular face. Keep a natural female sertão / cangaceira interpretation without changing who she is.",
 ];
 const DEUS_E_DIABO_WARDROBE_RULES = [
   "WARDROBE: fully replace the visitor's real-world clothing with film-appropriate sertão / cangaço / rural Brazilian northeastern wardrobe. Do NOT preserve the visitor's original clothes. Modern clothing must not remain visible in the final image. No t-shirt, polo, contemporary blouse, hoodie, jacket, dress shirt, jeans or casual contemporary outfit from the source image may survive.",
   "For men: rustic sertão clothing, rough cotton shirt, weathered fabric, leather vest or rustic leather elements when appropriate, simple belt, utilitarian styling, arid and worn look.",
-  "For women: preserve feminine facial identity and do not masculinize the face. Use a female cangaceira / sertaneja-inspired wardrobe — rustic dress or blouse/skirt composition compatible with the cangaço universe, worn natural fabrics, subtle leather details when appropriate. The final result must remain clearly the same woman.",
+  "For women: rustic feminine sertão / cangaceira-inspired wardrobe — rustic dress or blouse/skirt composition compatible with the cangaço universe, worn natural fabrics, subtle leather details when appropriate. Preserve identity and femininity. No over-costuming. No caricature.",
 ];
 const DEUS_E_DIABO_HAT_RULES = [
   "HAT (MANDATORY for this film): the visitor MUST wear an authentic Brazilian cangaceiro leather hat with the characteristic half-moon / crescent silhouette, upward-curved side flaps, structured leather body, visible cangaço-style metallic ornaments / stars / decorative details, and leather straps. The hat must fit naturally on the head with correct scale proportional to the head — never too small, never oversized, never cartoonish, never theatrical fantasy, never a cowboy / western / peão / generic rural hat.",
-  "Images 4 and 5 are prop references used ONLY for the design and fit of the cangaceiro hat (Image 4 = front view, Image 5 = side view). They must never alter the visitor's face, hairstyle, expression, age, or gender presentation, and must never change body, clothing, pose, framing or environment.",
-  "The cangaceiro hat is mandatory in this film, but it must never hide, cover or distort the face. If any conflict arises between hat placement and facial fidelity, prioritize facial fidelity while still keeping the hat visible.",
+  "Images 5 and 6 are prop references used ONLY for the design and fit of the cangaceiro hat (Image 5 = front view, Image 6 = side view). They must never alter the visitor's face, age, gender presentation, hairstyle, expression or facial structure, and must never change body, clothing, pose, framing or environment.",
+  "The face must remain the main visual focal point. The hat is required, but must remain secondary to identity. Do not let the hat overpower the face. Do not let the hat dominate the framing. Do not crop or compose the image in a way that makes the hat more important than the face. If any conflict arises between hat placement and facial fidelity, prioritize facial fidelity while still keeping the hat visible.",
+];
+const DEUS_E_DIABO_FRAMING_RULES = [
+  "FRAMING: prefer a medium shot or medium close-up where the face is clearly visible, the wardrobe is visible, the hat is visible, and the face remains the focal point. Avoid extreme close-ups dominated by the hat, and avoid any composition where the hat's presence overwhelms the face.",
 ];
 const DEUS_E_DIABO_NEGATIVE_ADDITIONS = [
-  "wrong face",
+  "wrong person",
+  "different person",
   "altered identity",
+  "aged face",
+  "older face",
+  "harsher face",
+  "gaunt face",
+  "masculine female face",
+  "feminized male face",
+  "distorted face",
   "extra people",
-  "duplicated person",
   "extra faces",
+  "duplicated person",
   "modern clothing",
   "preserved source clothing",
-  "polo shirt",
-  "contemporary blouse",
-  "modern fashion",
   "cowboy hat",
   "western hat",
-  "peão hat",
-  "generic rural hat",
-  "small hat",
+  "generic hat",
   "oversized hat",
-  "face covered by hat",
-  "masculine face on a female visitor",
-  "distorted face",
+  "hat dominating the image",
+  "face hidden by hat",
   "deformed hands",
   "extra limbs",
   "cartoon",
@@ -553,60 +563,90 @@ function buildPromptText(
   scenePack: ScenePackForGeneration,
   hasHatRef = false,
   filmSlug: string | null = null,
+  hasSecondaryIdentity = false,
 ): BuiltPrompt {
   const parsed = parseScenePackPrompt(scenePack.prompt);
   const parts: string[] = [];
   const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
+  const useSecondaryIdentity = isDeusEDiabo && hasSecondaryIdentity;
 
-  // 1. Reference role declaration — strict visual priority
-  parts.push(
-    "Image 1 is the PRIMARY FACE IDENTITY REFERENCE and has the highest priority. It is a close, guided portrait of the visitor and is the absolute source of truth for facial identity.",
-  );
-  parts.push(
-    "Use Image 1 for face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair (beard/stubble), eyebrows, glasses if present, apparent age, and overall recognizable identity.",
-  );
-  parts.push(
-    "Image 2 is the FULL APPEARANCE, CLOTHING AND BODY PROPORTION REFERENCE. It shows the same visitor framed from the waist up.",
-  );
-  parts.push(
-    "Use Image 2 for posture, body proportions, full hair shape, shoulders, torso, clothing texture, and general appearance — but always defer to Image 1 for the face itself.",
-  );
-  parts.push(
-    "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it only for the selected scene pack environment, composition, lighting direction and atmosphere.",
-  );
-
-  if (hasHatRef) {
+  // Reference-role declarations. The Deus e o Diabo path uses a distinct
+  // 6-image layout (face crop + uncropped identity as dual identity refs);
+  // all other films continue with the classic 3+prop layout.
+  if (useSecondaryIdentity) {
     parts.push(
-      "Images 4 and 5 are low-priority prop design and fit references only, used only when the selected scene pack explicitly provides them.",
+      "Image 1 is the PRIMARY FACE IDENTITY REFERENCE (close face crop of the visitor) and has the highest priority for facial identity.",
     );
     parts.push(
-      "Use prop references only to guide the explicit prop from the selected scene pack. They must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
+      "Image 2 is the SECONDARY IDENTITY REFERENCE (the original uncropped identity photo of the visitor). Use it for full-head shape, hair, apparent age and overall recognizability.",
     );
     parts.push(
-      "Any prop must remain proportional to the visitor and naturally integrated into the costume, without dominating the image, covering the face or changing the framing.",
+      "Images 1 and 2 together are the ONLY source of truth for the face, identity, hair, age, gender presentation and ethnicity.",
     );
+    parts.push(
+      "Image 3 is the APPEARANCE / BODY / CLOTHING reference. Use it only for body proportions, posture and general body appearance.",
+    );
+    parts.push(
+      "Image 4 is the SCENE / ENVIRONMENT / COMPOSITION reference. Use it only for the environment, composition, lighting direction and atmosphere.",
+    );
+    if (hasHatRef) {
+      parts.push(
+        "Images 5 and 6 are LOW-PRIORITY prop references used ONLY for the design and fit of the cangaceiro hat (Image 5 = front, Image 6 = side). They must never influence facial identity, age, gender presentation, hairstyle, expression, body, clothing, pose, camera distance, lighting or environment.",
+      );
+    }
+  } else {
+    parts.push(
+      "Image 1 is the PRIMARY FACE IDENTITY REFERENCE and has the highest priority. It is a close, guided portrait of the visitor and is the absolute source of truth for facial identity.",
+    );
+    parts.push(
+      "Use Image 1 for face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair (beard/stubble), eyebrows, glasses if present, apparent age, and overall recognizable identity.",
+    );
+    parts.push(
+      "Image 2 is the FULL APPEARANCE, CLOTHING AND BODY PROPORTION REFERENCE. It shows the same visitor framed from the waist up.",
+    );
+    parts.push(
+      "Use Image 2 for posture, body proportions, full hair shape, shoulders, torso, clothing texture, and general appearance — but always defer to Image 1 for the face itself.",
+    );
+    parts.push(
+      "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it only for the selected scene pack environment, composition, lighting direction and atmosphere.",
+    );
+    if (hasHatRef) {
+      parts.push(
+        "Images 4 and 5 are low-priority prop design and fit references only, used only when the selected scene pack explicitly provides them.",
+      );
+      parts.push(
+        "Use prop references only to guide the explicit prop from the selected scene pack. They must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
+      );
+      parts.push(
+        "Any prop must remain proportional to the visitor and naturally integrated into the costume, without dominating the image, covering the face or changing the framing.",
+      );
+    }
   }
 
 
   // 2. Hard identity rules
   parts.push(
-    "HARD RULES (highest priority): facial identity has absolute priority. The visitor's facial identity from Image 1 must remain the highest priority and must not be altered by any other reference. Do NOT redraw the face. Do NOT blend the face with another person. Do NOT stylize the face to match the scene.",
+    "HARD RULES (highest priority): facial identity has absolute priority. The visitor's facial identity must remain the highest priority and must not be altered by any other reference. Do NOT redraw the face. Do NOT blend the face with another person. Do NOT stylize the face to match the scene.",
   );
   parts.push(
-    "Exactly one person in the final image, and that person must be clearly recognizable as the visitor from Image 1 — not a similar person.",
+    "Exactly one person in the final image, and that person must be clearly recognizable as the visitor — not a similar person.",
   );
   parts.push(
     "Wardrobe and environment must adapt to fit the visitor. The visitor's face must NOT be altered to fit the style.",
   );
   parts.push(
-    "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
+    useSecondaryIdentity
+      ? "The visitor must be naturally integrated into the environment from Image 4 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 4."
+      : "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
   );
 
   // Film-specific hardening for "Deus e o Diabo na Terra do Sol".
   if (isDeusEDiabo) {
     for (const rule of DEUS_E_DIABO_IDENTITY_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_FEMALE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_WARDROBE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_HAT_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_FRAMING_RULES) parts.push(rule);
   }
 
   const hatUsage = extractHatUsage(parsed);
@@ -620,12 +660,16 @@ function buildPromptText(
     "FRAMING: keep the selected scene pack framing visible and legible. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment.",
   );
   parts.push(
-    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Additional prop images, when present, are the lowest priority and must never replace or weaken Images 1, 2 or 3.",
+    useSecondaryIdentity
+      ? "HIERARCHY: Images 1 and 2 (face and identity) = highest priority. Image 3 (appearance, body, clothing) = second priority. Image 4 (environment, composition) = third priority. Images 5 and 6 (hat prop references) are the lowest priority and must never replace or weaken Images 1, 2, 3 or 4."
+      : "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Additional prop images, when present, are the lowest priority and must never replace or weaken Images 1, 2 or 3.",
   );
 
   // Absolute identity conflict rule.
   parts.push(
-    "When any visual reference conflicts with Image 1, Image 1 always wins for the face, hair, age and identity.",
+    useSecondaryIdentity
+      ? "When any visual reference conflicts with Images 1 and 2, Images 1 and 2 always win for the face, hair, age, gender presentation and identity."
+      : "When any visual reference conflicts with Image 1, Image 1 always wins for the face, hair, age and identity.",
   );
 
   // 4. Scene-pack-specific style — only from the resolved scene pack.
@@ -684,8 +728,9 @@ export function __buildPipocaPromptInputForTests(
   scenePack: ScenePackForGeneration,
   hasHatRef = false,
   filmSlug: string | null = null,
+  hasSecondaryIdentity = false,
 ): BuiltPrompt {
-  return buildPromptText(scenePack, hasHatRef, filmSlug);
+  return buildPromptText(scenePack, hasHatRef, filmSlug, hasSecondaryIdentity);
 }
 
 /* ---------- Replicate helpers ---------- */
@@ -693,19 +738,20 @@ export function __buildPipocaPromptInputForTests(
 async function createReplicatePrediction(input: {
   prompt: string;
   identityUrl: string;
+  identityRawUrl?: string | null;
   appearanceUrl: string;
   sceneImageUrl: string;
   hatReferenceUrls: string[];
 }): Promise<ReplicatePrediction> {
   const token = getReplicateToken();
-  // Send both hat references when available: front (image 4) and side (image 5).
+  // Send both hat references when available: front and side.
   const hatRefs = input.hatReferenceUrls.slice(0, 2);
-  const inputImages = [
-    input.identityUrl,
-    input.appearanceUrl,
-    input.sceneImageUrl,
-    ...hatRefs,
-  ];
+  // Order (default): identity, appearance, scene, then up to 2 hat refs.
+  // Order (Deus e o Diabo w/ identity raw): identity (face crop), identity
+  // raw (secondary), appearance, scene, hat front, hat side.
+  const inputImages = input.identityRawUrl
+    ? [input.identityUrl, input.identityRawUrl, input.appearanceUrl, input.sceneImageUrl, ...hatRefs]
+    : [input.identityUrl, input.appearanceUrl, input.sceneImageUrl, ...hatRefs];
   const body = {
     input: {
       prompt: input.prompt,
@@ -890,26 +936,74 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     }
     const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
 
+    // Deus e o Diabo — try to resolve the secondary identity reference (the
+    // uncropped identity photo). Best-effort: if the file is missing (older
+    // captures / upload failure), fall back to the 3+prop layout for this
+    // generation and log the fallback flag.
+    let signedIdentityRawUrl: string | null = null;
+    let identityRawResolved = false;
+    if (isDeusEDiabo) {
+      const identityRawPath = `${session.id}/${capture.id}/${IDENTITY_RAW_NAME}`;
+      try {
+        const folder = `${session.id}/${capture.id}`;
+        const { data: listing } = await supabaseAdmin.storage
+          .from(ORIGINALS_BUCKET)
+          .list(folder, { limit: 100 });
+        const rawEntry = listing?.find((f: any) => f.name === IDENTITY_RAW_NAME);
+        const rawSize = (rawEntry?.metadata as { size?: number } | undefined)?.size ?? 0;
+        if (rawEntry && rawSize >= 2048) {
+          const { data: signedRaw } = await supabaseAdmin.storage
+            .from(ORIGINALS_BUCKET)
+            .createSignedUrl(identityRawPath, SIGNED_REF_TTL);
+          if (signedRaw?.signedUrl) {
+            signedIdentityRawUrl = signedRaw.signedUrl;
+            identityRawResolved = true;
+          }
+        }
+      } catch {
+        signedIdentityRawUrl = null;
+        identityRawResolved = false;
+      }
+      if (!identityRawResolved) {
+        console.warn(`${GEN_LOG} DEUS_E_DIABO_IDENTITY_RAW_MISSING`, {
+          film_slug: filmSlug,
+          scene_pack_id: session.scene_pack_id,
+          capture_id: capture.id,
+          fallback_reference_layout: "3+prop",
+        });
+      }
+    }
+
     // Prop references are scene-pack-driven. For "Deus e o Diabo na Terra do
-    // Sol" we re-enable hat visual references (hybrid cangaço mode) — face
-    // priority is enforced through the strict identity rules in the prompt.
+    // Sol" we keep the cangaceiro hat references (Images 5 & 6 when the
+    // secondary identity is available, otherwise 4 & 5) — facial fidelity is
+    // enforced through the strict identity rules in the prompt.
     const hatReferenceUrls: string[] = extractHatReferenceUrls(parsedScenePrompt);
     const hatRefUsed: string[] = hatReferenceUrls.slice(0, 2);
     console.log(`${GEN_LOG} prop references resolved from scene pack`, {
       scene_pack_id: chosenScenePackId,
       hat_reference_count: hatRefUsed.length,
     });
-    const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0, filmSlug);
+    const hasSecondaryIdentity = isDeusEDiabo && identityRawResolved;
+    const builtPrompt = buildPromptText(
+      scenePack,
+      hatRefUsed.length > 0,
+      filmSlug,
+      hasSecondaryIdentity,
+    );
+    const baseImageCount = hasSecondaryIdentity ? 4 : 3;
+    const totalReferenceCount = baseImageCount + hatRefUsed.length;
 
     if (isDeusEDiabo) {
-      console.log(`${GEN_LOG} DEUS_E_DIABO_HYBRID_CANGACO_MODE`, {
+      console.log(`${GEN_LOG} DEUS_E_DIABO_IDENTITY_RECOVERY_MODE`, {
         film_slug: filmSlug,
         scene_pack_id: chosenScenePackId,
-        reference_count: 3 + hatRefUsed.length,
-        face_crop_used: true,
+        reference_count: totalReferenceCount,
+        identity_reference_count: hasSecondaryIdentity ? 2 : 1,
         hat_reference_count: hatRefUsed.length,
-        strict_clothing_replacement: true,
-        identity_priority_mode: "strict",
+        strict_face_identity_mode: true,
+        female_identity_protection_enabled: true,
+        secondary_identity_available: hasSecondaryIdentity,
       });
     }
 
@@ -922,6 +1016,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
 
     const referenceRoles = [
       "identity-face-crop",
+      ...(hasSecondaryIdentity ? ["identity-raw"] : []),
       "appearance-medium",
       "scene-base",
       ...(hatRefUsed.length > 0 ? ["hat-front", "hat-side"].slice(0, hatRefUsed.length) : []),
@@ -933,9 +1028,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       visual_style: scenePack.visual_style,
       color_mode: scenePack.color_mode,
       reference_image_filename: referenceImageFilename,
-      base_image_count: 3,
+      base_image_count: baseImageCount,
       prop_reference_count: hatRefUsed.length,
-      reference_count: 3 + hatRefUsed.length,
+      reference_count: totalReferenceCount,
       reference_roles: referenceRoles,
       prompt_sections: builtPrompt.sectionLabels,
       extracted_negative_count: builtPrompt.extractedNegativeCount,
@@ -1003,13 +1098,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       attempt: attemptNumber,
       hatReferenceAvailable: hatReferenceUrls.length,
       hatReferenceUsed: hatRefUsed.length,
-      order: [
-        "identity-close",
-        "appearance-medium",
-        "scene-base",
-        "hat-front",
-        "hat-side",
-      ].slice(0, 3 + hatRefUsed.length),
+      order: referenceRoles,
     });
     if (hatRefUsed.length > 0) {
       console.log(`${GEN_LOG} usando chapéu como referência secundária`);
@@ -1017,9 +1106,9 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     console.log(`[PIPOCA_GENERATION_REFERENCES]`, {
       film_id: session.selected_film_id ?? null,
       scene_pack_id: chosenScenePackId,
-      base_image_count: 3,
+      base_image_count: baseImageCount,
       prop_reference_count: hatRefUsed.length,
-      total_image_count: 3 + hatRefUsed.length,
+      total_image_count: totalReferenceCount,
       prop_roles: hatRefUsed.length > 0
         ? ["hat-front", "hat-side"].slice(0, hatRefUsed.length)
         : [],
@@ -1032,6 +1121,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       prediction = await createReplicatePrediction({
         prompt: builtPrompt.promptText,
         identityUrl: signedIdentity.signedUrl,
+        identityRawUrl: signedIdentityRawUrl,
         appearanceUrl: signedAppearance.signedUrl,
         sceneImageUrl,
         hatReferenceUrls: hatRefUsed,
@@ -1059,7 +1149,7 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           attempt: attemptNumber,
           identity_photo_path: identityPath,
           appearance_photo_path: appearancePath,
-          input_image_count: 3 + hatRefUsed.length,
+          input_image_count: totalReferenceCount,
           scene_pack_id: chosenScenePackId,
           hat_reference_count_available: hatReferenceUrls.length,
           hat_reference_count_used: hatRefUsed.length,
