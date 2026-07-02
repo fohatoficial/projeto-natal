@@ -563,60 +563,90 @@ function buildPromptText(
   scenePack: ScenePackForGeneration,
   hasHatRef = false,
   filmSlug: string | null = null,
+  hasSecondaryIdentity = false,
 ): BuiltPrompt {
   const parsed = parseScenePackPrompt(scenePack.prompt);
   const parts: string[] = [];
   const isDeusEDiabo = filmSlug === DEUS_E_DIABO_FILM_SLUG;
+  const useSecondaryIdentity = isDeusEDiabo && hasSecondaryIdentity;
 
-  // 1. Reference role declaration — strict visual priority
-  parts.push(
-    "Image 1 is the PRIMARY FACE IDENTITY REFERENCE and has the highest priority. It is a close, guided portrait of the visitor and is the absolute source of truth for facial identity.",
-  );
-  parts.push(
-    "Use Image 1 for face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair (beard/stubble), eyebrows, glasses if present, apparent age, and overall recognizable identity.",
-  );
-  parts.push(
-    "Image 2 is the FULL APPEARANCE, CLOTHING AND BODY PROPORTION REFERENCE. It shows the same visitor framed from the waist up.",
-  );
-  parts.push(
-    "Use Image 2 for posture, body proportions, full hair shape, shoulders, torso, clothing texture, and general appearance — but always defer to Image 1 for the face itself.",
-  );
-  parts.push(
-    "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it only for the selected scene pack environment, composition, lighting direction and atmosphere.",
-  );
-
-  if (hasHatRef) {
+  // Reference-role declarations. The Deus e o Diabo path uses a distinct
+  // 6-image layout (face crop + uncropped identity as dual identity refs);
+  // all other films continue with the classic 3+prop layout.
+  if (useSecondaryIdentity) {
     parts.push(
-      "Images 4 and 5 are low-priority prop design and fit references only, used only when the selected scene pack explicitly provides them.",
+      "Image 1 is the PRIMARY FACE IDENTITY REFERENCE (close face crop of the visitor) and has the highest priority for facial identity.",
     );
     parts.push(
-      "Use prop references only to guide the explicit prop from the selected scene pack. They must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
+      "Image 2 is the SECONDARY IDENTITY REFERENCE (the original uncropped identity photo of the visitor). Use it for full-head shape, hair, apparent age and overall recognizability.",
     );
     parts.push(
-      "Any prop must remain proportional to the visitor and naturally integrated into the costume, without dominating the image, covering the face or changing the framing.",
+      "Images 1 and 2 together are the ONLY source of truth for the face, identity, hair, age, gender presentation and ethnicity.",
     );
+    parts.push(
+      "Image 3 is the APPEARANCE / BODY / CLOTHING reference. Use it only for body proportions, posture and general body appearance.",
+    );
+    parts.push(
+      "Image 4 is the SCENE / ENVIRONMENT / COMPOSITION reference. Use it only for the environment, composition, lighting direction and atmosphere.",
+    );
+    if (hasHatRef) {
+      parts.push(
+        "Images 5 and 6 are LOW-PRIORITY prop references used ONLY for the design and fit of the cangaceiro hat (Image 5 = front, Image 6 = side). They must never influence facial identity, age, gender presentation, hairstyle, expression, body, clothing, pose, camera distance, lighting or environment.",
+      );
+    }
+  } else {
+    parts.push(
+      "Image 1 is the PRIMARY FACE IDENTITY REFERENCE and has the highest priority. It is a close, guided portrait of the visitor and is the absolute source of truth for facial identity.",
+    );
+    parts.push(
+      "Use Image 1 for face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair (beard/stubble), eyebrows, glasses if present, apparent age, and overall recognizable identity.",
+    );
+    parts.push(
+      "Image 2 is the FULL APPEARANCE, CLOTHING AND BODY PROPORTION REFERENCE. It shows the same visitor framed from the waist up.",
+    );
+    parts.push(
+      "Use Image 2 for posture, body proportions, full hair shape, shoulders, torso, clothing texture, and general appearance — but always defer to Image 1 for the face itself.",
+    );
+    parts.push(
+      "Image 3 is the PRIMARY ENVIRONMENT, COMPOSITION AND FRAMING REFERENCE. Use it only for the selected scene pack environment, composition, lighting direction and atmosphere.",
+    );
+    if (hasHatRef) {
+      parts.push(
+        "Images 4 and 5 are low-priority prop design and fit references only, used only when the selected scene pack explicitly provides them.",
+      );
+      parts.push(
+        "Use prop references only to guide the explicit prop from the selected scene pack. They must not influence facial identity, body proportions, clothing, pose, camera distance, lighting or environment.",
+      );
+      parts.push(
+        "Any prop must remain proportional to the visitor and naturally integrated into the costume, without dominating the image, covering the face or changing the framing.",
+      );
+    }
   }
 
 
   // 2. Hard identity rules
   parts.push(
-    "HARD RULES (highest priority): facial identity has absolute priority. The visitor's facial identity from Image 1 must remain the highest priority and must not be altered by any other reference. Do NOT redraw the face. Do NOT blend the face with another person. Do NOT stylize the face to match the scene.",
+    "HARD RULES (highest priority): facial identity has absolute priority. The visitor's facial identity must remain the highest priority and must not be altered by any other reference. Do NOT redraw the face. Do NOT blend the face with another person. Do NOT stylize the face to match the scene.",
   );
   parts.push(
-    "Exactly one person in the final image, and that person must be clearly recognizable as the visitor from Image 1 — not a similar person.",
+    "Exactly one person in the final image, and that person must be clearly recognizable as the visitor — not a similar person.",
   );
   parts.push(
     "Wardrobe and environment must adapt to fit the visitor. The visitor's face must NOT be altered to fit the style.",
   );
   parts.push(
-    "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
+    useSecondaryIdentity
+      ? "The visitor must be naturally integrated into the environment from Image 4 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 4."
+      : "The visitor must be naturally integrated into the environment from Image 3 — no pasted look, no cutout, no flat overlay. Body scale, posture, light on the skin, contact shadows and depth of field must match Image 3.",
   );
 
   // Film-specific hardening for "Deus e o Diabo na Terra do Sol".
   if (isDeusEDiabo) {
     for (const rule of DEUS_E_DIABO_IDENTITY_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_FEMALE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_WARDROBE_RULES) parts.push(rule);
     for (const rule of DEUS_E_DIABO_HAT_RULES) parts.push(rule);
+    for (const rule of DEUS_E_DIABO_FRAMING_RULES) parts.push(rule);
   }
 
   const hatUsage = extractHatUsage(parsed);
@@ -630,12 +660,16 @@ function buildPromptText(
     "FRAMING: keep the selected scene pack framing visible and legible. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment.",
   );
   parts.push(
-    "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Additional prop images, when present, are the lowest priority and must never replace or weaken Images 1, 2 or 3.",
+    useSecondaryIdentity
+      ? "HIERARCHY: Images 1 and 2 (face and identity) = highest priority. Image 3 (appearance, body, clothing) = second priority. Image 4 (environment, composition) = third priority. Images 5 and 6 (hat prop references) are the lowest priority and must never replace or weaken Images 1, 2, 3 or 4."
+      : "HIERARCHY: Image 1 (face identity) = highest priority. Image 2 (appearance, body, clothing) = second priority. Image 3 (environment, composition) = third priority. Additional prop images, when present, are the lowest priority and must never replace or weaken Images 1, 2 or 3.",
   );
 
   // Absolute identity conflict rule.
   parts.push(
-    "When any visual reference conflicts with Image 1, Image 1 always wins for the face, hair, age and identity.",
+    useSecondaryIdentity
+      ? "When any visual reference conflicts with Images 1 and 2, Images 1 and 2 always win for the face, hair, age, gender presentation and identity."
+      : "When any visual reference conflicts with Image 1, Image 1 always wins for the face, hair, age and identity.",
   );
 
   // 4. Scene-pack-specific style — only from the resolved scene pack.
@@ -694,8 +728,9 @@ export function __buildPipocaPromptInputForTests(
   scenePack: ScenePackForGeneration,
   hasHatRef = false,
   filmSlug: string | null = null,
+  hasSecondaryIdentity = false,
 ): BuiltPrompt {
-  return buildPromptText(scenePack, hasHatRef, filmSlug);
+  return buildPromptText(scenePack, hasHatRef, filmSlug, hasSecondaryIdentity);
 }
 
 /* ---------- Replicate helpers ---------- */
