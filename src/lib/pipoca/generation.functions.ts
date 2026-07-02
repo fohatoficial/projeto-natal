@@ -42,47 +42,56 @@ const CIRCO_FORBIDDEN_POSITIVE_TERMS = [
 ];
 
 // Correção cirúrgica para "Deus e o Diabo na Terra do Sol":
-// - Desativa referências visuais de chapéu (usa apenas 3 imagens).
-// - Reforça identidade facial e preservação feminina.
-// - Exige troca total da roupa real.
+// - Modo IDENTITY RECOVERY: 6 referências.
+// - Image 1 = face crop, Image 2 = foto original de identidade (sem crop),
+//   Image 3 = appearance, Image 4 = scene, Image 5/6 = chapéu (frontal/lateral).
+// - Images 1 e 2 mandam juntas na identidade. Preserva feminilidade e idade.
 const DEUS_E_DIABO_FILM_SLUG = "deus-e-o-diabo-na-terra-do-sol";
 const DEUS_E_DIABO_IDENTITY_RULES = [
-  "STRICT IDENTITY MODE for this scene. Image 1 is the ONLY source of truth for the face, identity, hair, age, gender presentation and ethnicity. Do not redesign the face. Do not blend, average or invent facial features. Do not replace the visitor with a similar-looking person.",
-  "Preserve face shape, jawline, eyes, eyebrows, nose, mouth, skin tone, hairline and hairstyle exactly as they appear in Image 1.",
-  "Do not masculinize feminine facial structure. Do not age the person up or down. Do not harden or squareify the jawline.",
-  "Preserve the subject's gender presentation from Image 1. If the visitor is a woman, keep clearly feminine facial identity and hair; do not convert the subject into a masculine cangaceiro archetype. The person must still remain unmistakably herself.",
-  "When any reference or style cue conflicts with Image 1, Image 1 must always win for face, hair, age, gender and identity.",
+  "STRICT IDENTITY RECOVERY MODE for this scene. Image 1 is the PRIMARY identity reference (close face crop of the visitor) and Image 2 is the SECONDARY identity reference (the original, uncropped identity photo showing full-head shape, hair, age and overall recognizability). Images 1 and 2 together are the ONLY source of truth for face, identity, hair, apparent age, gender presentation and ethnicity.",
+  "Preserve the same person, not a similar person. Preserve the same apparent age, the same gender presentation, face shape, jawline, cheek volume, eye spacing, eyebrow shape, nose shape, mouth shape, lip shape, skin tone, hairline and hairstyle exactly as they appear in Images 1 and 2.",
+  "Do not age the face. Do not harden the face. Do not make the face more severe than the reference. Do not exaggerate wrinkles, under-eye hollows, smile lines or facial severity. Do not reinterpret the person as a different person. Do not blend, average or invent facial features. Do not blend facial traits from Images 3, 4, 5 or 6 into the face.",
+  "When any visual reference conflicts with Images 1 and 2, Images 1 and 2 always win for face, identity, age, gender presentation, hair and recognizability.",
+  "Exactly one person in the final image, unmistakably the same visitor from Images 1 and 2.",
+];
+const DEUS_E_DIABO_FEMALE_RULES = [
+  "FEMALE IDENTITY PROTECTION: if the visitor is a woman, she must remain clearly recognizable as the same woman. Preserve feminine facial identity. Do not masculinize female visitors. Do not age female visitors. Do not create a harsher, gaunter or more angular face. Keep a natural female sertão / cangaceira interpretation without changing who she is.",
 ];
 const DEUS_E_DIABO_WARDROBE_RULES = [
   "WARDROBE: fully replace the visitor's real-world clothing with film-appropriate sertão / cangaço / rural Brazilian northeastern wardrobe. Do NOT preserve the visitor's original clothes. Modern clothing must not remain visible in the final image. No t-shirt, polo, contemporary blouse, hoodie, jacket, dress shirt, jeans or casual contemporary outfit from the source image may survive.",
   "For men: rustic sertão clothing, rough cotton shirt, weathered fabric, leather vest or rustic leather elements when appropriate, simple belt, utilitarian styling, arid and worn look.",
-  "For women: preserve feminine facial identity and do not masculinize the face. Use a female cangaceira / sertaneja-inspired wardrobe — rustic dress or blouse/skirt composition compatible with the cangaço universe, worn natural fabrics, subtle leather details when appropriate. The final result must remain clearly the same woman.",
+  "For women: rustic feminine sertão / cangaceira-inspired wardrobe — rustic dress or blouse/skirt composition compatible with the cangaço universe, worn natural fabrics, subtle leather details when appropriate. Preserve identity and femininity. No over-costuming. No caricature.",
 ];
 const DEUS_E_DIABO_HAT_RULES = [
   "HAT (MANDATORY for this film): the visitor MUST wear an authentic Brazilian cangaceiro leather hat with the characteristic half-moon / crescent silhouette, upward-curved side flaps, structured leather body, visible cangaço-style metallic ornaments / stars / decorative details, and leather straps. The hat must fit naturally on the head with correct scale proportional to the head — never too small, never oversized, never cartoonish, never theatrical fantasy, never a cowboy / western / peão / generic rural hat.",
-  "Images 4 and 5 are prop references used ONLY for the design and fit of the cangaceiro hat (Image 4 = front view, Image 5 = side view). They must never alter the visitor's face, hairstyle, expression, age, or gender presentation, and must never change body, clothing, pose, framing or environment.",
-  "The cangaceiro hat is mandatory in this film, but it must never hide, cover or distort the face. If any conflict arises between hat placement and facial fidelity, prioritize facial fidelity while still keeping the hat visible.",
+  "Images 5 and 6 are prop references used ONLY for the design and fit of the cangaceiro hat (Image 5 = front view, Image 6 = side view). They must never alter the visitor's face, age, gender presentation, hairstyle, expression or facial structure, and must never change body, clothing, pose, framing or environment.",
+  "The face must remain the main visual focal point. The hat is required, but must remain secondary to identity. Do not let the hat overpower the face. Do not let the hat dominate the framing. Do not crop or compose the image in a way that makes the hat more important than the face. If any conflict arises between hat placement and facial fidelity, prioritize facial fidelity while still keeping the hat visible.",
+];
+const DEUS_E_DIABO_FRAMING_RULES = [
+  "FRAMING: prefer a medium shot or medium close-up where the face is clearly visible, the wardrobe is visible, the hat is visible, and the face remains the focal point. Avoid extreme close-ups dominated by the hat, and avoid any composition where the hat's presence overwhelms the face.",
 ];
 const DEUS_E_DIABO_NEGATIVE_ADDITIONS = [
-  "wrong face",
+  "wrong person",
+  "different person",
   "altered identity",
+  "aged face",
+  "older face",
+  "harsher face",
+  "gaunt face",
+  "masculine female face",
+  "feminized male face",
+  "distorted face",
   "extra people",
-  "duplicated person",
   "extra faces",
+  "duplicated person",
   "modern clothing",
   "preserved source clothing",
-  "polo shirt",
-  "contemporary blouse",
-  "modern fashion",
   "cowboy hat",
   "western hat",
-  "peão hat",
-  "generic rural hat",
-  "small hat",
+  "generic hat",
   "oversized hat",
-  "face covered by hat",
-  "masculine face on a female visitor",
-  "distorted face",
+  "hat dominating the image",
+  "face hidden by hat",
   "deformed hands",
   "extra limbs",
   "cartoon",
