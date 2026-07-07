@@ -4,7 +4,7 @@
 // usando apenas os agregados (totals + perCapital). Detalhes/PII são
 // ignorados no frontend.
 
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,11 +19,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  checkPrintQueueSession,
-  loginPrintQueue,
-  logoutPrintQueue,
-} from "@/lib/pipoca/print-queue.functions";
+import { logoutPrintQueue } from "@/lib/pipoca/print-queue.functions";
 import {
   getDadosSummary,
   type CapitalIndicators,
