@@ -16,11 +16,8 @@ const SIGNED_TTL = 60 * 30;
 const TokenInput = z.object({ publicToken: z.string().trim().uuid() });
 
 async function requireAdmin(): Promise<void> {
-  const { PRINT_QUEUE_COOKIE, isValidSessionToken } = await import(
-    "@/lib/pipoca/print-auth.server"
-  );
-  const tok = getCookie(PRINT_QUEUE_COOKIE);
-  if (!isValidSessionToken(tok)) throw new Error("Unauthorized");
+  // PIN removido: acesso liberado às páginas /dados e /fila-de-impressao.
+  return;
 }
 
 // ─── Public: visitor requests print from their phone ────────────────────
