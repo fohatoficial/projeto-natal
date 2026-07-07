@@ -50,87 +50,8 @@ const COLOR_AMBER = "#F2B544";
 const COLOR_MUTED = "#94A3B8";
 
 function DadosPage() {
-  const [authed, setAuthed] = useState<boolean | null>(null);
-  const checkFn = useServerFn(checkPrintQueueSession);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await checkFn({});
-        setAuthed(r.authenticated);
-      } catch {
-        setAuthed(false);
-      }
-    })();
-  }, [checkFn]);
-
-  if (authed === null) {
-    return (
-      <div className="h-[100dvh] w-full grid place-items-center bg-[#000C20] text-white">
-        <div className="w-10 h-10 rounded-full border-2 border-transparent border-t-[color:var(--gold)] animate-spin" style={{ ["--gold" as any]: COLOR_GOLD }} />
-      </div>
-    );
-  }
-  if (!authed) return <PinForm onAuthed={() => setAuthed(true)} />;
-  return <DashboardPresentation onSignOut={() => setAuthed(false)} />;
-}
-
-// ───────────────────────────── PIN ─────────────────────────────
-function PinForm({ onAuthed }: { onAuthed: () => void }) {
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const login = useServerFn(loginPrintQueue);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      await login({ data: { pin } });
-      onAuthed();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha no login");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="h-[100dvh] w-full grid place-items-center bg-[#000C20] text-white px-5">
-      <form
-        onSubmit={submit}
-        className="w-full max-w-sm border border-white/15 rounded-2xl p-6 flex flex-col gap-4"
-      >
-        <h1 className="font-display text-2xl text-center">
-          PAINEL DE <span style={{ color: COLOR_GOLD }}>RESULTADOS</span>
-        </h1>
-        <p className="text-sm text-white/70 text-center">
-          Informe o PIN para acessar o painel.
-        </p>
-        <input
-          type="password"
-          inputMode="numeric"
-          autoComplete="off"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          placeholder="PIN"
-          className="w-full bg-black/40 border border-white/20 rounded-md px-3 py-3 text-center text-lg tracking-[0.5em]"
-        />
-        {error && <p className="text-red-300 text-sm text-center">{error}</p>}
-        <button
-          disabled={loading || pin.length === 0}
-          className="w-full font-semibold uppercase tracking-wider rounded-md py-3 disabled:opacity-60"
-          style={{ background: COLOR_GOLD, color: COLOR_BG }}
-        >
-          {loading ? "Entrando…" : "Entrar"}
-        </button>
-        <Link to="/" className="text-xs text-center text-white/50 underline">
-          Voltar para a experiência
-        </Link>
-      </form>
-    </div>
-  );
+  // PIN removido: acesso liberado.
+  return <DashboardPresentation onSignOut={() => { /* noop */ }} />;
 }
 
 // ───────────────────────────── Helpers ─────────────────────────────
