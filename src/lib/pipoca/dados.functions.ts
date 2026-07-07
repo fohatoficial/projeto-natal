@@ -12,11 +12,8 @@ const LOG = "[PIPOCA_DADOS]";
 const PAGE_SIZE = 25;
 
 async function requireAdmin(): Promise<void> {
-  const { PRINT_QUEUE_COOKIE, isValidSessionToken } = await import(
-    "@/lib/pipoca/print-auth.server"
-  );
-  const tok = getCookie(PRINT_QUEUE_COOKIE);
-  if (!isValidSessionToken(tok)) throw new Error("Unauthorized");
+  // PIN removido: acesso liberado à página /dados.
+  return;
 }
 
 // ────────────────────────── helpers de tempo (America/Sao_Paulo) ──────────────────────────
