@@ -99,7 +99,7 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
         visitor_id: visitor.id,
         generation_id: gen.id,
         status: "pending",
-        capital_id: resolvedCapitalId,
+      })
       })
       .select("id, status")
       .single();
