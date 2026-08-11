@@ -1,80 +1,28 @@
-import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { CapitalGate } from "@/components/pipoca/CapitalGate";
-import { readValidStoredCapital } from "@/lib/pipoca/capital-storage";
+import { PipocaFlow } from "@/components/pipoca/PipocaFlow";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Pipoca & Cena — Tela Brasil" },
+      { title: "Pipoca & Cena — Projeto Natal" },
       {
         name: "description",
         content:
-          "Experiência interativa Tela Brasil: escolha um filme brasileiro, tire sua foto e entre em cena.",
+          "Experiência interativa: escolha um filme brasileiro, tire sua foto e entre em cena com inteligência artificial.",
       },
-      { property: "og:title", content: "Pipoca & Cena — Tela Brasil" },
+      { property: "og:title", content: "Pipoca & Cena — Projeto Natal" },
       {
         property: "og:description",
         content:
-          "Escolha uma obra do catálogo Tela Brasil, tire sua foto e veja a IA transformar você em personagem de uma cena inspirada no filme.",
+          "Escolha uma obra do catálogo, tire sua foto e veja a IA transformar você em personagem de uma cena inspirada no filme.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Index,
 });
 
 function Index() {
-  const [ready, setReady] = useState(false);
-  const [forwardSearch, setForwardSearch] = useState("");
-
-  useEffect(() => {
-    const search = window.location.search ?? "";
-    const params = new URLSearchParams(search);
-
-    // ?resetCapital=1 limpa a seleção e força o gate novamente.
-    if (params.get("resetCapital") === "1") {
-      try {
-        window.localStorage.removeItem("pipoca_selected_capital");
-      } catch {
-        /* noop */
-      }
-      console.log("[PIPOCA_CAPITAL]", "CAPITAL_SELECTION_EXPIRED", {
-        reason: "manual_reset",
-      });
-      params.delete("resetCapital");
-      const cleaned = params.toString();
-      const nextSearch = cleaned ? `?${cleaned}` : "";
-      // Mantém ?display=totem e demais params técnicos.
-      window.history.replaceState({}, "", `/${nextSearch}`);
-      setForwardSearch(nextSearch);
-      setReady(true);
-      return;
-    }
-
-    setForwardSearch(search);
-    const stored = readValidStoredCapital();
-    if (stored) {
-      console.log("[PIPOCA_CAPITAL]", "CAPITAL_SELECTION_REUSED", {
-        capital_slug: stored.capital_slug,
-        selected_date: stored.selected_date,
-      });
-      window.location.replace(`/experiencia/${stored.capital_slug}${search}`);
-      return;
-    }
-    // Sem capital válida — pode ser primeira vez OU dia trocou.
-    console.log("[PIPOCA_CAPITAL]", "CAPITAL_SELECTION_EXPIRED", {
-      reason: "missing_or_expired",
-    });
-    setReady(true);
-  }, []);
-
-  if (!ready) {
-    return (
-      <div className="min-h-[100dvh] grid place-items-center bg-[#000C20] text-white">
-        <div className="w-10 h-10 rounded-full border-2 border-transparent border-t-gold animate-spin" />
-      </div>
-    );
-  }
-
-  return <CapitalGate forwardSearch={forwardSearch} />;
+  return <PipocaFlow />;
 }

@@ -137,7 +137,7 @@ function getDeviceId(): string | null {
 
 const GEN_LOG = "[PIPOCA_GENERATION]";
 
-export function PipocaFlow({ capitalSlug }: { capitalSlug?: string } = {}) {
+export function PipocaFlow() {
   const [step, setStep] = useState<Step>("choose");
   const [selected, setSelected] = useState<Movie | null>(null);
   const [visitorId, setVisitorId] = useState<string | null>(null);
@@ -254,7 +254,6 @@ export function PipocaFlow({ capitalSlug }: { capitalSlug?: string } = {}) {
             deviceId: getDeviceId(),
             contentType: "image/jpeg",
             visitorId: visitorId ?? null,
-            capitalSlug: capitalSlug ?? null,
           },
         });
         current = res as Prepared;

@@ -1,30 +1,15 @@
 // /dados — Painel executivo visual (modo apresentação) para o cliente.
 // Sem filtros, sem dados pessoais. Dashboard vertical contínuo.
 // Reutiliza a server function getDadosSummary (RPC pipoca_dados_summary),
-// usando apenas os agregados (totals + perCapital). Detalhes/PII são
+// usando apenas os agregados globais (totals). Detalhes/PII são
 // ignorados no frontend.
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import type * as React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useCallback, useEffect, useState } from "react";
 import { logoutPrintQueue } from "@/lib/pipoca/print-queue.functions";
-import {
-  getDadosSummary,
-  type CapitalIndicators,
-  type DadosSummary,
-} from "@/lib/pipoca/dados.functions";
+import { getDadosSummary, type DadosSummary } from "@/lib/pipoca/dados.functions";
 
 export const Route = createFileRoute("/dados")({
   head: () => ({
@@ -61,20 +46,6 @@ function spTimeLabel(iso: string): string {
   } catch {
     return "—";
   }
-}
-
-const SYSTEM_LABEL = "Dados anteriores";
-
-function splitCapitals(perCapital: CapitalIndicators[]): {
-  real: CapitalIndicators[];
-  unknown: CapitalIndicators | null;
-} {
-  const unknown =
-    perCapital.find((c) => c.isSystem) ??
-    perCapital.find((c) => /desconhecid/i.test(c.capitalName)) ??
-    null;
-  const real = perCapital.filter((c) => c !== unknown);
-  return { real, unknown };
 }
 
 // ───────────────────────────── Dashboard (vertical scroll) ─────────────────────────────
@@ -125,11 +96,6 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const split = useMemo(
-    () => (data ? splitCapitals(data.perCapital) : { real: [], unknown: null }),
-    [data],
-  );
-
   function scrollToId(id: string) {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -140,17 +106,7 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
 
   const anchors: Array<{ id: string; label: string }> = [
     { id: "sec-overview", label: "Visão geral" },
-    { id: "sec-captures", label: "Capitais" },
-    { id: "sec-generations", label: "Gerações" },
-    { id: "sec-prints", label: "Impressões" },
   ];
-
-  const ordered = data
-    ? [
-        ...split.real.slice().sort((a, b) => b.captures - a.captures),
-        ...(split.unknown ? [split.unknown] : []),
-      ]
-    : [];
 
   return (
     <div className="min-h-screen w-full text-white relative" style={{ background: COLOR_BG }}>
@@ -229,31 +185,6 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
               <SectionOverview data={data} />
             </Section>
 
-            <Section id="sec-captures" title="Experiências por capital">
-              <ChartFrame>
-                <SectionCaptures real={split.real} unknown={split.unknown} />
-              </ChartFrame>
-            </Section>
-
-            <Section id="sec-generations" title="Fotos geradas por capital">
-              <ChartFrame>
-                <SectionGenerations real={split.real} unknown={split.unknown} />
-              </ChartFrame>
-            </Section>
-
-            <Section id="sec-prints" title="Impressões por capital">
-              <ChartFrame>
-                <SectionPrints real={split.real} unknown={split.unknown} data={data} />
-              </ChartFrame>
-            </Section>
-
-            <Section id="sec-cards" title="Resumo por capital">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                {ordered.map((c) => (
-                  <CapitalCard key={c.capitalId} c={c} />
-                ))}
-              </div>
-            </Section>
           </>
         )}
 
@@ -446,297 +377,4 @@ function SectionOverview({ data }: { data: DadosSummary }) {
   );
 }
 
-// ───────────────────────────── Section: Capturas por capital ─────────────────────────────
-function SectionCaptures({
-  real,
-  unknown,
-}: {
-  real: CapitalIndicators[];
-  unknown: CapitalIndicators | null;
-}) {
-  const sorted = [...real].sort((a, b) => b.captures - a.captures);
-  const chartData = sorted.map((c) => ({
-    name: c.capitalName,
-    capturas: c.captures,
-    hoje: c.capturesToday,
-  }));
 
-  return (
-    <div className="h-full w-full grid grid-rows-[1fr_auto] gap-3">
-      <div className="rounded-2xl border border-white/10 p-3 sm:p-5 min-h-0 flex flex-col">
-        {chartData.length === 0 ? (
-          <div className="flex-1 grid place-items-center text-white/50">
-            Ainda não há capturas registradas.
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={chartData}
-              layout="vertical"
-              margin={{ top: 8, right: 60, left: 8, bottom: 8 }}
-              barCategoryGap={"22%"}
-            >
-              <CartesianGrid stroke="rgba(255,255,255,0.06)" horizontal={false} />
-              <XAxis type="number" stroke={COLOR_MUTED} fontSize={11} allowDecimals={false} />
-              <YAxis
-                type="category"
-                dataKey="name"
-                stroke={COLOR_MUTED}
-                fontSize={12}
-                width={140}
-                tick={{ fill: "#E5E7EB" }}
-              />
-              <Tooltip
-                cursor={{ fill: "rgba(255,255,255,0.05)" }}
-                contentStyle={tooltipStyle}
-                labelStyle={{ color: COLOR_GOLD }}
-                formatter={(v: number, name: string) => [v, name === "capturas" ? "Capturas" : "Hoje"]}
-              />
-              <Bar dataKey="capturas" fill={COLOR_GOLD} radius={[0, 6, 6, 0]} isAnimationActive={false}>
-                <LabelInsideBar />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-
-      {unknown && unknown.captures > 0 && (
-        <UnknownStrip
-          label="Dados anteriores sem identificação de capital"
-          value={unknown.captures}
-          hint={`hoje: ${unknown.capturesToday}`}
-        />
-      )}
-    </div>
-  );
-}
-
-function LabelInsideBar() {
-  // Recharts label content rendered via formatter — left as placeholder.
-  return null;
-}
-
-const tooltipStyle: React.CSSProperties = {
-  background: "#0a1830",
-  border: "1px solid rgba(255,255,255,0.15)",
-  borderRadius: 8,
-  color: "white",
-  fontSize: 12,
-};
-
-// ───────────────────────────── Section: Gerações por capital ─────────────────────────────
-function SectionGenerations({
-  real,
-  unknown,
-}: {
-  real: CapitalIndicators[];
-  unknown: CapitalIndicators | null;
-}) {
-  const sorted = [...real].sort((a, b) => b.captures - a.captures);
-  const chartData = sorted.map((c) => ({
-    name: c.capitalName,
-    Capturas: c.captures,
-    Gerações: c.generations,
-    hoje: c.generationsToday,
-  }));
-
-  return (
-    <div className="h-full w-full grid grid-rows-[1fr_auto] gap-3">
-      <div className="rounded-2xl border border-white/10 p-3 sm:p-5 min-h-0 flex flex-col">
-        {chartData.length === 0 ? (
-          <div className="flex-1 grid place-items-center text-white/50">
-            Ainda não há gerações registradas.
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 16, right: 16, left: 0, bottom: 28 }}>
-              <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis
-                dataKey="name"
-                stroke={COLOR_MUTED}
-                fontSize={11}
-                interval={0}
-                angle={chartData.length > 4 ? -15 : 0}
-                textAnchor={chartData.length > 4 ? "end" : "middle"}
-                height={50}
-              />
-              <YAxis stroke={COLOR_MUTED} fontSize={11} allowDecimals={false} />
-              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: COLOR_GOLD }} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
-              <Legend wrapperStyle={{ fontSize: 12, color: "white" }} />
-              <Bar dataKey="Capturas" fill={COLOR_BLUE} radius={[6, 6, 0, 0]} isAnimationActive={false} />
-              <Bar dataKey="Gerações" fill={COLOR_GOLD} radius={[6, 6, 0, 0]} isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-
-      {unknown && (unknown.captures > 0 || unknown.generations > 0) && (
-        <UnknownStrip
-          label="Dados anteriores · capturas / gerações"
-          value={`${unknown.captures} / ${unknown.generations}`}
-          hint={`hoje: ${unknown.generationsToday}`}
-        />
-      )}
-    </div>
-  );
-}
-
-// ───────────────────────────── Section: Impressões ─────────────────────────────
-function SectionPrints({
-  real,
-  unknown,
-  data,
-}: {
-  real: CapitalIndicators[];
-  unknown: CapitalIndicators | null;
-  data: DadosSummary;
-}) {
-  const sorted = [...real].sort(
-    (a, b) =>
-      b.queuePending + b.queuePrinting + b.queuePrinted -
-      (a.queuePending + a.queuePrinting + a.queuePrinted),
-  );
-  const chartData = sorted.map((c) => ({
-    name: c.capitalName,
-    Pendentes: c.queuePending,
-    "Em impressão": c.queuePrinting,
-    Impressas: c.queuePrinted,
-  }));
-  const t = data.totals;
-
-  return (
-    <div className="h-full w-full grid grid-rows-[auto_1fr_auto] gap-3">
-      <section className="grid grid-cols-3 gap-2 sm:gap-3">
-        <Kpi label="Pendentes" value={t.queuePending} size="sm" />
-        <Kpi label="Em impressão" value={t.queuePrinting} size="sm" />
-        <Kpi label="Impressas" value={t.queuePrinted} size="sm" accent />
-      </section>
-
-      <div className="rounded-2xl border border-white/10 p-3 sm:p-5 min-h-0 flex flex-col">
-        {chartData.length === 0 ? (
-          <div className="flex-1 grid place-items-center text-white/50">
-            Ainda não há impressões registradas.
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 28 }}>
-              <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis
-                dataKey="name"
-                stroke={COLOR_MUTED}
-                fontSize={11}
-                interval={0}
-                angle={chartData.length > 4 ? -15 : 0}
-                textAnchor={chartData.length > 4 ? "end" : "middle"}
-                height={50}
-              />
-              <YAxis stroke={COLOR_MUTED} fontSize={11} allowDecimals={false} />
-              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: COLOR_GOLD }} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
-              <Legend wrapperStyle={{ fontSize: 12, color: "white" }} />
-              <Bar dataKey="Pendentes" stackId="q" fill={COLOR_AMBER} isAnimationActive={false} />
-              <Bar dataKey="Em impressão" stackId="q" fill={COLOR_BLUE} isAnimationActive={false} />
-              <Bar dataKey="Impressas" stackId="q" fill={COLOR_GREEN} radius={[6, 6, 0, 0]} isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-
-      {unknown &&
-        (unknown.queuePending + unknown.queuePrinting + unknown.queuePrinted > 0) && (
-          <UnknownStrip
-            label="Dados anteriores · pendentes / impressão / impressas"
-            value={`${unknown.queuePending} / ${unknown.queuePrinting} / ${unknown.queuePrinted}`}
-          />
-        )}
-    </div>
-  );
-}
-
-
-function CapitalCard({ c }: { c: CapitalIndicators }) {
-  const isUnknown = c.isSystem;
-  return (
-    <div
-      className="rounded-2xl border h-full min-h-0 p-3 sm:p-5 flex flex-col gap-3"
-      style={{
-        background: isUnknown ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0.04)",
-        borderColor: isUnknown ? "rgba(255,255,255,0.08)" : "rgba(248,186,50,0.25)",
-      }}
-    >
-      <header className="min-w-0">
-        <div className="text-[10px] uppercase tracking-[0.25em] text-white/45 truncate">
-          {isUnknown ? SYSTEM_LABEL : "Capital"}
-        </div>
-        <h3
-          className="font-display text-lg sm:text-xl truncate"
-          style={{ color: isUnknown ? "rgba(255,255,255,0.75)" : COLOR_GOLD }}
-        >
-          {c.capitalName}
-        </h3>
-      </header>
-      <div className="grid grid-cols-3 gap-2 flex-1 min-h-0">
-        <Stat label="Capturas" value={c.captures} highlight />
-        <Stat label="Gerações" value={c.generations} />
-        <Stat label="Impressas" value={c.queuePrinted} />
-      </div>
-      <footer className="grid grid-cols-2 gap-2 text-[11px] text-white/55">
-        <div className="flex items-center justify-between rounded-md bg-white/[0.04] px-2 py-1.5">
-          <span>Capturas hoje</span>
-          <span className="text-white font-semibold">{c.capturesToday}</span>
-        </div>
-        <div className="flex items-center justify-between rounded-md bg-white/[0.04] px-2 py-1.5">
-          <span>Gerações hoje</span>
-          <span className="text-white font-semibold">{c.generationsToday}</span>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: number;
-  highlight?: boolean;
-}) {
-  return (
-    <div className="rounded-lg bg-black/30 border border-white/10 p-2 flex flex-col items-center justify-center min-h-0">
-      <div className="text-[9px] uppercase tracking-wider text-white/50">{label}</div>
-      <div
-        className="font-display text-xl sm:text-2xl leading-none mt-1"
-        style={{ color: highlight ? COLOR_GOLD : "white" }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-// ───────────────────────────── Unknown strip ─────────────────────────────
-function UnknownStrip({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: number | string;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 sm:px-4 py-2 flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <div className="text-[10px] uppercase tracking-wider text-white/45">
-          {SYSTEM_LABEL}
-        </div>
-        <div className="text-xs sm:text-sm text-white/75 truncate">{label}</div>
-      </div>
-      <div className="text-right shrink-0">
-        <div className="font-display text-lg sm:text-2xl text-white">{value}</div>
-        {hint && <div className="text-[10px] text-white/45">{hint}</div>}
-      </div>
-    </div>
-  );
-}

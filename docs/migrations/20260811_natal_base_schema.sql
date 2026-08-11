@@ -2,11 +2,9 @@
 -- Pipoca & Cena — Projeto Natal — SCHEMA BASE
 -- Arquivo: docs/migrations/20260811_natal_base_schema.sql
 --
--- Executar MANUALMENTE no NOVO projeto Supabase (Projeto Natal), ANTES de:
---   1) 20260618_pipoca_capitals.sql
---   2) 20260619_pipoca_print_queue_capital.sql
---   3) 20260620_pipoca_dados_rpcs.sql
---   4) 20260630_pipoca_cinemateca.sql (opcional — adiciona Cinemateca)
+-- Executar MANUALMENTE no NOVO projeto Supabase (Projeto Natal).
+-- Arquitetura final: SEM qualquer conceito de capital/cidade/localização.
+-- Opcional depois: 20260630_pipoca_cinemateca.sql (adiciona Cinemateca).
 --
 -- Este arquivo NÃO é executado automaticamente e NÃO insere nenhum dado
 -- de visitantes, sessões, capturas, gerações ou fila do projeto antigo.
@@ -120,9 +118,7 @@ ALTER TABLE public.pipoca_visitors ENABLE ROW LEVEL SECURITY;
 
 -- =========================================================================
 -- 4) pipoca_sessions
---    capital_id é adicionado por 20260618; visitor_id por 20260615.
---    Ambos já constam aqui para que o schema base fique consistente —
---    as migrations posteriores usam ADD COLUMN IF NOT EXISTS.
+--    Sem capital_id: o Projeto Natal não tem localização.
 -- =========================================================================
 CREATE TABLE IF NOT EXISTS public.pipoca_sessions (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -220,7 +216,7 @@ ALTER TABLE public.pipoca_generations ENABLE ROW LEVEL SECURITY;
 
 -- =========================================================================
 -- 7) pipoca_print_queue
---    (mesma definição de 20260615; capital_id é adicionado por 20260619)
+--    Sem capital_id.
 -- =========================================================================
 CREATE TABLE IF NOT EXISTS public.pipoca_print_queue (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -281,17 +277,85 @@ COMMIT;
 -- =========================================================================
 -- 9) Ordem de execução recomendada no Projeto Natal
 -- =========================================================================
---   1. 20260811_natal_base_schema.sql   (este arquivo)
---   2. 20260618_pipoca_capitals.sql
---   3. 20260619_pipoca_print_queue_capital.sql
---   4. 20260620_pipoca_dados_rpcs.sql
---   5. 20260630_pipoca_cinemateca.sql   (opcional)
+--   1. 20260811_natal_base_schema.sql   (este arquivo — inclui a RPC do painel)
+--   2. 20260630_pipoca_cinemateca.sql   (opcional)
 --
--- Observação: 20260615_pipoca_visitors_and_print_queue.sql fica redundante,
--- pois seu conteúdo já está incluído aqui (tudo com IF NOT EXISTS — executá-la
--- de novo é inofensivo).
+-- Migrations 20260615, 20260618, 20260619 e 20260620 são históricas do
+-- Pipoca & Cena/Tela Brasil e NÃO fazem parte do Projeto Natal.
 --
 -- Após executar tudo, é necessário cadastrar manualmente:
 --   - filmes em public.pipoca_films
 --   - scene packs em public.pipoca_scene_packs (com reference_image_url
 --     apontando para o bucket pipoca-reference-assets do PROJETO NATAL)
+
+-- =========================================================================
+-- 10) RPC do painel executivo (/dados) — agregados globais, sem capital
+-- =========================================================================
+BEGIN;
+
+create or replace function public.pipoca_dados_summary(
+  p_start        timestamptz,
+  p_end          timestamptz,
+  p_film         uuid,
+  p_gen_status   text,
+  p_print_status text,
+  p_search       text,
+  p_today_start  timestamptz,
+  p_today_end    timestamptz
+)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with cap as (
+    select c.id, c.created_at, s.visitor_id, s.selected_film_id
+    from public.pipoca_captures c
+    join public.pipoca_sessions s on s.id = c.session_id
+    where (p_start is null or c.created_at >= p_start)
+      and (p_end   is null or c.created_at <  p_end)
+      and (p_film  is null or s.selected_film_id = p_film)
+  ),
+  gen as (
+    select g.*
+    from public.pipoca_generations g
+    where (p_start is null or g.created_at >= p_start)
+      and (p_end   is null or g.created_at <  p_end)
+      and (p_film  is null or g.film_id = p_film)
+      and (p_gen_status is null or g.status = p_gen_status)
+  ),
+  pq as (
+    select q.*
+    from public.pipoca_print_queue q
+    where (p_print_status is null or q.status = p_print_status)
+  )
+  select jsonb_build_object(
+    'totals', jsonb_build_object(
+      'captures',              (select count(*) from cap),
+      'captures_today',        (select count(*) from cap
+                                 where (p_today_start is null or created_at >= p_today_start)
+                                   and (p_today_end   is null or created_at <  p_today_end)),
+      'generations',           (select count(*) from gen),
+      'generations_today',     (select count(*) from gen
+                                 where (p_today_start is null or created_at >= p_today_start)
+                                   and (p_today_end   is null or created_at <  p_today_end)),
+      'generations_completed', (select count(*) from gen where status = 'completed'),
+      'generations_failed',    (select count(*) from gen where status = 'failed'),
+      'unique_visitors',       (select count(distinct visitor_id) from cap where visitor_id is not null),
+      'queue_pending',         (select count(*) from pq where status = 'pending'),
+      'queue_printing',        (select count(*) from pq where status = 'printing'),
+      'queue_printed',         (select count(*) from pq where status = 'printed')
+    )
+  );
+$$;
+
+revoke all on function public.pipoca_dados_summary(
+  timestamptz, timestamptz, uuid, text, text, text, timestamptz, timestamptz
+) from public, anon, authenticated;
+grant execute on function public.pipoca_dados_summary(
+  timestamptz, timestamptz, uuid, text, text, text, timestamptz, timestamptz
+) to service_role;
+
+
+COMMIT;

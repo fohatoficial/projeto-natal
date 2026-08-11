@@ -63,46 +63,6 @@ function buildResultPageUrl(publicToken: string): string {
 
 const PQ_LOG = "[PIPOCA_PRINT_QUEUE_AUTO]";
 
-const PRINT_CAPITAL_LOG = "[PIPOCA_PRINT_CAPITAL]";
-
-async function resolveCapitalForGeneration(
-  supabaseAdmin: any,
-  generationId: string,
-): Promise<{ capitalId: string | null; mismatch: boolean }> {
-  const { data: gen } = await supabaseAdmin
-    .from("pipoca_generations")
-    .select("id, capital_id, capture_id")
-    .eq("id", generationId)
-    .maybeSingle();
-  if (!gen) return { capitalId: null, mismatch: false };
-  let captureCapitalId: string | null = null;
-  if (gen.capture_id) {
-    const { data: cap } = await supabaseAdmin
-      .from("pipoca_captures")
-      .select("capital_id")
-      .eq("id", gen.capture_id)
-      .maybeSingle();
-    captureCapitalId = (cap?.capital_id as string | null) ?? null;
-  }
-  const genCapitalId = (gen.capital_id as string | null) ?? null;
-  if (genCapitalId && captureCapitalId && genCapitalId !== captureCapitalId) {
-    console.warn(PRINT_CAPITAL_LOG, "PRINT_CAPITAL_MISMATCH", {
-      generation_id: generationId,
-      generation_capital_id: genCapitalId,
-      capture_capital_id: captureCapitalId,
-    });
-    return { capitalId: null, mismatch: true };
-  }
-  const resolved = genCapitalId ?? captureCapitalId;
-  if (resolved) return { capitalId: resolved, mismatch: false };
-  const { data: unknown } = await supabaseAdmin
-    .from("pipoca_capitals")
-    .select("id")
-    .eq("slug", "capital-desconhecida")
-    .maybeSingle();
-  return { capitalId: (unknown?.id as string | null) ?? null, mismatch: false };
-}
-
 async function ensurePrintQueueEntry(
   supabaseAdmin: any,
   generationId: string,
@@ -145,28 +105,12 @@ async function ensurePrintQueueEntry(
       return { queueId: null, alreadyExists: false, error: "no_visitor" };
     }
 
-    const { capitalId, mismatch } = await resolveCapitalForGeneration(supabaseAdmin, generationId);
-    if (mismatch) {
-      return { queueId: null, alreadyExists: false, error: "capital_mismatch" };
-    }
-    if (!capitalId) {
-      console.warn(PQ_LOG, {
-        generationId,
-        outputAvailable: true,
-        queueCreated: false,
-        alreadyExists: false,
-        errorCode: "no_capital",
-      });
-      return { queueId: null, alreadyExists: false, error: "no_capital" };
-    }
-
     const { data: inserted, error: iErr } = await supabaseAdmin
       .from("pipoca_print_queue")
       .insert({
         visitor_id: visitorId,
         generation_id: generationId,
         status: "pending",
-        capital_id: capitalId,
       })
       .select("id")
       .single();
@@ -201,11 +145,6 @@ async function ensurePrintQueueEntry(
       outputAvailable: true,
       queueCreated: true,
       alreadyExists: false,
-    });
-    console.log(PRINT_CAPITAL_LOG, "PRINT_CAPITAL_ATTACHED", {
-      queue_id: inserted.id,
-      generation_id: generationId,
-      capital_id: capitalId,
     });
     return { queueId: inserted.id, alreadyExists: false };
   } catch (e) {
@@ -700,32 +639,18 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
 
     const { data: session, error: sErr } = await supabaseAdmin
       .from("pipoca_sessions")
-      .select("id, selected_film_id, scene_pack_id, status, capital_id")
+      .select("id, selected_film_id, scene_pack_id, status")
       .eq("id", data.sessionId)
       .maybeSingle();
     if (sErr || !session) throw new Error("Sessão não encontrada");
 
     const { data: capture, error: cErr } = await supabaseAdmin
       .from("pipoca_captures")
-      .select("id, session_id, capital_id")
+      .select("id, session_id")
       .eq("id", data.captureId)
       .maybeSingle();
     if (cErr || !capture) throw new Error("Captura não encontrada");
     if (capture.session_id !== session.id) throw new Error("Captura inválida");
-
-    // Capital integrity: capture and session must agree. Historical records
-    // without capital_id are tolerated; new ones must match.
-    const sessionCapitalId = (session as any).capital_id as string | null;
-    const captureCapitalId = (capture as any).capital_id as string | null;
-    if (sessionCapitalId && captureCapitalId && sessionCapitalId !== captureCapitalId) {
-      console.warn(`${GEN_LOG} GENERATION_CAPITAL_MISMATCH`, {
-        session_capital_id: sessionCapitalId,
-        capture_capital_id: captureCapitalId,
-        capture_id: capture.id,
-      });
-      throw new Error("GENERATION_CAPITAL_MISMATCH");
-    }
-    const resolvedCapitalId = captureCapitalId ?? sessionCapitalId ?? null;
 
     if (!session.scene_pack_id || !session.selected_film_id) {
       throw new Error("Sessão sem filme/scene pack");
@@ -895,19 +820,10 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
         status: "queued",
         provider: "replicate",
         attempt_number: attemptNumber,
-        capital_id: resolvedCapitalId,
       })
       .select("id")
       .single();
     if (genErr || !generation) throw new Error("Falha ao criar registro de geração");
-
-    if (resolvedCapitalId) {
-      console.log(`${GEN_LOG} GENERATION_CAPITAL_ATTACHED`, {
-        capital_id: resolvedCapitalId,
-        generation_id: generation.id,
-        capture_id: capture.id,
-      });
-    }
 
     console.log(`${GEN_LOG} geração usando referências`, {
       generationId: generation.id,
