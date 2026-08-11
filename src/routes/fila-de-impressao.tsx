@@ -61,6 +61,7 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [loading, setLoading] = useState(true);
   const [confirmClear, setConfirmClear] = useState<0 | 1 | 2>(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [activeCount, setActiveCount] = useState(0);
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -79,12 +80,18 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
       setItems(r.items);
       const c = await countFn({});
       setActiveCount(c.count);
+      setLoadError(null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (msg.toLowerCase().includes("unauthorized")) {
         onSignOut();
         return;
       }
+      setLoadError(
+        /ausente|Missing env/i.test(msg)
+          ? `Configuração do servidor incompleta: ${msg}`
+          : msg || "Não foi possível carregar a fila de impressão.",
+      );
     } finally {
       setLoading(false);
     }
@@ -209,6 +216,15 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
           Sair
         </button>
       </header>
+
+      {loadError && (
+        <div
+          role="alert"
+          className="mx-4 mt-3 rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+        >
+          {loadError}
+        </div>
+      )}
 
       <div className="px-4 py-3 flex flex-wrap items-center gap-2">
         <input
