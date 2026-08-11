@@ -100,7 +100,6 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
         generation_id: gen.id,
         status: "pending",
       })
-      })
       .select("id, status")
       .single();
     if (iErr || !inserted) {
@@ -129,11 +128,6 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
     }
 
     console.log(`${LOG} item criado na fila`, { queueId: inserted.id });
-    console.log("[PIPOCA_PRINT_CAPITAL]", "PRINT_CAPITAL_ATTACHED", {
-      queue_id: inserted.id,
-      generation_id: gen.id,
-      capital_id: resolvedCapitalId,
-    });
     return {
       success: true as const,
       alreadyRequested: false as const,
