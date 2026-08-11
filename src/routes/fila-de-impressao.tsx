@@ -6,15 +6,12 @@ const PRINT_QUEUE_PAGE_SIZE = 10;
 import {
   logoutPrintQueue,
   listPrintQueue,
-  listPrintQueueCapitals,
   markPrintedItem,
   cancelPrintItem,
   clearPrintQueue,
   countActivePrintQueue,
   type PrintQueueItem,
 } from "@/lib/pipoca/print-queue.functions";
-
-type QueueCapitalOption = { id: string; name: string; isSystem: boolean };
 
 export const Route = createFileRoute("/fila-de-impressao")({
   head: () => ({
@@ -47,7 +44,6 @@ function getPageNumbers(current: number, total: number): Array<number | "…"> {
 
 function QueueView({ onSignOut }: { onSignOut: () => void }) {
   const list = useServerFn(listPrintQueue);
-  const listCaps = useServerFn(listPrintQueueCapitals);
   const markFn = useServerFn(markPrintedItem);
   const cancelFn = useServerFn(cancelPrintItem);
   const clearFn = useServerFn(clearPrintQueue);
@@ -55,8 +51,6 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   const logout = useServerFn(logoutPrintQueue);
 
   const [items, setItems] = useState<PrintQueueItem[]>([]);
-  const [capitalOptions, setCapitalOptions] = useState<QueueCapitalOption[]>([]);
-  const [capitalFilter, setCapitalFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [loading, setLoading] = useState(true);
@@ -74,7 +68,6 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
         data: {
           search: search || undefined,
           status: statusFilter,
-          capitalId: capitalFilter !== "all" ? capitalFilter : undefined,
         },
       });
       setItems(r.items);
@@ -95,33 +88,13 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [list, countFn, search, statusFilter, capitalFilter, onSignOut]);
+  }, [list, countFn, search, statusFilter, onSignOut]);
 
   useEffect(() => {
     void refresh();
     const t = window.setInterval(refresh, 10_000);
     return () => window.clearInterval(t);
   }, [refresh]);
-
-  // Carrega capitais que existem na fila (uma vez, com refresh periódico leve).
-  useEffect(() => {
-    let alive = true;
-    async function loadCaps() {
-      try {
-        const r = await listCaps({});
-        if (!alive) return;
-        setCapitalOptions(r.capitals);
-      } catch {
-        /* noop */
-      }
-    }
-    void loadCaps();
-    const t = window.setInterval(loadCaps, 60_000);
-    return () => {
-      alive = false;
-      window.clearInterval(t);
-    };
-  }, [listCaps]);
 
   async function handleSignOut() {
     try { await logout({}); } catch { /* noop */ }
@@ -173,7 +146,7 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
   // Reset to page 1 when filter/search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, capitalFilter]);
+  }, [search, statusFilter]);
 
   // Clamp page if it no longer exists after data refresh
   useEffect(() => {
@@ -245,19 +218,6 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
           <option value="cleared">Zerados</option>
           <option value="cancelled">Cancelados</option>
           <option value="all">Todos</option>
-        </select>
-        <select
-          value={capitalFilter}
-          onChange={(e) => setCapitalFilter(e.target.value)}
-          className="bg-black/40 border border-white/20 rounded-md px-3 py-2 text-sm"
-          aria-label="Filtrar por capital"
-        >
-          <option value="all">Todas as capitais</option>
-          {capitalOptions.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
         </select>
         <button
           onClick={refresh}
@@ -399,9 +359,6 @@ function QueueRow({
           {item.filmTitle} · WhatsApp ****{item.visitorWhatsappLast4}
         </p>
         <p className="text-[11px] text-white/45 mt-0.5">{requested}</p>
-        <p className="text-[11px] text-white/55 mt-0.5">
-          Capital: <span className="text-white/80">{item.capitalName}</span>
-        </p>
         <div className="mt-2 flex flex-wrap gap-2">
           <button
             onClick={() => onPrint(item)}
