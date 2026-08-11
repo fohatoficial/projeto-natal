@@ -1,11 +1,11 @@
 {
-  "version": 1,
   "asset_id": "81005976-aa68-4880-90ed-e70f253ec886",
-  "project_id": "a41771ec-482f-4dc3-9092-09c6c271363e",
-  "url": "/__l5e/assets-v1/81005976-aa68-4880-90ed-e70f253ec886/deus-e-o-diabo.jpg",
-  "r2_key": "a/v1/a41771ec-482f-4dc3-9092-09c6c271363e/81005976-aa68-4880-90ed-e70f253ec886/deus-e-o-diabo.jpg",
-  "original_filename": "deus-e-o-diabo.jpg",
-  "size": 60900,
   "content_type": "image/jpeg",
-  "created_at": "2026-06-14T11:36:18Z"
+  "created_at": "2026-06-14T11:36:18Z",
+  "original_filename": "deus-e-o-diabo.jpg",
+  "project_id": "9e372163-9e26-48a9-9712-e38119e310c9",
+  "r2_key": "a/v1/9e372163-9e26-48a9-9712-e38119e310c9/81005976-aa68-4880-90ed-e70f253ec886/deus-e-o-diabo.jpg",
+  "size": 60900,
+  "url": "/__l5e/assets-v1/81005976-aa68-4880-90ed-e70f253ec886/deus-e-o-diabo.jpg",
+  "version": 1
 }

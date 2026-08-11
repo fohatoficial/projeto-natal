@@ -1,11 +1,11 @@
 {
-  "version": 1,
   "asset_id": "ebc60a74-6a98-4a67-97b1-950064f94104",
-  "project_id": "a41771ec-482f-4dc3-9092-09c6c271363e",
-  "url": "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg",
-  "r2_key": "a/v1/a41771ec-482f-4dc3-9092-09c6c271363e/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg",
-  "original_filename": "logo_tela_brasil_light.svg",
-  "size": 3481,
   "content_type": "image/svg+xml",
-  "created_at": "2026-06-14T11:36:08Z"
+  "created_at": "2026-06-14T11:36:08Z",
+  "original_filename": "logo_tela_brasil_light.svg",
+  "project_id": "9e372163-9e26-48a9-9712-e38119e310c9",
+  "r2_key": "a/v1/9e372163-9e26-48a9-9712-e38119e310c9/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg",
+  "size": 3481,
+  "url": "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg",
+  "version": 1
 }
