@@ -1,24 +1,13 @@
 // /dados — Painel executivo visual (modo apresentação) para o cliente.
 // Sem filtros, sem dados pessoais. Dashboard vertical contínuo.
 // Reutiliza a server function getDadosSummary (RPC pipoca_dados_summary),
-// usando apenas os agregados (totals + perCapital). Detalhes/PII são
+// usando apenas os agregados globais (totals). Detalhes/PII são
 // ignorados no frontend.
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import type * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { logoutPrintQueue } from "@/lib/pipoca/print-queue.functions";
 import { getDadosSummary, type DadosSummary } from "@/lib/pipoca/dados.functions";
 
@@ -388,11 +377,4 @@ function SectionOverview({ data }: { data: DadosSummary }) {
   );
 }
 
-const tooltipStyle: React.CSSProperties = {
-  background: "#0a1830",
-  border: "1px solid rgba(255,255,255,0.15)",
-  borderRadius: 8,
-  color: "white",
-  fontSize: 12,
-};
 
