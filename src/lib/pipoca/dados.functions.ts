@@ -358,11 +358,7 @@ export const getDadosSummary = createServerFn({ method: "POST" })
         queuePending: Number(t.queue_pending ?? 0),
         queuePrinting: Number(t.queue_printing ?? 0),
         queuePrinted: Number(t.queue_printed ?? 0),
-        capturesWithoutCapital: Number(t.captures_without_capital ?? 0),
-        generationsWithoutCapital: Number(t.generations_without_capital ?? 0),
-        queueWithoutCapital: Number(t.queue_without_capital ?? 0),
       },
-      perCapital,
       topFilms,
       details: {
         page: safePage,
@@ -374,7 +370,6 @@ export const getDadosSummary = createServerFn({ method: "POST" })
         rows,
       },
       options: {
-        capitals: capitalsOpt,
         films: filmsOpt,
         generationStatuses,
         printStatuses,
