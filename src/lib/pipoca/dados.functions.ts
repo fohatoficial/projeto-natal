@@ -94,7 +94,6 @@ function rangeBoundsSP(
 export type DadosFilters = {
   startDate?: string | null;
   endDate?: string | null;
-  capitalId?: string | null;
   filmId?: string | null;
   generationStatus?: string | null;
   printStatus?: string | null;
@@ -102,27 +101,9 @@ export type DadosFilters = {
   page?: number | null;
 };
 
-export type CapitalIndicators = {
-  capitalId: string;
-  capitalName: string;
-  isSystem: boolean;
-  selectable: boolean;
-  active: boolean;
-  captures: number;
-  capturesToday: number;
-  generations: number;
-  generationsToday: number;
-  queuePending: number;
-  queuePrinting: number;
-  queuePrinted: number;
-  queueTotal: number;
-};
-
 export type DetailRow = {
   captureId: string;
   createdAt: string;
-  capitalId: string | null;
-  capitalName: string;
   visitorFirstName: string;
   visitorFullName: string;
   whatsappMasked: string;
@@ -137,15 +118,6 @@ export type DetailRow = {
 };
 
 export type FilmOption = { id: string; title: string };
-export type CapitalOption = {
-  id: string;
-  name: string;
-  isSystem: boolean;
-  active: boolean;
-  selectable: boolean;
-  hasRecords: boolean;
-};
-
 export type DadosSummary = {
   generatedAt: string;
   filters: DadosFilters;
@@ -163,11 +135,7 @@ export type DadosSummary = {
     queuePending: number;
     queuePrinting: number;
     queuePrinted: number;
-    capturesWithoutCapital: number;
-    generationsWithoutCapital: number;
-    queueWithoutCapital: number;
   };
-  perCapital: CapitalIndicators[];
   topFilms: Array<{ filmId: string; title: string; captures: number }>;
   details: {
     page: number;
@@ -179,7 +147,6 @@ export type DadosSummary = {
     rows: DetailRow[];
   };
   options: {
-    capitals: CapitalOption[];
     films: FilmOption[];
     generationStatuses: string[];
     printStatuses: string[];
@@ -189,7 +156,6 @@ export type DadosSummary = {
 const FiltersSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  capitalId: z.string().uuid().nullable().optional(),
   filmId: z.string().uuid().nullable().optional(),
   generationStatus: z.string().min(1).max(40).nullable().optional(),
   printStatus: z.string().min(1).max(40).nullable().optional(),
@@ -234,7 +200,6 @@ export const getDadosSummary = createServerFn({ method: "POST" })
     const rpcArgs = {
       p_start: range.startISO,
       p_end: range.endISO,
-      p_capital: data.capitalId ?? null,
       p_film: data.filmId ?? null,
       p_gen_status: data.generationStatus ?? null,
       p_print_status: data.printStatus ?? null,
@@ -243,19 +208,13 @@ export const getDadosSummary = createServerFn({ method: "POST" })
 
     // Painel executivo: apenas summary (agregados). A RPC pipoca_dados_page
     // não é mais consultada — listagem detalhada/PII não aparece em /dados.
-    const [summaryRes, { data: capsAll }, { data: filmsAll }] =
+    const [summaryRes, { data: filmsAll }] =
       await Promise.all([
         supabaseAdmin.rpc("pipoca_dados_summary", {
           ...rpcArgs,
           p_today_start: today.startISO,
           p_today_end: today.endISO,
         }),
-        supabaseAdmin
-          .from("pipoca_capitals")
-          .select("id, name, slug, is_system, selectable, active, display_order")
-          .order("is_system", { ascending: true })
-          .order("display_order", { ascending: true })
-          .order("name", { ascending: true }),
         supabaseAdmin.from("pipoca_films").select("id, title").order("title", { ascending: true }),
       ]);
     const pageRows: Array<Record<string, any>> = [];
@@ -270,9 +229,8 @@ export const getDadosSummary = createServerFn({ method: "POST" })
       throw new Error("Não foi possível carregar os dados do painel.");
     }
 
-    const summary = (summaryRes.data ?? { totals: {}, per_capital: [] }) as {
+    const summary = (summaryRes.data ?? { totals: {} }) as {
       totals: Record<string, number | string | null>;
-      per_capital: Array<Record<string, any>>;
     };
 
     // Debug: totais brutos (sem dados pessoais) — diagnóstico do KPI Capturas.
@@ -299,31 +257,6 @@ export const getDadosSummary = createServerFn({ method: "POST" })
     
     
 
-    // hasRecords: para cada capital (lista curta, ≤ ~10), uma head-count em
-    // pipoca_captures com LIMIT 1. Nenhuma chamada cresce com a base.
-    const capitalsList = (capsAll ?? []) as Array<{ id: string }>;
-    const hasRecordsChecks = await Promise.all(
-      capitalsList.map(async (c) => {
-        const { count } = await supabaseAdmin
-          .from("pipoca_captures")
-          .select("id", { count: "exact", head: true })
-          .eq("capital_id", c.id)
-          .limit(1);
-        return [c.id, (count ?? 0) > 0] as const;
-      }),
-    );
-    const hasRecordsSet = new Set(
-      hasRecordsChecks.filter(([, has]) => has).map(([id]) => id),
-    );
-
-    const capitalsOpt: CapitalOption[] = (capsAll ?? []).map((c: any) => ({
-      id: c.id as string,
-      name: c.name as string,
-      isSystem: Boolean(c.is_system),
-      active: Boolean(c.active),
-      selectable: Boolean(c.selectable),
-      hasRecords: hasRecordsSet.has(c.id as string),
-    }));
     const filmsOpt: FilmOption[] = (filmsAll ?? []).map((f: any) => ({
       id: f.id as string,
       title: f.title as string,
@@ -331,30 +264,6 @@ export const getDadosSummary = createServerFn({ method: "POST" })
 
     const generationStatuses = ["queued", "processing", "completed", "failed"];
     const printStatuses = ["pending", "printing", "printed", "failed", "cleared", "cancelled"];
-
-    // ── perCapital
-    const perCapital: CapitalIndicators[] = (summary.per_capital ?? []).map((r) => ({
-      capitalId: r.capital_id as string,
-      capitalName: (r.capital_name as string) ?? "—",
-      isSystem: Boolean(r.is_system),
-      selectable: Boolean(r.selectable),
-      active: Boolean(r.active),
-      captures: Number(r.captures ?? 0),
-      capturesToday: Number(r.captures_today ?? 0),
-      generations: Number(r.generations ?? 0),
-      generationsToday: Number(r.generations_today ?? 0),
-      queuePending: Number(r.queue_pending ?? 0),
-      queuePrinting: Number(r.queue_printing ?? 0),
-      queuePrinted: Number(r.queue_printed ?? 0),
-      queueTotal:
-        Number(r.queue_pending ?? 0) +
-        Number(r.queue_printing ?? 0) +
-        Number(r.queue_printed ?? 0),
-    }));
-
-    // Reatribuição por DDD removida: registros novos respeitam a capital
-    // escolhida pelo técnico. O histórico já foi categorizado e permanece
-    // como está.
 
     // ── totals
     const t = summary.totals ?? {};
@@ -376,8 +285,6 @@ export const getDadosSummary = createServerFn({ method: "POST" })
     const rows: DetailRow[] = pageRows.map((r: any) => ({
       captureId: r.capture_id as string,
       createdAt: r.created_at as string,
-      capitalId: (r.capital_id as string | null) ?? null,
-      capitalName: (r.capital_name as string | null) ?? (r.capital_id ? "—" : "Sem capital"),
       visitorFirstName: (r.visitor_first_name as string | null) ?? "—",
       visitorFullName: (r.visitor_full_name as string | null) ?? "—",
       whatsappMasked: maskWhatsapp(
@@ -430,7 +337,6 @@ export const getDadosSummary = createServerFn({ method: "POST" })
       filters: {
         startDate: data.startDate ?? null,
         endDate: data.endDate ?? null,
-        capitalId: data.capitalId ?? null,
         filmId: data.filmId ?? null,
         generationStatus: data.generationStatus ?? null,
         printStatus: data.printStatus ?? null,
