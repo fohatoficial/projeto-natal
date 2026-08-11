@@ -28,7 +28,7 @@ export const requestPipocaPrint = createServerFn({ method: "POST" })
 
     const { data: gen, error: gErr } = await supabaseAdmin
       .from("pipoca_generations")
-      .select("id, session_id, capture_id, capital_id, final_image_path, public_token, status")
+      .select("id, session_id, capture_id, final_image_path, public_token, status")
       .eq("public_token", data.publicToken)
       .eq("status", "completed")
       .maybeSingle();
