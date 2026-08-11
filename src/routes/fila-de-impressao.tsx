@@ -217,6 +217,15 @@ function QueueView({ onSignOut }: { onSignOut: () => void }) {
         </button>
       </header>
 
+      {loadError && (
+        <div
+          role="alert"
+          className="mx-4 mt-3 rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+        >
+          {loadError}
+        </div>
+      )}
+
       <div className="px-4 py-3 flex flex-wrap items-center gap-2">
         <input
           value={search}
