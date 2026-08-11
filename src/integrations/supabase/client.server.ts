@@ -17,10 +17,7 @@ function getEnv(name: string): string {
   return value;
 }
 
-const supabaseUrl =
-  process.env.SUPABASE_URL ??
-  process.env.VITE_SUPABASE_URL ??
-  "https://brsplarbpylygnsakyjf.supabase.co";
+const supabaseUrl = getEnv("PIPOCA_SUPABASE_URL");
 
 // Note: Lovable reserves the "SUPABASE_" prefix for managed secrets, so the
 // external project's service_role is stored as PIPOCA_SUPABASE_SERVICE_ROLE_KEY.
