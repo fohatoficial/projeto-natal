@@ -8,7 +8,7 @@ const ORIGINALS_BUCKET = "pipoca-visitor-originals";
 const GENERATED_BUCKET = "pipoca-generated-scenes";
 const SIGNED_DOWNLOAD_TTL = 60 * 30;
 const SIGNED_REF_TTL = 60 * 30;
-const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/, "");
+
 
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
