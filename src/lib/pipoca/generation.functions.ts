@@ -8,7 +8,7 @@ const ORIGINALS_BUCKET = "pipoca-visitor-originals";
 const GENERATED_BUCKET = "pipoca-generated-scenes";
 const SIGNED_DOWNLOAD_TTL = 60 * 30;
 const SIGNED_REF_TTL = 60 * 30;
-const PUBLIC_RESULT_BASE_URL = "https://pipocaecena.lovable.app".replace(/\/+$/, "");
+
 
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
@@ -57,8 +57,9 @@ function isUuid(value: unknown): value is string {
   );
 }
 
-function buildResultPageUrl(publicToken: string): string {
-  return `${PUBLIC_RESULT_BASE_URL}/resultado/${encodeURIComponent(publicToken)}`;
+function buildResultPageUrl(origin: string, publicToken: string): string {
+  const base = origin.replace(/\/+$/, "");
+  return `${base}/resultado/${encodeURIComponent(publicToken)}`;
 }
 
 const PQ_LOG = "[PIPOCA_PRINT_QUEUE_AUTO]";
@@ -160,6 +161,7 @@ async function ensurePrintQueueEntry(
 }
 
 async function ensurePublicResultFields(
+  origin: string,
   supabaseAdmin: any,
   gen: {
     id: string;
@@ -173,7 +175,7 @@ async function ensurePublicResultFields(
   if (!gen.final_image_path) throw new Error("Imagem final indisponível");
 
   const publicToken = isUuid(gen.public_token) ? gen.public_token.trim() : crypto.randomUUID();
-  const resultPageUrl = buildResultPageUrl(publicToken);
+  const resultPageUrl = buildResultPageUrl(origin, publicToken);
 
   if (gen.public_token !== publicToken || gen.result_page_url !== resultPageUrl) {
     const { error } = await supabaseAdmin
@@ -634,7 +636,8 @@ const CreateInput = z.object({
 
 export const createPipocaGeneration = createServerFn({ method: "POST" })
   .inputValidator((input) => CreateInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, request }: { data: { sessionId: string; captureId: string }; request?: Request }) => {
+    const origin = new URL(request!.url).origin;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: session, error: sErr } = await supabaseAdmin
@@ -932,7 +935,8 @@ type StatusResponse =
 
 export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
   .inputValidator((input) => StatusInput.parse(input))
-  .handler(async ({ data }): Promise<StatusResponse> => {
+  .handler(async ({ data, request }: { data: { generationId: string }; request?: Request }): Promise<StatusResponse> => {
+    const origin = new URL(request!.url).origin;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: gen, error: gErr } = await supabaseAdmin
@@ -953,7 +957,7 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
     });
 
     if (gen.status === "completed" && gen.final_image_path) {
-      const { publicToken, resultPageUrl } = await ensurePublicResultFields(supabaseAdmin, gen);
+      const { publicToken, resultPageUrl } = await ensurePublicResultFields(origin, supabaseAdmin, gen);
       await ensurePrintQueueEntry(supabaseAdmin, gen.id, gen.session_id);
       const { data: signed, error: sErr } = await supabaseAdmin.storage
         .from(GENERATED_BUCKET)
@@ -1060,7 +1064,7 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
         ? Math.round(pred.metrics.predict_time * 1000)
         : null;
     const publicToken = isUuid(gen.public_token) ? gen.public_token.trim() : crypto.randomUUID();
-    const resultPageUrl = buildResultPageUrl(publicToken);
+    const resultPageUrl = buildResultPageUrl(origin, publicToken);
 
     await supabaseAdmin
       .from("pipoca_generations")
