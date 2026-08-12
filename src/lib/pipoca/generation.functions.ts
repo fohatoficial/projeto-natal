@@ -822,7 +822,6 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           hat_reference_side_url: hatRefUsed[1] ?? null,
           prompt_cache_key: `${session.selected_film_id}:${chosenScenePackId}`,
           reference_image_filename: referenceImageFilename,
-          prompt_contamination_detected: builtPrompt.diagnostics.prompt_contamination_detected,
           post_process: builtPrompt.shouldApplyNeutralGrayscale ? "neutral-grayscale" : "none",
           post_process_contrast: builtPrompt.shouldApplyNeutralGrayscale ? 8 : null,
         },
