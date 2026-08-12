@@ -186,11 +186,6 @@ type ScenePackForGeneration = {
 
 type PromptDiagnostics = {
   contains_monochrome: boolean;
-  contains_sertao: boolean;
-  contains_cangaco: boolean;
-  contains_cinema_novo: boolean;
-  contains_circo: boolean;
-  prompt_contamination_detected: boolean;
 };
 
 type BuiltPrompt = {
