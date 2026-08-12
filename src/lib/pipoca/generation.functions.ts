@@ -636,7 +636,8 @@ const CreateInput = z.object({
 
 export const createPipocaGeneration = createServerFn({ method: "POST" })
   .inputValidator((input) => CreateInput.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, request }: { data: { sessionId: string; captureId: string }; request?: Request }) => {
+    const origin = new URL(request!.url).origin;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: session, error: sErr } = await supabaseAdmin
