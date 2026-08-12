@@ -706,10 +706,6 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0);
     const sceneImageUrl = scenePack.reference_image_url;
     const referenceImageFilename = safeFilenameFromUrl(scenePack.reference_image_url);
-    const image3MatchesScenePack = sceneImageUrl === scenePack.reference_image_url;
-    const circoReferenceMismatch =
-      scenePack.id === CIRCO_SCENE_PACK_ID && scenePack.reference_image_url !== CIRCO_REFERENCE_IMAGE_URL;
-    const promptPreparedFromResolvedScenePack = chosenScenePackId === scenePack.id;
 
     const referenceRoles = [
       "identity-face-crop",
@@ -736,32 +732,8 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       model: REPLICATE_MODEL,
       scene_pack_version: (scenePack as any).updated_at ?? null,
       contains_monochrome: builtPrompt.diagnostics.contains_monochrome,
-      contains_sertao: builtPrompt.diagnostics.contains_sertao,
-      contains_cangaco: builtPrompt.diagnostics.contains_cangaco,
-      contains_cinema_novo: builtPrompt.diagnostics.contains_cinema_novo,
-      contains_circo: builtPrompt.diagnostics.contains_circo,
       routing_match: scenePack.film_id === session.selected_film_id,
-      prompt_contamination_detected:
-        builtPrompt.diagnostics.prompt_contamination_detected || circoReferenceMismatch,
     });
-
-    if (
-      scenePack.film_id !== session.selected_film_id ||
-      scenePack.id !== chosenScenePackId ||
-      !image3MatchesScenePack ||
-      !promptPreparedFromResolvedScenePack ||
-      circoReferenceMismatch ||
-      builtPrompt.diagnostics.prompt_contamination_detected
-    ) {
-      console.warn(`${GEN_LOG} ${CROSS_FILM_PROMPT_CONTAMINATION}`, {
-        film_id: session.selected_film_id,
-        scene_pack_id: chosenScenePackId,
-        scene_pack_film_id: scenePack.film_id,
-        reference_image_filename: referenceImageFilename,
-        circo_reference_mismatch: circoReferenceMismatch,
-      });
-      throw new Error(CROSS_FILM_PROMPT_CONTAMINATION);
-    }
 
 
 
