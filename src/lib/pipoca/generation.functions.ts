@@ -501,7 +501,7 @@ function buildPromptText(
     promptText,
     positivePromptText,
     negativePromptText,
-    diagnostics: analyzePrompt(positivePromptText, scenePack.id),
+    diagnostics: analyzePrompt(positivePromptText),
     shouldApplyNeutralGrayscale: containsAny(
       [scenePack.color_mode, scenePack.visual_style, ...extracted.sections.map((s) => s.body)]
         .filter(Boolean)
