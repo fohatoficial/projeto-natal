@@ -476,13 +476,11 @@ function buildPromptText(
   if (scenePack.color_mode?.trim()) parts.push(`COLOR MODE: ${scenePack.color_mode.trim()}.`);
   if (scenePack.framing?.trim()) parts.push(`SCENE PACK FRAMING: ${scenePack.framing.trim()}.`);
   if (scenePack.pose_type?.trim()) parts.push(`POSE TYPE: ${scenePack.pose_type.trim()}.`);
-  if (scenePack.id === CIRCO_SCENE_PACK_ID) parts.push(CIRCO_COLOR_INSTRUCTION);
 
   const positivePromptText = parts.join(" ");
   const negativeParts: string[] = [];
   if (scenePack.negative_prompt?.trim()) negativeParts.push(scenePack.negative_prompt.trim());
   if (extracted.forbidden.length > 0) negativeParts.push(...extracted.forbidden);
-  if (scenePack.id === CIRCO_SCENE_PACK_ID) negativeParts.push(...CIRCO_NEGATIVE_PROMPT_ADDITIONS);
   const seenNeg = new Set<string>();
   const dedupedNeg: string[] = [];
   for (const raw of negativeParts) {
