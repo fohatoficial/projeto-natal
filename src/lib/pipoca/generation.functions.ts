@@ -934,8 +934,8 @@ type StatusResponse =
 
 export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
   .inputValidator((input) => StatusInput.parse(input))
-  .handler(async ({ data, request }: { data: { generationId: string }; request: Request }): Promise<StatusResponse> => {
-    const origin = new URL(request.url).origin;
+  .handler(async ({ data, request }: { data: { generationId: string }; request?: Request }): Promise<StatusResponse> => {
+    const origin = new URL(request!.url).origin;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: gen, error: gErr } = await supabaseAdmin
