@@ -1064,7 +1064,7 @@ export const getPipocaGenerationStatus = createServerFn({ method: "POST" })
         ? Math.round(pred.metrics.predict_time * 1000)
         : null;
     const publicToken = isUuid(gen.public_token) ? gen.public_token.trim() : crypto.randomUUID();
-    const resultPageUrl = buildResultPageUrl(publicToken);
+    const resultPageUrl = buildResultPageUrl(origin, publicToken);
 
     await supabaseAdmin
       .from("pipoca_generations")
