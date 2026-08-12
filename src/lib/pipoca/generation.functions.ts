@@ -161,6 +161,7 @@ async function ensurePrintQueueEntry(
 }
 
 async function ensurePublicResultFields(
+  origin: string,
   supabaseAdmin: any,
   gen: {
     id: string;
@@ -174,7 +175,7 @@ async function ensurePublicResultFields(
   if (!gen.final_image_path) throw new Error("Imagem final indisponível");
 
   const publicToken = isUuid(gen.public_token) ? gen.public_token.trim() : crypto.randomUUID();
-  const resultPageUrl = buildResultPageUrl(publicToken);
+  const resultPageUrl = buildResultPageUrl(origin, publicToken);
 
   if (gen.public_token !== publicToken || gen.result_page_url !== resultPageUrl) {
     const { error } = await supabaseAdmin
