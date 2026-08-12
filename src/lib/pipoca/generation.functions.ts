@@ -12,33 +12,8 @@ const SIGNED_REF_TTL = 60 * 30;
 
 const IDENTITY_NAME = "identity-close.jpg";
 const APPEARANCE_NAME = "appearance-medium.jpg";
-const CIRCO_SCENE_PACK_ID = "407b5a71-6f4d-4fb0-b14a-e8cccab25001";
-const CIRCO_REFERENCE_IMAGE_URL =
-  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/scenes/o-grande-circo-mistico/backstage-circo-encantado-v1.png";
 const CROSS_FILM_PROMPT_CONTAMINATION = "CROSS_FILM_PROMPT_CONTAMINATION";
 const STYLE_PREP_ERROR_MESSAGE = "Não foi possível preparar o estilo deste filme. Tente novamente.";
-const CIRCO_COLOR_INSTRUCTION =
-  "Full color image. Rich deep reds, warm golds and theatrical lighting. Do not generate monochrome, grayscale or black and white.";
-const CIRCO_NEGATIVE_PROMPT_ADDITIONS = [
-  "monochrome",
-  "grayscale",
-  "black and white",
-  "desaturated image",
-  "Cinema Novo aesthetic",
-  "sertão landscape",
-  "cangaço clothing",
-  "cangaceiro hat",
-  "arid desert scenery",
-];
-const CIRCO_FORBIDDEN_POSITIVE_TERMS = [
-  "Cinema Novo",
-  "sertão",
-  "cangaço",
-  "cangaceiro",
-  "monochrome",
-  "black and white",
-  "Glauber Rocha",
-];
 
 // Prop references (e.g. cangaceiro hats) are scene-pack-driven via the
 // `prop_references.hat_reference_images` array in the scene pack `prompt`
@@ -211,11 +186,6 @@ type ScenePackForGeneration = {
 
 type PromptDiagnostics = {
   contains_monochrome: boolean;
-  contains_sertao: boolean;
-  contains_cangaco: boolean;
-  contains_cinema_novo: boolean;
-  contains_circo: boolean;
-  prompt_contamination_detected: boolean;
 };
 
 type BuiltPrompt = {
@@ -412,11 +382,8 @@ function containsAny(text: string, terms: string[]): boolean {
   return terms.some((term) => normalized.includes(term.toLocaleLowerCase("pt-BR")));
 }
 
-function analyzePrompt(positivePromptText: string, scenePackId: string): PromptDiagnostics {
-  const inspectedText = scenePackId === CIRCO_SCENE_PACK_ID
-    ? positivePromptText.replace(CIRCO_COLOR_INSTRUCTION, "")
-    : positivePromptText;
-  const contains_monochrome = containsAny(inspectedText, [
+function analyzePrompt(positivePromptText: string): PromptDiagnostics {
+  const contains_monochrome = containsAny(positivePromptText, [
     "monochrome",
     "black and white",
     "grayscale",
@@ -424,20 +391,7 @@ function analyzePrompt(positivePromptText: string, scenePackId: string): PromptD
     "monocromático",
     "monocromatico",
   ]);
-  const contains_sertao = containsAny(inspectedText, ["sertão", "sertao"]);
-  const contains_cangaco = containsAny(inspectedText, ["cangaço", "cangaco", "cangaceiro"]);
-  const contains_cinema_novo = containsAny(inspectedText, ["Cinema Novo", "Glauber Rocha"]);
-  const contains_circo = containsAny(inspectedText, ["circo", "circense", "cortinas", "teatral"]);
-  return {
-    contains_monochrome,
-    contains_sertao,
-    contains_cangaco,
-    contains_cinema_novo,
-    contains_circo,
-    prompt_contamination_detected:
-      scenePackId === CIRCO_SCENE_PACK_ID &&
-      containsAny(inspectedText, CIRCO_FORBIDDEN_POSITIVE_TERMS),
-  };
+  return { contains_monochrome };
 }
 
 function buildPromptText(
@@ -522,13 +476,11 @@ function buildPromptText(
   if (scenePack.color_mode?.trim()) parts.push(`COLOR MODE: ${scenePack.color_mode.trim()}.`);
   if (scenePack.framing?.trim()) parts.push(`SCENE PACK FRAMING: ${scenePack.framing.trim()}.`);
   if (scenePack.pose_type?.trim()) parts.push(`POSE TYPE: ${scenePack.pose_type.trim()}.`);
-  if (scenePack.id === CIRCO_SCENE_PACK_ID) parts.push(CIRCO_COLOR_INSTRUCTION);
 
   const positivePromptText = parts.join(" ");
   const negativeParts: string[] = [];
   if (scenePack.negative_prompt?.trim()) negativeParts.push(scenePack.negative_prompt.trim());
   if (extracted.forbidden.length > 0) negativeParts.push(...extracted.forbidden);
-  if (scenePack.id === CIRCO_SCENE_PACK_ID) negativeParts.push(...CIRCO_NEGATIVE_PROMPT_ADDITIONS);
   const seenNeg = new Set<string>();
   const dedupedNeg: string[] = [];
   for (const raw of negativeParts) {
@@ -549,7 +501,7 @@ function buildPromptText(
     promptText,
     positivePromptText,
     negativePromptText,
-    diagnostics: analyzePrompt(positivePromptText, scenePack.id),
+    diagnostics: analyzePrompt(positivePromptText),
     shouldApplyNeutralGrayscale: containsAny(
       [scenePack.color_mode, scenePack.visual_style, ...extracted.sections.map((s) => s.body)]
         .filter(Boolean)
@@ -754,10 +706,6 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
     const builtPrompt = buildPromptText(scenePack, hatRefUsed.length > 0);
     const sceneImageUrl = scenePack.reference_image_url;
     const referenceImageFilename = safeFilenameFromUrl(scenePack.reference_image_url);
-    const image3MatchesScenePack = sceneImageUrl === scenePack.reference_image_url;
-    const circoReferenceMismatch =
-      scenePack.id === CIRCO_SCENE_PACK_ID && scenePack.reference_image_url !== CIRCO_REFERENCE_IMAGE_URL;
-    const promptPreparedFromResolvedScenePack = chosenScenePackId === scenePack.id;
 
     const referenceRoles = [
       "identity-face-crop",
@@ -784,32 +732,8 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
       model: REPLICATE_MODEL,
       scene_pack_version: (scenePack as any).updated_at ?? null,
       contains_monochrome: builtPrompt.diagnostics.contains_monochrome,
-      contains_sertao: builtPrompt.diagnostics.contains_sertao,
-      contains_cangaco: builtPrompt.diagnostics.contains_cangaco,
-      contains_cinema_novo: builtPrompt.diagnostics.contains_cinema_novo,
-      contains_circo: builtPrompt.diagnostics.contains_circo,
       routing_match: scenePack.film_id === session.selected_film_id,
-      prompt_contamination_detected:
-        builtPrompt.diagnostics.prompt_contamination_detected || circoReferenceMismatch,
     });
-
-    if (
-      scenePack.film_id !== session.selected_film_id ||
-      scenePack.id !== chosenScenePackId ||
-      !image3MatchesScenePack ||
-      !promptPreparedFromResolvedScenePack ||
-      circoReferenceMismatch ||
-      builtPrompt.diagnostics.prompt_contamination_detected
-    ) {
-      console.warn(`${GEN_LOG} ${CROSS_FILM_PROMPT_CONTAMINATION}`, {
-        film_id: session.selected_film_id,
-        scene_pack_id: chosenScenePackId,
-        scene_pack_film_id: scenePack.film_id,
-        reference_image_filename: referenceImageFilename,
-        circo_reference_mismatch: circoReferenceMismatch,
-      });
-      throw new Error(CROSS_FILM_PROMPT_CONTAMINATION);
-    }
 
 
 
@@ -898,7 +822,6 @@ export const createPipocaGeneration = createServerFn({ method: "POST" })
           hat_reference_side_url: hatRefUsed[1] ?? null,
           prompt_cache_key: `${session.selected_film_id}:${chosenScenePackId}`,
           reference_image_filename: referenceImageFilename,
-          prompt_contamination_detected: builtPrompt.diagnostics.prompt_contamination_detected,
           post_process: builtPrompt.shouldApplyNeutralGrayscale ? "neutral-grayscale" : "none",
           post_process_contrast: builtPrompt.shouldApplyNeutralGrayscale ? 8 : null,
         },
