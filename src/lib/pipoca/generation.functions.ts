@@ -57,8 +57,9 @@ function isUuid(value: unknown): value is string {
   );
 }
 
-function buildResultPageUrl(publicToken: string): string {
-  return `${PUBLIC_RESULT_BASE_URL}/resultado/${encodeURIComponent(publicToken)}`;
+function buildResultPageUrl(origin: string, publicToken: string): string {
+  const base = origin.replace(/\/+$/, "");
+  return `${base}/resultado/${encodeURIComponent(publicToken)}`;
 }
 
 const PQ_LOG = "[PIPOCA_PRINT_QUEUE_AUTO]";
