@@ -6,15 +6,13 @@ import { getPrintItemImage } from "@/lib/pipoca/print-queue.functions";
 export const Route = createFileRoute("/imprimir/$queueId")({
   head: () => ({
     meta: [
-      { title: "Imprimir — Pipoca & Cena" },
+      { title: "Imprimir — Projeto Natal" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: PrintPage,
 });
 
-const BAR_URL =
-  "https://brsplarbpylygnsakyjf.supabase.co/storage/v1/object/public/pipoca-reference-assets/print/barra-impressao-v1.jpg.jpg";
 const CANVAS_W = 1200;
 const CANVAS_H = 1800;
 
@@ -34,22 +32,13 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-async function composePrintImage(
-  photoUrl: string,
-  queueId: string,
-): Promise<{ blobUrl: string; barHeight: number; photoHeight: number }> {
+async function composePrintImage(photoUrl: string, queueId: string): Promise<string> {
   let photoObj: string | null = null;
-  let barObj: string | null = null;
   try {
-    [photoObj, barObj] = await Promise.all([
-      fetchAsObjectURL(photoUrl).catch(() => {
-        throw new Error("PHOTO_LOAD_FAILED");
-      }),
-      fetchAsObjectURL(BAR_URL).catch(() => {
-        throw new Error("BAR_LOAD_FAILED");
-      }),
-    ]);
-    const [photo, bar] = await Promise.all([loadImage(photoObj), loadImage(barObj)]);
+    photoObj = await fetchAsObjectURL(photoUrl).catch(() => {
+      throw new Error("PHOTO_LOAD_FAILED");
+    });
+    const photo = await loadImage(photoObj);
 
     const canvas = document.createElement("canvas");
     canvas.width = CANVAS_W;
@@ -59,15 +48,13 @@ async function composePrintImage(
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    const naturalBarHeight = Math.round(CANVAS_W * (bar.naturalHeight / bar.naturalWidth));
-    const maxBarHeight = Math.round(CANVAS_H * 0.2);
-    const barHeight = Math.min(naturalBarHeight, maxBarHeight);
-    const photoHeight = CANVAS_H - barHeight;
-
-    // object-fit: cover, object-position: center for the photo area
+    // object-fit: cover, object-position: center for the full card
     const srcRatio = photo.naturalWidth / photo.naturalHeight;
-    const dstRatio = CANVAS_W / photoHeight;
-    let sx = 0, sy = 0, sw = photo.naturalWidth, sh = photo.naturalHeight;
+    const dstRatio = CANVAS_W / CANVAS_H;
+    let sx = 0,
+      sy = 0,
+      sw = photo.naturalWidth,
+      sh = photo.naturalHeight;
     if (srcRatio > dstRatio) {
       // source wider → crop sides
       sw = photo.naturalHeight * dstRatio;
@@ -77,8 +64,7 @@ async function composePrintImage(
       sh = photo.naturalWidth / dstRatio;
       sy = (photo.naturalHeight - sh) / 2;
     }
-    ctx.drawImage(photo, sx, sy, sw, sh, 0, 0, CANVAS_W, photoHeight);
-    ctx.drawImage(bar, 0, photoHeight, CANVAS_W, barHeight);
+    ctx.drawImage(photo, sx, sy, sw, sh, 0, 0, CANVAS_W, CANVAS_H);
 
     const blob: Blob = await new Promise((resolve, reject) =>
       canvas.toBlob(
@@ -91,14 +77,11 @@ async function composePrintImage(
     console.log("[PIPOCA_PRINT_COMPOSE]", {
       queueId,
       canvas: `${CANVAS_W}x${CANVAS_H}`,
-      barHeight,
-      photoHeight,
       blobSize: blob.size,
     });
-    return { blobUrl, barHeight, photoHeight };
+    return blobUrl;
   } finally {
     if (photoObj) URL.revokeObjectURL(photoObj);
-    if (barObj) URL.revokeObjectURL(barObj);
   }
 }
 
@@ -116,16 +99,11 @@ function PrintPage() {
     try {
       const r = await getImage({ data: { queueId } });
       if (!r.imageUrl) throw new Error("PHOTO_LOAD_FAILED");
-      const { blobUrl } = await composePrintImage(r.imageUrl, queueId);
+      const blobUrl = await composePrintImage(r.imageUrl, queueId);
       setComposedUrl(blobUrl);
       setStatus("Pronto. Use o diálogo de impressão.");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "";
-      if (msg === "BAR_LOAD_FAILED") {
-        setError("Não foi possível carregar a barra de impressão.");
-      } else {
-        setError("Não foi possível preparar a foto para impressão.");
-      }
+      setError("Não foi possível preparar a foto para impressão.");
     }
   }
 
