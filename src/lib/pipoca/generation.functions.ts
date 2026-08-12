@@ -382,11 +382,8 @@ function containsAny(text: string, terms: string[]): boolean {
   return terms.some((term) => normalized.includes(term.toLocaleLowerCase("pt-BR")));
 }
 
-function analyzePrompt(positivePromptText: string, scenePackId: string): PromptDiagnostics {
-  const inspectedText = scenePackId === CIRCO_SCENE_PACK_ID
-    ? positivePromptText.replace(CIRCO_COLOR_INSTRUCTION, "")
-    : positivePromptText;
-  const contains_monochrome = containsAny(inspectedText, [
+function analyzePrompt(positivePromptText: string): PromptDiagnostics {
+  const contains_monochrome = containsAny(positivePromptText, [
     "monochrome",
     "black and white",
     "grayscale",
@@ -394,20 +391,7 @@ function analyzePrompt(positivePromptText: string, scenePackId: string): PromptD
     "monocromático",
     "monocromatico",
   ]);
-  const contains_sertao = containsAny(inspectedText, ["sertão", "sertao"]);
-  const contains_cangaco = containsAny(inspectedText, ["cangaço", "cangaco", "cangaceiro"]);
-  const contains_cinema_novo = containsAny(inspectedText, ["Cinema Novo", "Glauber Rocha"]);
-  const contains_circo = containsAny(inspectedText, ["circo", "circense", "cortinas", "teatral"]);
-  return {
-    contains_monochrome,
-    contains_sertao,
-    contains_cangaco,
-    contains_cinema_novo,
-    contains_circo,
-    prompt_contamination_detected:
-      scenePackId === CIRCO_SCENE_PACK_ID &&
-      containsAny(inspectedText, CIRCO_FORBIDDEN_POSITIVE_TERMS),
-  };
+  return { contains_monochrome };
 }
 
 function buildPromptText(
