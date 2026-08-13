@@ -33,18 +33,20 @@
   --color-cinema: var(--cinema);
   --color-gold: var(--gold);
 
-  --font-display: "Bebas Neue", "Impact", sans-serif;
+  --font-display: "Cormorant Garamond", Georgia, serif;
   --font-sans: "DM Sans", system-ui, sans-serif;
 }
 
 :root {
   --radius: 0.75rem;
 
-  --cinema: #06122e;
-  --gold: #F8BA32;
-  --brand-blue: #2E5BE5;
-  --brand-green: #92C37A;
-  --brand-red: #E0463A;
+  /* Projeto Natal — paleta noite de inverno premium */
+  --cinema: #0A1A2F;          /* céu de inverno, quase meia-noite */
+  --gold: #E7C88A;            /* champanhe quente (luz natalina) */
+  --brand-blue: #6E9CC4;      /* azul gelo */
+  --brand-green: #2F5D4B;     /* pinheiro profundo */
+  --brand-red: #B4574B;       /* vinho natalino discreto */
+  --snow: #EEF4FA;
 
   --background: var(--cinema);
   --foreground: oklch(1 0 0);
@@ -70,7 +72,7 @@
 @layer base {
   * { border-color: var(--color-border); }
   html, body {
-    background-color: #06122e;
+    background-color: #0A1A2F;
     color: var(--color-foreground);
     font-family: var(--font-sans);
   }
@@ -114,12 +116,13 @@
 
 @layer utilities {
   .font-display { font-family: var(--font-display); letter-spacing: 0.02em; }
-  .text-gold { color: #F8BA32; }
-  .bg-gold { background-color: #F8BA32; }
-  .border-gold { border-color: #F8BA32; }
-  .bg-cinema { background-color: #06122e; }
-  .text-brand-blue { color: #2E5BE5; }
-  .bg-brand-blue { background-color: #2E5BE5; }
+  .text-gold { color: #E7C88A; }
+  .bg-gold { background-color: #E7C88A; }
+  .border-gold { border-color: #E7C88A; }
+  .bg-cinema { background-color: #0A1A2F; }
+  .text-brand-blue { color: #6E9CC4; }
+  .bg-brand-blue { background-color: #6E9CC4; }
+  .text-snow { color: #EEF4FA; }
 
   /* ---------- Pipoca film selection (adaptive — sized by JS via ResizeObserver) ---------- */
   .pipoca-film-choose-screen { display: flex; flex-direction: column; width: 100%; overflow: hidden; }
@@ -237,19 +240,20 @@
     overflow: hidden;
   }
 
+  /* Neve suave — textura própria do Projeto Natal (sem assets herdados) */
   .brand-pattern {
-    background-image: url("/__l5e/assets-v1/c6d609ea-ed2f-42a5-a99f-1b967cf5f49f/pattern_brand.svg");
-    background-size: 900px auto;
+    background-image:
+      radial-gradient(circle at 12% 18%, rgba(255,255,255,0.55) 0 1.2px, transparent 1.6px),
+      radial-gradient(circle at 68% 42%, rgba(255,255,255,0.4) 0 1.5px, transparent 2px),
+      radial-gradient(circle at 38% 78%, rgba(255,255,255,0.35) 0 1px, transparent 1.4px),
+      radial-gradient(circle at 88% 88%, rgba(255,255,255,0.5) 0 1.3px, transparent 1.8px);
+    background-size: 220px 220px, 340px 340px, 180px 180px, 400px 400px;
     background-repeat: repeat;
-    background-position: center;
   }
 
   .brand-stripe {
-    height: 4px;
-    background: linear-gradient(90deg,
-      #2E5BE5 0%, #2E5BE5 33%,
-      #F8BA32 33%, #F8BA32 66%,
-      #92C37A 66%, #92C37A 100%);
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(231,200,138,0.75) 50%, transparent 100%);
   }
 
   /* Film grain texture */
@@ -284,10 +288,10 @@
     100% { background-position: 0% 50%; }
   }
   .bg-aurora {
-    background: radial-gradient(ellipse at 20% 20%, rgba(248,186,50,0.22) 0%, transparent 60%),
-                radial-gradient(ellipse at 80% 80%, rgba(46,91,229,0.20) 0%, transparent 55%),
-                radial-gradient(ellipse at 50% 50%, rgba(146,195,122,0.14) 0%, transparent 50%),
-                #06122e;
+    background: radial-gradient(ellipse at 20% 15%, rgba(231,200,138,0.16) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 80%, rgba(110,156,196,0.20) 0%, transparent 58%),
+                radial-gradient(ellipse at 50% 55%, rgba(47,93,75,0.14) 0%, transparent 55%),
+                #0A1A2F;
     background-size: 200% 200%;
     animation: bg-aurora 12s ease-in-out infinite;
   }
@@ -337,8 +341,8 @@
   }
 
   @keyframes glow-breathe {
-    0%, 100% { box-shadow: 0 0 30px rgba(248,186,50,0.45), 0 0 70px rgba(248,186,50,0.25); }
-    50% { box-shadow: 0 0 50px rgba(248,186,50,0.7), 0 0 110px rgba(248,186,50,0.4); }
+    0%, 100% { box-shadow: 0 0 24px rgba(231,200,138,0.32), 0 0 60px rgba(231,200,138,0.16); }
+    50% { box-shadow: 0 0 38px rgba(231,200,138,0.5), 0 0 96px rgba(231,200,138,0.26); }
   }
   .glow-pulse { animation: glow-breathe 2.2s ease-in-out infinite; }
 
@@ -371,7 +375,7 @@
   }
   .story-pop { animation: story-pop 420ms cubic-bezier(.2,.8,.2,1) both; }
 
-  /* Wedge transition between screens (Tela Brasil signature) */
+  /* Wedge transition between screens */
   @keyframes wedge-tl-in {
     0%   { transform: translate(-100%, -100%); }
     50%  { transform: translate(0, 0); }
@@ -396,32 +400,5 @@
     display: inline-block;
     min-width: 1.8em;
     text-align: center;
-  }
-
-  /* Tela Brasil signature card with chamfered corners */
-  .tb-card {
-    --tb-cut: 22px;
-    --tb-c1: #F8BA32;
-    --tb-c2: #2E5BE5;
-    position: relative;
-    clip-path: polygon(
-      var(--tb-cut) 0, 100% 0,
-      100% calc(100% - var(--tb-cut)),
-      calc(100% - var(--tb-cut)) 100%,
-      0 100%, 0 var(--tb-cut)
-    );
-  }
-  .tb-card::before, .tb-card::after {
-    content: ""; position: absolute;
-    width: var(--tb-cut); height: var(--tb-cut);
-    pointer-events: none;
-  }
-  .tb-card::before {
-    top: 0; left: 0; background: var(--tb-c1);
-    clip-path: polygon(0 0, 100% 0, 0 100%);
-  }
-  .tb-card::after {
-    bottom: 0; right: 0; background: var(--tb-c2);
-    clip-path: polygon(100% 0, 100% 100%, 0 100%);
   }
 }
