@@ -403,13 +403,13 @@ function buildPromptText(
 
   // 1. Reference role declaration — strict visual priority
   parts.push(
-    "Image 1 is the PRIMARY FACE IDENTITY REFERENCE and has the highest priority. It is a close, guided portrait of the visitor and is the absolute source of truth for facial identity.",
+    "Image 1 is the PRIMARY FACE IDENTITY REFERENCE and has the highest priority. It is a close, guided portrait of the visitor (or group of visitors) and is the absolute source of truth for facial identity.",
   );
   parts.push(
     "Use Image 1 for face shape, eyes, nose, mouth, jawline, skin tone, hair, facial hair (beard/stubble), eyebrows, glasses if present, apparent age, and overall recognizable identity.",
   );
   parts.push(
-    "Image 2 is the FULL APPEARANCE, CLOTHING AND BODY PROPORTION REFERENCE. It shows the same visitor framed from the waist up.",
+    "Image 2 is the FULL APPEARANCE, CLOTHING AND BODY PROPORTION REFERENCE. It shows the same visitor or group framed from the waist up, and defines how many people must appear in the final image.",
   );
   parts.push(
     "Use Image 2 for posture, body proportions, full hair shape, shoulders, torso, clothing texture, and general appearance — but always defer to Image 1 for the face itself.",
@@ -436,7 +436,10 @@ function buildPromptText(
     "HARD RULES (highest priority): facial identity has absolute priority. The visitor's facial identity from Image 1 must remain the highest priority and must not be altered by any other reference. Do NOT redraw the face. Do NOT blend the face with another person. Do NOT stylize the face to match the scene.",
   );
   parts.push(
-    "Exactly one person in the final image, and that person must be clearly recognizable as the visitor from Image 1 — not a similar person.",
+    "Preserve EXACTLY the same number of people present in the reference images — one person, a couple, a family or a small group. Never add extra people and never remove or merge anyone.",
+  );
+  parts.push(
+    "Every person must remain individually recognizable, with distinct faces, natural adult/child proportions and a balanced group composition. No fused or duplicated faces.",
   );
   parts.push(
     "Wardrobe and environment must adapt to fit the visitor. The visitor's face must NOT be altered to fit the style.",
@@ -450,7 +453,7 @@ function buildPromptText(
 
   // 3. Neutral composition
   parts.push(
-    "Vertical 4:5 framing, cinematic composition, shallow depth of field. The visitor anchored in the environment as if captured in a film still.",
+    "Vertical 4:5 framing, photographic postcard composition. Everyone anchored naturally in the environment, with the landmark from Image 3 clearly visible behind them.",
   );
   parts.push(
     "FRAMING: keep the selected scene pack framing visible and legible. Avoid close-up, very tight framing, extreme close-up, or overly-approximated portrait that cuts the costume and erases the environment.",
