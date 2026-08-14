@@ -41,15 +41,7 @@ export function usePipocaFilms(): State {
       }
 
       setState({
-        films: (data ?? [])
-          .filter((row) => {
-            // Ocultação temporária do filme "Carandiru" nos painéis de seleção.
-            // Não altera prompts nem a estrutura de geração — apenas esconde da UI.
-            const title = (row.title ?? "").toLowerCase();
-            const slug = (row.slug ?? "").toLowerCase();
-            return !title.includes("carandiru") && !slug.includes("carandiru");
-          })
-          .map(mapFilmRow),
+        films: (data ?? []).map(mapFilmRow),
         loading: false,
         error: null,
       });
