@@ -1563,7 +1563,7 @@ function Result({
     }
   }, [slide, onRestart]);
 
-  const bgUrl = imageUrl ?? movie.posterUrl || null;
+  const bgUrl = imageUrl ?? (movie.posterUrl || null);
 
   return (
     <Screen aurora>
