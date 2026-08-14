@@ -347,15 +347,15 @@ function SectionOverview({ data }: { data: DadosSummary }) {
           Projeto Natal
         </div>
         <div className="text-base sm:text-xl text-white/85 leading-relaxed max-w-3xl">
-          Um panorama em tempo real da experiência itinerante por todo o país.
-          Cada captura representa uma pessoa que viveu o cinema brasileiro
-          através da Pipoca &amp; Cena.
+          Um panorama em tempo real da experiência. Cada captura representa uma
+          pessoa que levou para casa seu cartão-postal natalino.
         </div>
         {data.topFilms.length > 0 && (
           <div className="mt-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="text-[10px] uppercase tracking-[0.3em] text-white/50">
-              Filme mais escolhido
+              Cenário mais escolhido
             </span>
+
             <span
               className="text-base sm:text-lg font-semibold"
               style={{ color: COLOR_GOLD }}
