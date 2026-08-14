@@ -32,7 +32,7 @@ function slugify(s: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 60) || "cena";
+    .slice(0, 60) || "natal";
 }
 
 /**
@@ -71,7 +71,7 @@ export const getPublicPipocaResult = createServerFn({ method: "POST" })
       .select("title")
       .eq("id", gen.film_id)
       .maybeSingle();
-    const filmTitle = film?.title ?? "Tela Brasil";
+    const filmTitle = film?.title ?? "Natal em Brasília";
 
     const { data: signed, error: sErr } = await supabaseAdmin.storage
       .from(GENERATED_BUCKET)
@@ -83,6 +83,6 @@ export const getPublicPipocaResult = createServerFn({ method: "POST" })
       filmTitle,
       imageUrl: signed.signedUrl,
       createdAt: gen.created_at,
-      downloadFilename: `pipoca-e-cena-${slugify(filmTitle)}.jpg`,
+      downloadFilename: `cartao-postal-natal-${slugify(filmTitle)}.jpg`,
     };
   });

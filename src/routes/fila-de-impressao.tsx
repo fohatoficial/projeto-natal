@@ -16,7 +16,7 @@ import {
 export const Route = createFileRoute("/fila-de-impressao")({
   head: () => ({
     meta: [
-      { title: "Fila de impressão — Pipoca & Cena" },
+      { title: "Fila de impressão — Projeto Natal" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
