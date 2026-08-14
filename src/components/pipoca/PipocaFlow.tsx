@@ -28,6 +28,7 @@ import {
   PRIVACY_CHECKBOX_LABEL,
 } from "@/lib/pipoca/privacy-notice";
 import { formatWhatsappMask, isValidBrWhatsapp } from "@/lib/pipoca/whatsapp";
+import { EXPERIENCE_NAME, SPONSOR } from "@/lib/pipoca/branding";
 
 
 
@@ -789,12 +790,12 @@ function Stories({
   movie,
   firstName,
   onDone,
-  onChangeFilm,
+  onRestart,
 }: {
   movie: Movie;
   firstName?: string;
   onDone: () => void;
-  onChangeFilm: () => void;
+  onRestart: () => void;
 }) {
   const [idx, setIdx] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -867,7 +868,7 @@ function Stories({
       />
 
       <div className="relative z-20 flex-1 min-h-0 w-full flex flex-col items-center justify-center max-w-2xl py-3 pointer-events-none">
-        {idx === 0 && <StoryFilm movie={movie} firstName={firstName} />}
+        {idx === 0 && <StoryScene movie={movie} firstName={firstName} />}
         {idx === 1 && <StoryTwoPhotos firstName={firstName} />}
         {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} firstName={firstName} />}
       </div>
@@ -878,11 +879,11 @@ function Stories({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onChangeFilm();
+              onRestart();
             }}
             className="text-xs uppercase tracking-[0.3em] text-white/65 hover:text-white underline underline-offset-4 py-2 px-3"
           >
-            Trocar filme
+            Voltar ao início
           </button>
         ) : (
           <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
@@ -894,29 +895,29 @@ function Stories({
   );
 }
 
-function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
-  const prefix = firstName ? `${firstName.toUpperCase()}, você escolheu` : "Você escolheu";
+function StoryScene({ movie, firstName }: { movie: Movie; firstName?: string }) {
+  const prefix = firstName ? `${firstName.toUpperCase()}, seu cenário é` : "Seu cenário é";
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
         {prefix}
       </span>
-      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
-        <img
-          src={movie.posterUrl}
-          alt={movie.title}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
-        <div className="absolute top-3 left-3">
-          <span className="inline-block bg-gold text-cinema text-[10px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded">
-            Tela Brasil
-          </span>
-        </div>
+      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/12 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] bg-white/5">
+        {movie.posterUrl ? (
+          <img
+            src={movie.posterUrl}
+            alt={movie.title}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : null}
+        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/50 to-transparent pointer-events-none" />
         <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
-          <h1 className="font-display text-3xl sm:text-4xl text-white leading-[0.95]">
+          <h1 className="font-display text-3xl sm:text-4xl text-snow leading-[1.05]">
             {movie.title}
           </h1>
+          <p className="mt-1 text-xs sm:text-sm text-white/70">
+            Neve suave, luzes de Natal e clima abaixo de zero.
+          </p>
         </div>
       </div>
     </div>
@@ -929,6 +930,9 @@ function StoryTwoPhotos({ firstName }: { firstName?: string }) {
       <h1 className="font-display text-3xl sm:text-5xl text-white leading-[0.95]">
         {firstName ? `${firstName}, vamos` : "Vamos"} tirar <span className="text-gold">duas fotos</span>
       </h1>
+      <p className="text-sm sm:text-base text-white/75 -mt-2">
+        Você pode aparecer sozinho, em casal ou com sua família.
+      </p>
       <div className="grid grid-cols-2 gap-4 w-full">
         <div className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-4">
           <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="#F8BA32" strokeWidth="1.8">
@@ -936,7 +940,7 @@ function StoryTwoPhotos({ firstName }: { firstName?: string }) {
             <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" strokeLinecap="round" />
           </svg>
           <p className="text-xs sm:text-sm text-white/85 leading-snug">
-            Uma foto <span className="text-gold">de perto</span> para reconhecer seu rosto
+            Uma foto <span className="text-gold">de perto</span> para reconhecer os rostos
           </p>
         </div>
         <div className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-4">
@@ -945,7 +949,7 @@ function StoryTwoPhotos({ firstName }: { firstName?: string }) {
             <path d="M8 22v-7l-2-4h12l-2 4v7" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <p className="text-xs sm:text-sm text-white/85 leading-snug">
-            Uma foto <span className="text-gold">mais distante</span> para registrar sua postura
+            Uma foto <span className="text-gold">mais distante</span> para registrar todo mundo
           </p>
         </div>
       </div>
@@ -1073,12 +1077,12 @@ function Camera({
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
   const title =
-    variant === "identity" ? "OLHE PARA A CÂMERA" : "DÊ UM PASSO PARA TRÁS";
+    variant === "identity" ? "Olhem para a câmera" : "Deem um passo para trás";
   const hint =
     variant === "identity"
-      ? "APROXIME-SE ATÉ APARECER O ROSTO, O CABELO E OS OMBROS"
-      : "APAREÇA DA CABEÇA ATÉ A CINTURA";
-  const subtitle = variant === "identity" ? "FOTO 1 DE 2" : "FOTO 2 DE 2";
+      ? "Aproxime-se até aparecerem rosto, cabelo e ombros de quem for aparecer"
+      : "Sozinho, em casal ou com a família — todos da cabeça até a cintura";
+  const subtitle = variant === "identity" ? "Foto 1 de 2" : "Foto 2 de 2";
   const countingDown = count !== null && count > 0;
 
   return (
@@ -1118,7 +1122,7 @@ function Camera({
               letterSpacing: "0.2em",
             }}
           >
-            FIQUE PARADO
+FIQUEM PARADOS
           </p>
         ) : null}
 
@@ -1218,7 +1222,7 @@ function CameraError({
       </div>
       <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
         {copy.canRetry ? <PrimaryCta onClick={onRetry}>Tentar novamente</PrimaryCta> : null}
-        <GhostBtn onClick={onBack}>Voltar para os filmes</GhostBtn>
+        <GhostBtn onClick={onBack}>Voltar ao início</GhostBtn>
       </div>
     </Screen>
   );
@@ -1363,7 +1367,7 @@ function Processing({
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setIconIdx((i) => (i + 1) % CINEMA_ICONS.length);
+      setIconIdx((i) => (i + 1) % WINTER_ICONS.length);
     }, 1400);
     return () => clearInterval(interval);
   }, []);
@@ -1405,7 +1409,7 @@ function Processing({
 
   return (
     <Screen aurora>
-      <Header subtitle="Criando sua cena" />
+      <Header subtitle="Criando seu cartão-postal" />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center text-center gap-6 sm:gap-8 max-w-xl">
         <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full border border-gold/20 grid place-items-center relative animate-badge-in">
@@ -1424,7 +1428,7 @@ function Processing({
           ))}
           {/* Rotating cinema icon */}
           <div className="relative w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 grid place-items-center">
-            {CINEMA_ICONS.map((Icon, i) => (
+            {WINTER_ICONS.map((Icon, i) => (
               <div
                 key={i}
                 className={`absolute inset-0 grid place-items-center text-gold transition-all duration-500 ${
@@ -1442,11 +1446,12 @@ function Processing({
 
 
         <div className="space-y-2">
-          <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-none">
-            {firstName ? `${firstName}, aguarde...` : <>Luzes, câmera, <span className="text-gold">ação</span>...</>}
+          <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-snow leading-tight">
+            {firstName ? `${firstName}, ` : ""}preparando seu{" "}
+            <span className="text-gold">Natal abaixo de zero</span>...
           </h1>
           <p className="text-white/70 text-sm sm:text-base">
-            Inspirado em <span className="text-white">{movie.title}</span>
+            {movie.title}
           </p>
         </div>
 
@@ -1558,7 +1563,7 @@ function Result({
     }
   }, [slide, onRestart]);
 
-  const bgUrl = imageUrl ?? movie.posterUrl;
+  const bgUrl = imageUrl ?? movie.posterUrl || null;
 
   return (
     <Screen aurora>
@@ -1597,27 +1602,33 @@ function Result({
         {slide === 0 && (
           <div className="flex flex-col items-center gap-3 sm:gap-4 w-full h-full animate-fade-up">
             <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95]">
-              {firstName ? `${firstName}, sua ` : "Sua "}<span className="text-gold">cena</span> está pronta
+              {firstName ? `${firstName}, seu ` : "Seu "}
+              <span className="text-gold">cartão-postal</span> está pronto
             </h1>
 
             <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto flex items-center justify-center">
               <img
                 src={imageUrl ?? movie.posterUrl}
-                alt="Cena gerada"
+                alt="Cartão-postal natalino gerado"
                 className="max-w-full max-h-full object-contain rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]"
               />
             </div>
 
             <span className="text-[10px] uppercase tracking-[0.3em] text-white/60">
-              Inspirado em {movie.title}
+              {movie.title}
             </span>
+            {SPONSOR.institutionalMessage ? (
+              <span className="text-[11px] text-white/70 text-center max-w-md">
+                {SPONSOR.institutionalMessage}
+              </span>
+            ) : null}
           </div>
         )}
 
         {slide === 1 && (
           <div className="flex flex-col items-center gap-4 sm:gap-5 w-full animate-fade-up">
             <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95] text-center">
-              SUA FOTO JÁ FOI ENVIADA PARA <span className="text-gold">IMPRESSÃO</span>
+              Seu cartão-postal já foi enviado para <span className="text-gold">impressão</span>
             </h1>
             <p className="text-sm sm:text-base text-white/80 text-center">
               Dirija-se ao balcão para retirar sua foto.
@@ -1724,7 +1735,7 @@ function VisitorRegistration({
       <Header />
       <div className="relative z-10 flex-1 min-h-0 w-full max-w-md mx-auto flex flex-col items-stretch justify-center gap-4 py-3">
         <h1 className="font-display text-3xl sm:text-4xl text-white text-center leading-[0.95]">
-          Antes de entrar em <span className="text-gold">cena</span>
+          Antes de criar seu <span className="text-gold">cartão-postal</span>
         </h1>
         <label className="flex flex-col gap-1 text-left">
           <span className="text-xs uppercase tracking-[0.25em] text-white/70">Nome</span>
@@ -1761,7 +1772,7 @@ function VisitorRegistration({
           >
             Aviso de Privacidade
           </button>{" "}
-          e autorizo o tratamento do meu nome, WhatsApp e imagens para criar, disponibilizar e produzir minha foto personalizada.
+          e autorizo o tratamento do meu nome, WhatsApp e imagens para criar, disponibilizar e produzir meu cartão-postal natalino.
         </p>
         {error && (
           <div className="rounded-md border border-red-400/40 bg-red-950/30 p-3 text-center">
