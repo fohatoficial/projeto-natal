@@ -14,7 +14,7 @@ import { getDadosSummary, type DadosSummary } from "@/lib/pipoca/dados.functions
 export const Route = createFileRoute("/dados")({
   head: () => ({
     meta: [
-      { title: "Dados — Pipoca & Cena" },
+      { title: "Dados — Projeto Natal" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -126,7 +126,7 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
         <div className="px-4 sm:px-8 pt-3 pb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="min-w-0">
             <div className="text-[10px] sm:text-xs tracking-[0.3em] uppercase text-white/50">
-              Pipoca &amp; Cena · Tela Brasil
+              Projeto Natal · Natal em Brasília
             </div>
             <h1 className="font-display text-lg sm:text-2xl truncate">
               Painel de resultados
@@ -189,7 +189,7 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
         )}
 
         <footer className="pt-6 pb-10 text-center text-[11px] text-white/40">
-          Pipoca &amp; Cena · Tela Brasil
+          Projeto Natal · Natal em Brasília
         </footer>
       </main>
 
@@ -344,18 +344,18 @@ function SectionOverview({ data }: { data: DadosSummary }) {
         }}
       >
         <div className="text-[11px] uppercase tracking-[0.3em] text-white/50">
-          Tela Brasil · Pipoca &amp; Cena
+          Projeto Natal
         </div>
         <div className="text-base sm:text-xl text-white/85 leading-relaxed max-w-3xl">
-          Um panorama em tempo real da experiência itinerante por todo o país.
-          Cada captura representa uma pessoa que viveu o cinema brasileiro
-          através da Pipoca &amp; Cena.
+          Um panorama em tempo real da experiência. Cada captura representa uma
+          pessoa que levou para casa seu cartão-postal natalino.
         </div>
         {data.topFilms.length > 0 && (
           <div className="mt-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="text-[10px] uppercase tracking-[0.3em] text-white/50">
-              Filme mais escolhido
+              Cenário mais escolhido
             </span>
+
             <span
               className="text-base sm:text-lg font-semibold"
               style={{ color: COLOR_GOLD }}

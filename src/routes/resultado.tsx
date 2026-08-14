@@ -3,17 +3,17 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 export const Route = createFileRoute("/resultado")({
   head: () => ({
     meta: [
-      { title: "Sua cena Pipoca & Cena — Tela Brasil" },
+      { title: "Seu cartão-postal natalino" },
       {
         name: "description",
         content:
-          "Baixe e compartilhe a sua imagem personalizada criada na experiência Pipoca & Cena do Tela Brasil.",
+          "Baixe e compartilhe o seu cartão-postal natalino criado com inteligência artificial.",
       },
-      { property: "og:title", content: "Sua cena — Pipoca & Cena" },
+      { property: "og:title", content: "Seu cartão-postal natalino" },
       {
         property: "og:description",
         content:
-          "Sua imagem personalizada criada na experiência Pipoca & Cena do Tela Brasil.",
+          "Seu cartão-postal natalino personalizado, pronto para baixar e compartilhar.",
       },
     ],
   }),

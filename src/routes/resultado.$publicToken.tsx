@@ -3,17 +3,16 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { getPublicPipocaResult, type PublicResult } from "@/lib/pipoca/public-result.functions";
 
-const LOGO_URL =
-  "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
+import { EXPERIENCE_NAME, SPONSOR } from "@/lib/pipoca/branding";
 
 export const Route = createFileRoute("/resultado/$publicToken")({
   head: () => ({
     meta: [
-      { title: "Sua cena Pipoca & Cena — Tela Brasil" },
+      { title: "Seu cartão-postal natalino" },
       { name: "robots", content: "noindex, nofollow" },
       {
         name: "description",
-        content: "Sua cena cinematográfica gerada na experiência Pipoca & Cena.",
+        content: "Seu cartão-postal natalino gerado com inteligência artificial.",
       },
     ],
   }),
@@ -105,8 +104,8 @@ function PublicResultPage() {
   async function handleShare() {
     if (status.kind !== "ready") return;
     const shareUrl = window.location.href;
-    const title = "Minha cena — Pipoca & Cena";
-    const text = "Inspirado em cinema brasileiro · Pipoca & Cena";
+    const title = "Meu cartão-postal natalino";
+    const text = "Criei meu cartão-postal de Natal com inteligência artificial.";
     if (navigator.share) {
       try {
         await navigator.share({ title, text, url: shareUrl });
@@ -123,41 +122,50 @@ function PublicResultPage() {
 
   return (
     <div
-      className="min-h-[100dvh] w-full bg-[#000C20] text-white"
+      className="min-h-[100dvh] w-full bg-cinema text-white"
       style={{
         paddingBottom: "max(env(safe-area-inset-bottom), 1.25rem)",
         paddingTop: "max(env(safe-area-inset-top), 1.25rem)",
       }}
     >
       <div className="mx-auto w-full max-w-md px-5 flex flex-col items-center">
-        <img src={LOGO_URL} alt="Tela Brasil" className="h-9 w-auto" />
-        <span className="mt-2 text-[10px] uppercase tracking-[0.3em] text-gold">
-          Pipoca &amp; Cena
+        {SPONSOR.sponsorLogoUrl ? (
+          <img
+            src={SPONSOR.sponsorLogoUrl}
+            alt={SPONSOR.sponsorName ?? "Patrocinador"}
+            className="h-8 w-auto opacity-95"
+          />
+        ) : null}
+        <span className="font-display text-2xl text-snow">
+          {SPONSOR.actionName ?? EXPERIENCE_NAME}
+        </span>
+        <span className="mt-1 text-[10px] uppercase tracking-[0.3em] text-gold">
+          Cartão-postal natalino
         </span>
 
         {status.kind === "loading" && (
           <div className="mt-16 flex flex-col items-center gap-4">
             <div className="w-14 h-14 rounded-full border-2 border-transparent border-t-gold animate-spin" />
-            <p className="text-white/70 text-sm">Carregando sua cena…</p>
+            <p className="text-white/70 text-sm">Carregando seu cartão-postal…</p>
           </div>
         )}
 
         {status.kind === "missing" && (
           <ErrorBlock
-            title="RESULTADO NÃO ENCONTRADO"
-            body="Este link não corresponde a nenhuma cena. Verifique o QR Code e tente novamente."
+            title="Resultado não encontrado"
+            body="Este link não corresponde a nenhum cartão-postal. Verifique o QR Code e tente novamente."
           />
         )}
         {status.kind === "pending" && (
           <ErrorBlock
-            title="SUA CENA AINDA ESTÁ SENDO PREPARADA"
+            title="Seu cartão-postal ainda está sendo preparado"
             body="Aguarde alguns instantes e atualize a página."
           />
         )}
         {status.kind === "imageUnavailable" && (
           <ErrorBlock
-            title="NÃO FOI POSSÍVEL CARREGAR SUA CENA"
-            body="A imagem desta cena não está disponível no momento."
+            title="Não foi possível carregar seu cartão-postal"
+            body="A imagem não está disponível no momento."
           />
         )}
         {status.kind === "error" && (
@@ -167,16 +175,16 @@ function PublicResultPage() {
         {status.kind === "ready" && (
           <>
             <h1 className="font-display text-3xl sm:text-4xl text-center mt-6 leading-[0.95]">
-              SUA CENA ESTÁ <span className="text-gold">PRONTA</span>
+              Seu cartão-postal está <span className="text-gold">pronto</span>
             </h1>
             <p className="mt-2 text-center text-sm text-white/70">
-              Inspirado em <span className="text-white">{status.data.filmTitle}</span>
+              {status.data.filmTitle}
             </p>
 
             <div className="mt-5 w-full rounded-xl overflow-hidden border border-white/15 bg-black shadow-2xl">
               <img
                 src={status.data.imageUrl}
-                alt={`Cena inspirada em ${status.data.filmTitle}`}
+                alt={`Cartão-postal natalino — ${status.data.filmTitle}`}
                 className="block w-full h-auto"
               />
             </div>
@@ -200,7 +208,7 @@ function PublicResultPage() {
 
               <div className="rounded-md border border-gold/40 bg-gold/5 p-3 text-center">
                 <p className="font-display text-sm uppercase tracking-wider text-gold">
-                  Sua foto já foi enviada para impressão
+                  Seu cartão-postal já foi enviado para impressão
                 </p>
                 <p className="mt-1 text-[11px] text-white/75">
                   Dirija-se ao balcão para retirar sua foto.
@@ -208,8 +216,22 @@ function PublicResultPage() {
               </div>
             </div>
 
+            {/* Área reservada para o patrocinador (a definir). */}
+            {SPONSOR.institutionalMessage || SPONSOR.sponsorName ? (
+              <div className="mt-6 w-full rounded-xl border border-white/10 bg-white/5 p-4 text-center">
+                {SPONSOR.institutionalMessage ? (
+                  <p className="text-sm text-white/80">{SPONSOR.institutionalMessage}</p>
+                ) : null}
+                {SPONSOR.sponsorName ? (
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.3em] text-white/50">
+                    Oferecido por {SPONSOR.sponsorName}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
             <p className="mt-6 text-[10px] uppercase tracking-[0.3em] text-white/40 text-center">
-              Tela Brasil · {new Date(status.data.createdAt).toLocaleDateString("pt-BR")}
+              {new Date(status.data.createdAt).toLocaleDateString("pt-BR")}
             </p>
           </>
         )}

@@ -28,6 +28,7 @@ import {
   PRIVACY_CHECKBOX_LABEL,
 } from "@/lib/pipoca/privacy-notice";
 import { formatWhatsappMask, isValidBrWhatsapp } from "@/lib/pipoca/whatsapp";
+import { EXPERIENCE_NAME, SPONSOR } from "@/lib/pipoca/branding";
 
 
 
@@ -44,62 +45,58 @@ type Step =
 
 type CameraVariant = "identity" | "appearance";
 
-const LOGO_URL =
-  "/__l5e/assets-v1/ebc60a74-6a98-4a67-97b1-950064f94104/logo_tela_brasil_light.svg";
-
 const LOADING_PHRASES = [
-  "Preparando o cenário...",
-  "Ajustando luz e atmosfera...",
-  "Colocando você no centro da cena...",
-  "Finalizando sua imagem cinematográfica...",
+  "Preparando seu Natal abaixo de zero...",
+  "Fazendo a neve cair sobre Brasília...",
+  "Acendendo as luzes da Catedral...",
+  "Finalizando seu cartão-postal...",
 ];
 
-const CinemaIconClapper = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-    <path d="M3 9.5 21 7l-.5-2.5L2.5 7 3 9.5Z" />
-    <path d="M3 9.5V20a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9.5" />
-    <path d="m7 8 1.5-3M12 7.5 13.5 4.5M17 7l1.5-3" />
+const IconSnowflake = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+    <path d="M12 2v20M2 12h20M5 5l14 14M19 5 5 19" />
+    <path d="M12 6l-2.2 2.2M12 6l2.2 2.2M12 18l-2.2-2.2M12 18l2.2-2.2M6 12l2.2-2.2M6 12l2.2 2.2M18 12l-2.2-2.2M18 12l-2.2 2.2" />
   </svg>
 );
-const CinemaIconPopcorn = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-    <path d="M18 8a2 2 0 0 0-2-2 3 3 0 0 0-5.66-1A3 3 0 0 0 6 8a2 2 0 0 0-2 2v1l2 10h12l2-10V10a2 2 0 0 0-2-2Z" />
-    <path d="M10 11v9M14 11v9M8 21h8" />
+const IconPine = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+    <path d="M12 3 7 10h3l-4 6h5v5h2v-5h5l-4-6h3L12 3Z" />
   </svg>
 );
-const CinemaIconFilm = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-    <rect x="3" y="3" width="18" height="18" rx="2" />
-    <path d="M7 3v18M17 3v18M3 8h4M3 12h4M3 16h4M17 8h4M17 12h4M17 16h4" />
+const IconGift = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+    <rect x="3" y="9" width="18" height="12" rx="1.5" />
+    <path d="M3 13h18M12 9v12M12 9s-1.5-5-4.5-5S6 9 12 9Zm0 0s1.5-5 4.5-5S18 9 12 9Z" />
   </svg>
 );
-const CinemaIconStar = () => (
+const IconPostcard = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+    <rect x="2.5" y="5" width="19" height="14" rx="2" />
+    <path d="M14 9h5M14 12h5M14 15h3" />
+    <circle cx="8" cy="11" r="2" />
+    <path d="M4.5 16c1-2 2-3 3.5-3s2.5 1 3.5 3" />
+  </svg>
+);
+const IconStar = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
     <path d="m12 2 2.9 6.9L22 10l-5.5 4.6L18.2 22 12 18.3 5.8 22l1.7-7.4L2 10l7.1-1.1L12 2Z" />
   </svg>
 );
-const CinemaIconCamera = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-    <path d="M3 7h3l2-2h8l2 2h3v12H3z" />
-    <circle cx="12" cy="13" r="3.5" />
-  </svg>
-);
-const CinemaIconSparkles = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+const IconSparkles = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
     <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />
     <circle cx="12" cy="12" r="2" fill="currentColor" />
   </svg>
 );
-const CINEMA_ICONS = [
-  CinemaIconClapper,
-  CinemaIconPopcorn,
-  CinemaIconFilm,
-  CinemaIconCamera,
-  CinemaIconStar,
-  CinemaIconSparkles,
+const WINTER_ICONS = [
+  IconSnowflake,
+  IconPine,
+  IconPostcard,
+  IconGift,
+  IconStar,
+  IconSparkles,
 ];
 
-const PAGE_SIZE = 4;
 const COUNTDOWN_SECONDS = 10;
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -233,8 +230,8 @@ export function PipocaFlow() {
         const message = e instanceof Error ? e.message : String(e ?? "");
         setGenError(
           message.includes("CROSS_FILM_PROMPT_CONTAMINATION")
-            ? "Não foi possível preparar o estilo deste filme. Tente novamente."
-            : "Não conseguimos iniciar sua cena.",
+            ? "Não foi possível preparar este cenário. Tente novamente."
+            : "Não conseguimos criar seu cartão-postal.",
         );
       }
     },
@@ -354,12 +351,12 @@ export function PipocaFlow() {
   return (
     <div className="bg-cinema text-white relative">
       {step === "choose" && (
-        <Choose
-          movies={films}
+        <Welcome
+          film={films[0] ?? null}
           loading={loading}
           error={error}
-          onPick={(m) => {
-            console.log(`${UX} filme selecionado`, { id: m.id, title: m.title });
+          onStart={(m) => {
+            console.log(`${UX} cenário selecionado`, { id: m.id, title: m.title });
             transitionTo(() => {
               setSelected(m);
               setStep("visitor_registration");
@@ -393,7 +390,7 @@ export function PipocaFlow() {
             console.log(`${UX} stories concluídos, abrindo câmera`);
             transitionTo(() => setStep("camera_identity"));
           }}
-          onChangeFilm={() => {
+          onRestart={() => {
             releaseSharedCamera();
             transitionTo(() => {
               setSelected(null);
@@ -526,7 +523,7 @@ function GenerationError({
           </svg>
         </div>
         <h2 className="font-display text-3xl sm:text-4xl text-white leading-tight">
-          NÃO CONSEGUIMOS CRIAR SUA CENA
+          Não conseguimos criar seu cartão-postal
         </h2>
         <p className="text-white/75 text-sm sm:text-base">
           {message}
@@ -578,7 +575,7 @@ function UploadError({
           </svg>
         </div>
         <h2 className="font-display text-3xl sm:text-4xl text-white leading-tight">
-          NÃO CONSEGUIMOS ENVIAR SUA FOTO
+          Não conseguimos enviar sua foto
         </h2>
         <p className="text-white/75 text-sm sm:text-base">
           Sua foto continua neste dispositivo. Toque para tentar novamente.
@@ -622,15 +619,25 @@ function Screen({
   );
 }
 
-function Logo({ className = "h-8 sm:h-10 lg:h-14 w-auto" }: { className?: string }) {
-  return <img src={LOGO_URL} alt="Tela Brasil" className={className} />;
-}
-
+/**
+ * Assinatura da experiência. A área do patrocinador já existe aqui —
+ * quando SPONSOR.sponsorLogoUrl/actionName forem definidos, aparecem
+ * automaticamente, sem redesenho.
+ */
 function Header({ subtitle }: { subtitle?: string }) {
   return (
     <div className="relative z-10 flex flex-col items-center gap-1.5 shrink-0">
-      <Logo />
-      <div className="brand-stripe w-20 sm:w-28 lg:w-40 rounded-full opacity-90" />
+      {SPONSOR.sponsorLogoUrl ? (
+        <img
+          src={SPONSOR.sponsorLogoUrl}
+          alt={SPONSOR.sponsorName ?? "Patrocinador"}
+          className="h-7 sm:h-9 w-auto opacity-95"
+        />
+      ) : null}
+      <span className="font-display text-xl sm:text-2xl lg:text-3xl text-snow tracking-wide">
+        {SPONSOR.actionName ?? EXPERIENCE_NAME}
+      </span>
+      <div className="brand-stripe w-24 sm:w-32 lg:w-44 rounded-full opacity-90" />
       {subtitle ? (
         <span className="mt-1 text-[10px] sm:text-xs lg:text-sm uppercase tracking-[0.3em] text-gold/85">
           {subtitle}
@@ -684,303 +691,94 @@ function GhostBtn({
   );
 }
 
-/* ---------- Step 1: Choose film ---------- */
+/* ---------- Step 1: Boas-vindas (cenário único: Natal em Brasília) ---------- */
 
-function Choose({
-  movies,
+function Welcome({
+  film,
   loading,
   error,
-  onPick,
+  onStart,
 }: {
-  movies: Movie[];
+  film: Movie | null;
   loading: boolean;
   error: string | null;
-  onPick: (m: Movie) => void;
+  onStart: (m: Movie) => void;
 }) {
-  const [page, setPage] = useState(0);
-  const activeFilms = useMemo(
-    () => movies.filter((film) => film.active !== false),
-    [movies],
-  );
-  const totalPages = Math.max(1, Math.ceil(activeFilms.length / PAGE_SIZE));
-  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
-  const visibleFilms = activeFilms.slice(
-    safePage * PAGE_SIZE,
-    safePage * PAGE_SIZE + PAGE_SIZE,
-  );
-  const visibleCount = visibleFilms.length;
-
-  // Only correct the page if it falls out of range (no setState during render).
-  useEffect(() => {
-    if (page !== safePage) setPage(safePage);
-  }, [page, safePage]);
-
-  // ---- Adaptive film grid (measure real available area) ----
-  // Posters use vertical aspect 2:3 (W:H). We try candidate (cols x rows)
-  // layouts and pick the one that maximizes card width within the box.
-  const POSTER_ASPECT = 2 / 3; // width / height
-  const gridWrapRef = useRef<HTMLDivElement | null>(null);
-  const [gridBox, setGridBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
-
-  const resizeCountRef = useRef(0);
-  useEffect(() => {
-    const el = gridWrapRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const apply = (w: number, h: number) => {
-      setGridBox((prev) => {
-        if (
-          prev.w > 0 &&
-          prev.h > 0 &&
-          Math.abs(w - prev.w) <= 2 &&
-          Math.abs(h - prev.h) <= 2
-        ) {
-          return prev;
-        }
-        resizeCountRef.current += 1;
-        return { w, h };
-      });
-    };
-    const ro = new ResizeObserver((entries) => {
-      for (const e of entries) {
-        const cr = e.contentRect;
-        apply(cr.width, cr.height);
-      }
-    });
-    ro.observe(el);
-    const onChange = () => {
-      const r = el.getBoundingClientRect();
-      apply(r.width, r.height);
-    };
-    window.addEventListener("orientationchange", onChange);
-    window.addEventListener("fullscreenchange", onChange);
-    if (document.fonts?.ready) document.fonts.ready.then(onChange).catch(() => {});
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("orientationchange", onChange);
-      window.removeEventListener("fullscreenchange", onChange);
-    };
-  }, []);
-
-  const layout = useMemo(() => {
-    const count = Math.max(1, visibleCount);
-
-    // Fallback dims until first measurement returns: assume portrait 2x2.
-    const w = gridBox.w > 0 ? gridBox.w : 360;
-    const h = gridBox.h > 0 ? gridBox.h : 560;
-    const isPortrait = h >= w;
-
-    // Candidate (cols, rows) per count.
-    let candidates: Array<{ cols: number; rows: number }>;
-    if (count === 1) candidates = [{ cols: 1, rows: 1 }];
-    else if (count === 2) {
-      candidates = isPortrait
-        ? [{ cols: 2, rows: 1 }, { cols: 1, rows: 2 }]
-        : [{ cols: 2, rows: 1 }];
-    } else if (count === 3) {
-      candidates = [{ cols: 2, rows: 2 }];
-    } else {
-      // 4: portrait → only 2x2; landscape → pick best of 2x2 / 4x1.
-      candidates = isPortrait
-        ? [{ cols: 2, rows: 2 }]
-        : [{ cols: 4, rows: 1 }, { cols: 2, rows: 2 }];
-    }
-
-    const gap = Math.max(6, Math.min(20, Math.floor(Math.min(w, h) * 0.018)));
-
-    let best = { cols: candidates[0].cols, rows: candidates[0].rows, cardW: 0, cardH: 0, gap };
-    for (const c of candidates) {
-      const cardW_byW = (w - gap * (c.cols - 1)) / c.cols;
-      const cardH_byH = (h - gap * (c.rows - 1)) / c.rows;
-      const cardW_byH = cardH_byH * POSTER_ASPECT;
-      const cardW = Math.max(100, Math.floor(Math.min(cardW_byW, cardW_byH)));
-      const cardH = Math.floor(cardW / POSTER_ASPECT);
-      if (cardW > best.cardW) best = { cols: c.cols, rows: c.rows, cardW, cardH, gap };
-    }
-    return best;
-  }, [gridBox.w, gridBox.h, visibleCount]);
-
-  // Temporary diagnostic log — no PII.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const displayMode =
-      document.documentElement.dataset.displayMode || "default";
-    console.log("[PIPOCA_STATIC_FILM_GRID]", {
-      display_mode: displayMode,
-      portrait_mode: vh > vw,
-      viewport_width: vw,
-      viewport_height: vh,
-      container_width: Math.round(gridBox.w),
-      container_height: Math.round(gridBox.h),
-      card_width: layout.cardW,
-      card_height: layout.cardH,
-      columns: layout.cols,
-      rows: layout.rows,
-      gap: layout.gap,
-      resize_update_count: resizeCountRef.current,
-      layout_stable: gridBox.w > 0 && gridBox.h > 0,
-    });
-  }, [gridBox.w, gridBox.h, visibleCount, layout]);
-
   return (
-    <Screen aurora className="pipoca-film-choose-screen">
+    <Screen aurora>
       <Header />
 
-      {/* CENTER */}
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-5xl py-3">
-        <h1 className="font-display text-[2.4rem] leading-[1.02] sm:text-5xl md:text-6xl lg:text-7xl text-white animate-fade-up">
-          Escolha seu{" "}
-          <span className="text-gold">filme</span>
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-4 gap-5 sm:gap-7">
+        <span className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-gold/85 animate-fade-up">
+          Experiência de Natal
+        </span>
+
+        <h1 className="font-display text-[2.6rem] leading-[1.05] sm:text-6xl lg:text-7xl text-snow animate-fade-up max-w-3xl">
+          Neste Natal, viva uma{" "}
+          <span className="text-gold italic">Brasília</span> que você nunca viu.
         </h1>
-        <p className="mt-2 sm:mt-3 text-sm sm:text-base lg:text-lg text-white/75 max-w-xl animate-fade-up">
-          Toque em uma obra do catálogo Tela Brasil para entrar em cena.
+
+        <p className="text-base sm:text-lg lg:text-xl text-white/75 max-w-xl animate-fade-up leading-relaxed">
+          Crie seu cartão-postal natalino com inteligência artificial, em frente
+          à Catedral Metropolitana coberta de neve.
         </p>
 
-        {/* Marquee badges */}
-        <div className="mt-4 sm:mt-5 w-full max-w-full overflow-hidden">
-          <div className="flex gap-3 animate-marquee whitespace-nowrap">
-            {[0, 1].map((dup) => (
-              <div key={dup} className="flex gap-3 shrink-0">
-                <MarqueeBadge color="#F8BA32" text="Cinema brasileiro" />
-                <MarqueeBadge color="#2E5BE5" text="Sua foto vira cena" />
-                <MarqueeBadge color="#92C37A" text="100% gratuito" />
-                <MarqueeBadge color="#F8BA32" text="Pronta em segundos" />
-                <MarqueeBadge color="#E0463A" text="Catálogo Tela Brasil" />
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center justify-center gap-2.5 animate-fade-up">
+          <WelcomeTag>Sozinho</WelcomeTag>
+          <WelcomeTag>Em casal</WelcomeTag>
+          <WelcomeTag>Com a família</WelcomeTag>
         </div>
 
-        {/* Grid */}
-        <div ref={gridWrapRef} className="pipoca-film-grid-wrap mt-4 sm:mt-5 lg:mt-6">
+        {film?.posterUrl ? (
+          <div className="relative w-[62vw] max-w-[280px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/12 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] animate-fade-up">
+            <img
+              src={film.posterUrl}
+              alt={film.title}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+            <span className="absolute bottom-3 inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-snow/90">
+              {film.title}
+            </span>
+          </div>
+        ) : null}
+
+        <div className="pt-1">
           {loading ? (
-            <p className="text-base text-white/70 tracking-wide animate-pulse-soft">
-              Carregando filmes…
+            <p className="text-sm text-white/60 tracking-wide animate-pulse-soft">
+              Preparando a experiência…
             </p>
           ) : error ? (
-            <p className="text-base text-white/85 max-w-md">{error}</p>
-          ) : activeFilms.length === 0 ? (
-            <p className="text-base text-white/70">Nenhum filme disponível.</p>
+            <p className="text-sm text-white/85 max-w-md">{error}</p>
+          ) : !film ? (
+            <p className="text-sm text-white/70 max-w-md">
+              O cenário de Natal ainda não está disponível.
+            </p>
           ) : (
-            <div
-              className="pipoca-film-grid"
-              data-count={visibleCount}
-              style={{
-                gridTemplateColumns: `repeat(${layout.cols}, ${layout.cardW}px)`,
-                gap: `${layout.gap}px`,
-              }}
-            >
-              {visibleFilms.map((m, i) => {
-                const isThirdOfThree = visibleCount === 3 && i === 2;
-                return (
-                  <div
-                    key={m.id}
-                    className="pipoca-film-card"
-                    style={{
-                      width: layout.cardW,
-                      ...(isThirdOfThree
-                        ? { gridColumn: "1 / -1", justifySelf: "center" }
-                        : null),
-                    }}
-                  >
-                    <PosterCard
-                      movie={m}
-                      onPick={onPick}
-                      cardHeight={layout.cardH}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+            <PrimaryCta onClick={() => onStart(film)}>
+              Criar meu cartão-postal
+            </PrimaryCta>
           )}
         </div>
       </div>
 
-
-      {/* FOOTER pagination */}
-      <div className="relative z-10 shrink-0 h-12 flex items-center justify-center gap-4">
-        {totalPages > 1 ? (
-          <>
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={safePage === 0}
-              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-white/25 grid place-items-center text-white text-2xl disabled:opacity-30 active:scale-95"
-              aria-label="Anterior"
-            >
-              ‹
-            </button>
-            <div className="flex items-center gap-2">
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`h-2 rounded-full transition-all ${
-                    i === safePage ? "w-8 bg-gold" : "w-2 bg-white/25"
-                  }`}
-                />
-              ))}
-            </div>
-            <span className="text-xs text-white/60 tracking-wider ml-1">
-              {safePage + 1} de {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={safePage >= totalPages - 1}
-              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-white/25 grid place-items-center text-white text-2xl disabled:opacity-30 active:scale-95"
-              aria-label="Próxima"
-            >
-              ›
-            </button>
-          </>
+      <div className="relative z-10 shrink-0 h-8 flex items-center justify-center">
+        {SPONSOR.sponsorName ? (
+          <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
+            Oferecido por {SPONSOR.sponsorName}
+          </span>
         ) : null}
       </div>
     </Screen>
   );
 }
 
-function MarqueeBadge({ color, text }: { color: string; text: string }) {
+function WelcomeTag({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-2 bg-white/5 border border-white/15 text-white/90 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm shrink-0">
-      <span
-        className="inline-block w-1.5 h-1.5 rounded-full"
-        style={{ background: color }}
-      />
-      {text}
+    <span className="inline-flex items-center gap-2 border border-white/15 bg-white/5 text-white/85 px-4 py-1.5 rounded-full text-xs sm:text-sm">
+      <span className="inline-block w-1.5 h-1.5 rounded-full bg-gold" />
+      {children}
     </span>
-  );
-}
-
-function PosterCard({
-  movie,
-  onPick,
-  cardHeight,
-}: {
-  movie: Movie;
-  onPick: (m: Movie) => void;
-  cardHeight?: number;
-}) {
-  return (
-    <button
-      onClick={() => onPick(movie)}
-      className="bg-card text-left shadow-2xl group border border-white/10 pipoca-film-card-btn"
-    >
-      <div
-        className="pipoca-film-cover-wrap"
-        style={cardHeight ? { height: cardHeight } : undefined}
-      >
-        <img
-          src={movie.posterUrl}
-          alt={movie.title}
-          className="pipoca-film-cover"
-        />
-        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none" />
-        <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3 z-10">
-          <h3 className="font-display text-base sm:text-lg md:text-xl leading-tight text-white drop-shadow-lg">
-            {movie.title}
-          </h3>
-        </div>
-      </div>
-    </button>
   );
 }
 
@@ -992,12 +790,12 @@ function Stories({
   movie,
   firstName,
   onDone,
-  onChangeFilm,
+  onRestart,
 }: {
   movie: Movie;
   firstName?: string;
   onDone: () => void;
-  onChangeFilm: () => void;
+  onRestart: () => void;
 }) {
   const [idx, setIdx] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -1070,7 +868,7 @@ function Stories({
       />
 
       <div className="relative z-20 flex-1 min-h-0 w-full flex flex-col items-center justify-center max-w-2xl py-3 pointer-events-none">
-        {idx === 0 && <StoryFilm movie={movie} firstName={firstName} />}
+        {idx === 0 && <StoryScene movie={movie} firstName={firstName} />}
         {idx === 1 && <StoryTwoPhotos firstName={firstName} />}
         {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} firstName={firstName} />}
       </div>
@@ -1081,11 +879,11 @@ function Stories({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onChangeFilm();
+              onRestart();
             }}
             className="text-xs uppercase tracking-[0.3em] text-white/65 hover:text-white underline underline-offset-4 py-2 px-3"
           >
-            Trocar filme
+            Voltar ao início
           </button>
         ) : (
           <span className="text-[10px] uppercase tracking-[0.3em] text-white/40">
@@ -1097,29 +895,29 @@ function Stories({
   );
 }
 
-function StoryFilm({ movie, firstName }: { movie: Movie; firstName?: string }) {
-  const prefix = firstName ? `${firstName.toUpperCase()}, você escolheu` : "Você escolheu";
+function StoryScene({ movie, firstName }: { movie: Movie; firstName?: string }) {
+  const prefix = firstName ? `${firstName.toUpperCase()}, seu cenário é` : "Seu cenário é";
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
         {prefix}
       </span>
-      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[3/4] rounded-2xl overflow-hidden border border-white/15 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]">
-        <img
-          src={movie.posterUrl}
-          alt={movie.title}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/55 to-transparent pointer-events-none" />
-        <div className="absolute top-3 left-3">
-          <span className="inline-block bg-gold text-cinema text-[10px] font-bold uppercase tracking-[0.2em] px-2 py-1 rounded">
-            Tela Brasil
-          </span>
-        </div>
+      <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/12 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] bg-white/5">
+        {movie.posterUrl ? (
+          <img
+            src={movie.posterUrl}
+            alt={movie.title}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : null}
+        <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/95 via-black/50 to-transparent pointer-events-none" />
         <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
-          <h1 className="font-display text-3xl sm:text-4xl text-white leading-[0.95]">
+          <h1 className="font-display text-3xl sm:text-4xl text-snow leading-[1.05]">
             {movie.title}
           </h1>
+          <p className="mt-1 text-xs sm:text-sm text-white/70">
+            Neve suave, luzes de Natal e clima abaixo de zero.
+          </p>
         </div>
       </div>
     </div>
@@ -1132,6 +930,9 @@ function StoryTwoPhotos({ firstName }: { firstName?: string }) {
       <h1 className="font-display text-3xl sm:text-5xl text-white leading-[0.95]">
         {firstName ? `${firstName}, vamos` : "Vamos"} tirar <span className="text-gold">duas fotos</span>
       </h1>
+      <p className="text-sm sm:text-base text-white/75 -mt-2">
+        Você pode aparecer sozinho, em casal ou com sua família.
+      </p>
       <div className="grid grid-cols-2 gap-4 w-full">
         <div className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-4">
           <svg viewBox="0 0 24 24" className="w-10 h-10" fill="none" stroke="#F8BA32" strokeWidth="1.8">
@@ -1139,7 +940,7 @@ function StoryTwoPhotos({ firstName }: { firstName?: string }) {
             <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" strokeLinecap="round" />
           </svg>
           <p className="text-xs sm:text-sm text-white/85 leading-snug">
-            Uma foto <span className="text-gold">de perto</span> para reconhecer seu rosto
+            Uma foto <span className="text-gold">de perto</span> para reconhecer os rostos
           </p>
         </div>
         <div className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-4">
@@ -1148,7 +949,7 @@ function StoryTwoPhotos({ firstName }: { firstName?: string }) {
             <path d="M8 22v-7l-2-4h12l-2 4v7" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <p className="text-xs sm:text-sm text-white/85 leading-snug">
-            Uma foto <span className="text-gold">mais distante</span> para registrar sua postura
+            Uma foto <span className="text-gold">mais distante</span> para registrar todo mundo
           </p>
         </div>
       </div>
@@ -1276,12 +1077,12 @@ function Camera({
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
   const title =
-    variant === "identity" ? "OLHE PARA A CÂMERA" : "DÊ UM PASSO PARA TRÁS";
+    variant === "identity" ? "Olhem para a câmera" : "Deem um passo para trás";
   const hint =
     variant === "identity"
-      ? "APROXIME-SE ATÉ APARECER O ROSTO, O CABELO E OS OMBROS"
-      : "APAREÇA DA CABEÇA ATÉ A CINTURA";
-  const subtitle = variant === "identity" ? "FOTO 1 DE 2" : "FOTO 2 DE 2";
+      ? "Aproxime-se até aparecerem rosto, cabelo e ombros de quem for aparecer"
+      : "Sozinho, em casal ou com a família — todos da cabeça até a cintura";
+  const subtitle = variant === "identity" ? "Foto 1 de 2" : "Foto 2 de 2";
   const countingDown = count !== null && count > 0;
 
   return (
@@ -1321,7 +1122,7 @@ function Camera({
               letterSpacing: "0.2em",
             }}
           >
-            FIQUE PARADO
+FIQUEM PARADOS
           </p>
         ) : null}
 
@@ -1421,7 +1222,7 @@ function CameraError({
       </div>
       <div className="relative z-10 shrink-0 flex flex-col items-center gap-2">
         {copy.canRetry ? <PrimaryCta onClick={onRetry}>Tentar novamente</PrimaryCta> : null}
-        <GhostBtn onClick={onBack}>Voltar para os filmes</GhostBtn>
+        <GhostBtn onClick={onBack}>Voltar ao início</GhostBtn>
       </div>
     </Screen>
   );
@@ -1566,7 +1367,7 @@ function Processing({
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setIconIdx((i) => (i + 1) % CINEMA_ICONS.length);
+      setIconIdx((i) => (i + 1) % WINTER_ICONS.length);
     }, 1400);
     return () => clearInterval(interval);
   }, []);
@@ -1608,7 +1409,7 @@ function Processing({
 
   return (
     <Screen aurora>
-      <Header subtitle="Criando sua cena" />
+      <Header subtitle="Criando seu cartão-postal" />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center text-center gap-6 sm:gap-8 max-w-xl">
         <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full border border-gold/20 grid place-items-center relative animate-badge-in">
@@ -1627,7 +1428,7 @@ function Processing({
           ))}
           {/* Rotating cinema icon */}
           <div className="relative w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 grid place-items-center">
-            {CINEMA_ICONS.map((Icon, i) => (
+            {WINTER_ICONS.map((Icon, i) => (
               <div
                 key={i}
                 className={`absolute inset-0 grid place-items-center text-gold transition-all duration-500 ${
@@ -1645,11 +1446,12 @@ function Processing({
 
 
         <div className="space-y-2">
-          <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-white leading-none">
-            {firstName ? `${firstName}, aguarde...` : <>Luzes, câmera, <span className="text-gold">ação</span>...</>}
+          <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-snow leading-tight">
+            {firstName ? `${firstName}, ` : ""}preparando seu{" "}
+            <span className="text-gold">Natal abaixo de zero</span>...
           </h1>
           <p className="text-white/70 text-sm sm:text-base">
-            Inspirado em <span className="text-white">{movie.title}</span>
+            {movie.title}
           </p>
         </div>
 
@@ -1761,7 +1563,7 @@ function Result({
     }
   }, [slide, onRestart]);
 
-  const bgUrl = imageUrl ?? movie.posterUrl;
+  const bgUrl = imageUrl ?? (movie.posterUrl || null);
 
   return (
     <Screen aurora>
@@ -1800,27 +1602,33 @@ function Result({
         {slide === 0 && (
           <div className="flex flex-col items-center gap-3 sm:gap-4 w-full h-full animate-fade-up">
             <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95]">
-              {firstName ? `${firstName}, sua ` : "Sua "}<span className="text-gold">cena</span> está pronta
+              {firstName ? `${firstName}, seu ` : "Seu "}
+              <span className="text-gold">cartão-postal</span> está pronto
             </h1>
 
             <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto flex items-center justify-center">
               <img
                 src={imageUrl ?? movie.posterUrl}
-                alt="Cena gerada"
+                alt="Cartão-postal natalino gerado"
                 className="max-w-full max-h-full object-contain rounded-2xl border border-white/10 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)]"
               />
             </div>
 
             <span className="text-[10px] uppercase tracking-[0.3em] text-white/60">
-              Inspirado em {movie.title}
+              {movie.title}
             </span>
+            {SPONSOR.institutionalMessage ? (
+              <span className="text-[11px] text-white/70 text-center max-w-md">
+                {SPONSOR.institutionalMessage}
+              </span>
+            ) : null}
           </div>
         )}
 
         {slide === 1 && (
           <div className="flex flex-col items-center gap-4 sm:gap-5 w-full animate-fade-up">
             <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95] text-center">
-              SUA FOTO JÁ FOI ENVIADA PARA <span className="text-gold">IMPRESSÃO</span>
+              Seu cartão-postal já foi enviado para <span className="text-gold">impressão</span>
             </h1>
             <p className="text-sm sm:text-base text-white/80 text-center">
               Dirija-se ao balcão para retirar sua foto.
@@ -1927,7 +1735,7 @@ function VisitorRegistration({
       <Header />
       <div className="relative z-10 flex-1 min-h-0 w-full max-w-md mx-auto flex flex-col items-stretch justify-center gap-4 py-3">
         <h1 className="font-display text-3xl sm:text-4xl text-white text-center leading-[0.95]">
-          Antes de entrar em <span className="text-gold">cena</span>
+          Antes de criar seu <span className="text-gold">cartão-postal</span>
         </h1>
         <label className="flex flex-col gap-1 text-left">
           <span className="text-xs uppercase tracking-[0.25em] text-white/70">Nome</span>
@@ -1964,7 +1772,7 @@ function VisitorRegistration({
           >
             Aviso de Privacidade
           </button>{" "}
-          e autorizo o tratamento do meu nome, WhatsApp e imagens para criar, disponibilizar e produzir minha foto personalizada.
+          e autorizo o tratamento do meu nome, WhatsApp e imagens para criar, disponibilizar e produzir meu cartão-postal natalino.
         </p>
         {error && (
           <div className="rounded-md border border-red-400/40 bg-red-950/30 p-3 text-center">

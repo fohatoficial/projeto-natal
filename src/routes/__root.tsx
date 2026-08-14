@@ -78,22 +78,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Pipoca & Cena — Tela Brasil" },
+      { title: "Projeto Natal — Cartão-postal natalino" },
       {
         name: "description",
         content:
-          "Experiência interativa Tela Brasil: escolha um filme brasileiro, tire sua foto e entre em cena.",
+          "Crie seu cartão-postal natalino com inteligência artificial: sozinho, em casal ou com a família.",
       },
-      { name: "author", content: "Tela Brasil" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { property: "og:title", content: "Pipoca & Cena — Tela Brasil" },
-      { name: "twitter:title", content: "Pipoca & Cena — Tela Brasil" },
-      { name: "description", content: "Tela Brasil: Cine Scene Creator lets users star in movie scenes." },
-      { property: "og:description", content: "Tela Brasil: Cine Scene Creator lets users star in movie scenes." },
-      { name: "twitter:description", content: "Tela Brasil: Cine Scene Creator lets users star in movie scenes." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d62278a8-0123-485a-b09f-94488a9d83df/id-preview-5695388c--a41771ec-482f-4dc3-9092-09c6c271363e.lovable.app-1781437037003.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d62278a8-0123-485a-b09f-94488a9d83df/id-preview-5695388c--a41771ec-482f-4dc3-9092-09c6c271363e.lovable.app-1781437037003.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -101,7 +93,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap",
       },
     ],
   }),
@@ -113,7 +105,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>
