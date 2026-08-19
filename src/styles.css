@@ -374,13 +374,14 @@
     100% { background-position: 0% 50%; }
   }
   .bg-aurora {
-    background: radial-gradient(ellipse at 20% 15%, rgba(231,200,138,0.16) 0%, transparent 60%),
-                radial-gradient(ellipse at 80% 80%, rgba(110,156,196,0.20) 0%, transparent 58%),
-                radial-gradient(ellipse at 50% 55%, rgba(47,93,75,0.14) 0%, transparent 55%),
-                #0A1A2F;
+    background: radial-gradient(ellipse at 18% 12%, rgba(198,154,75,0.20) 0%, transparent 58%),
+                radial-gradient(ellipse at 82% 84%, rgba(8,24,39,0.55) 0%, transparent 60%),
+                radial-gradient(ellipse at 52% 52%, rgba(23,56,47,0.18) 0%, transparent 55%),
+                linear-gradient(160deg, #8F1520 0%, #671018 50%, #3B0910 100%);
     background-size: 200% 200%;
-    animation: bg-aurora 12s ease-in-out infinite;
+    animation: bg-aurora 14s ease-in-out infinite;
   }
+
 
   /* Animations */
   @keyframes fade-up {
