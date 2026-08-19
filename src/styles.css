@@ -339,8 +339,9 @@
 
   .brand-stripe {
     height: 1px;
-    background: linear-gradient(90deg, transparent 0%, rgba(231,200,138,0.75) 50%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, rgba(198,154,75,0.75) 50%, transparent 100%);
   }
+
 
   /* Film grain texture */
   .film-grain { position: relative; }
