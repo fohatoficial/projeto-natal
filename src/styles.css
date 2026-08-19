@@ -32,42 +32,49 @@
 
   --color-cinema: var(--cinema);
   --color-gold: var(--gold);
+  --color-burgundy: var(--burgundy);
 
   --font-display: "Cormorant Garamond", Georgia, serif;
   --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-script: "Pinyon Script", "Cormorant Garamond", cursive;
 }
 
 :root {
   --radius: 0.75rem;
 
-  /* Projeto Natal — paleta noite de inverno premium */
-  --cinema: #0A1A2F;          /* céu de inverno, quase meia-noite */
-  --gold: #E7C88A;            /* champanhe quente (luz natalina) */
-  --brand-blue: #6E9CC4;      /* azul gelo */
-  --brand-green: #2F5D4B;     /* pinheiro profundo */
-  --brand-red: #B4574B;       /* vinho natalino discreto */
-  --snow: #EEF4FA;
+  /* Projeto Natal — identidade editorial premium (vermelho protagonista) */
+  --burgundy: #8F1520;        /* borgonha / vermelho profundo */
+  --burgundy-deep: #671018;   /* vermelho escuro */
+  --gold: #C69A4B;            /* dourado quente */
+  --ivory: #F6F0E5;           /* marfim */
+  --offwhite: #FCF8F0;
+  --cinema: #081827;          /* azul noite (fotografia/neve) */
+  --brand-green: #17382F;     /* verde natal de apoio */
+  --snow: #FCF8F0;
+  --brand-blue: #6E9CC4;
+  --brand-red: var(--burgundy);
 
-  --background: var(--cinema);
+  --background: var(--burgundy-deep);
   --foreground: oklch(1 0 0);
-  --card: oklch(0.22 0.03 260);
+  --card: oklch(0.24 0.06 20);
   --card-foreground: oklch(1 0 0);
-  --popover: oklch(0.22 0.03 260);
+  --popover: oklch(0.24 0.06 20);
   --popover-foreground: oklch(1 0 0);
-  --primary: var(--gold);
-  --primary-foreground: var(--cinema);
-  --secondary: oklch(0.28 0.03 260);
+  --primary: var(--burgundy);
+  --primary-foreground: var(--offwhite);
+  --secondary: oklch(0.3 0.05 20);
   --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(0.28 0.03 260);
-  --muted-foreground: oklch(0.72 0.02 260);
+  --muted: oklch(0.3 0.04 20);
+  --muted-foreground: oklch(0.78 0.02 60);
   --accent: var(--gold);
-  --accent-foreground: var(--cinema);
+  --accent-foreground: var(--burgundy-deep);
   --destructive: oklch(0.6 0.22 27);
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: var(--gold);
 }
+
 
 @layer base {
   * { border-color: var(--color-border); }
