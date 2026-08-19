@@ -32,36 +32,42 @@
 
   --color-cinema: var(--cinema);
   --color-gold: var(--gold);
+  --color-burgundy: var(--burgundy);
 
   --font-display: "Cormorant Garamond", Georgia, serif;
   --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-script: "Pinyon Script", "Cormorant Garamond", cursive;
 }
 
 :root {
   --radius: 0.75rem;
 
-  /* Projeto Natal — paleta noite de inverno premium */
-  --cinema: #0A1A2F;          /* céu de inverno, quase meia-noite */
-  --gold: #E7C88A;            /* champanhe quente (luz natalina) */
-  --brand-blue: #6E9CC4;      /* azul gelo */
-  --brand-green: #2F5D4B;     /* pinheiro profundo */
-  --brand-red: #B4574B;       /* vinho natalino discreto */
-  --snow: #EEF4FA;
+  /* Projeto Natal — identidade editorial premium (vermelho protagonista) */
+  --burgundy: #8F1520;        /* borgonha / vermelho profundo */
+  --burgundy-deep: #671018;   /* vermelho escuro */
+  --gold: #C69A4B;            /* dourado quente */
+  --ivory: #F6F0E5;           /* marfim */
+  --offwhite: #FCF8F0;
+  --cinema: #081827;          /* azul noite (fotografia/neve) */
+  --brand-green: #17382F;     /* verde natal de apoio */
+  --snow: #FCF8F0;
+  --brand-blue: #6E9CC4;
+  --brand-red: var(--burgundy);
 
-  --background: var(--cinema);
+  --background: var(--burgundy-deep);
   --foreground: oklch(1 0 0);
-  --card: oklch(0.22 0.03 260);
+  --card: oklch(0.24 0.06 20);
   --card-foreground: oklch(1 0 0);
-  --popover: oklch(0.22 0.03 260);
+  --popover: oklch(0.24 0.06 20);
   --popover-foreground: oklch(1 0 0);
-  --primary: var(--gold);
-  --primary-foreground: var(--cinema);
-  --secondary: oklch(0.28 0.03 260);
+  --primary: var(--burgundy);
+  --primary-foreground: var(--offwhite);
+  --secondary: oklch(0.3 0.05 20);
   --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(0.28 0.03 260);
-  --muted-foreground: oklch(0.72 0.02 260);
+  --muted: oklch(0.3 0.04 20);
+  --muted-foreground: oklch(0.78 0.02 60);
   --accent: var(--gold);
-  --accent-foreground: var(--cinema);
+  --accent-foreground: var(--burgundy-deep);
   --destructive: oklch(0.6 0.22 27);
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(1 0 0 / 12%);
@@ -69,10 +75,12 @@
   --ring: var(--gold);
 }
 
+
 @layer base {
   * { border-color: var(--color-border); }
   html, body {
-    background-color: #0A1A2F;
+    background-color: #24070C;
+
     color: var(--color-foreground);
     font-family: var(--font-sans);
   }
@@ -115,14 +123,92 @@
 }
 
 @layer utilities {
-  .font-display { font-family: var(--font-display); letter-spacing: 0.02em; }
-  .text-gold { color: #E7C88A; }
-  .bg-gold { background-color: #E7C88A; }
-  .border-gold { border-color: #E7C88A; }
-  .bg-cinema { background-color: #0A1A2F; }
+  .font-display { font-family: var(--font-display); letter-spacing: 0.01em; }
+  .font-script { font-family: var(--font-script); letter-spacing: 0; }
+  .text-gold { color: #C69A4B; }
+  .bg-gold { background-color: #C69A4B; }
+  .border-gold { border-color: #C69A4B; }
+  .text-burgundy { color: #8F1520; }
+  .bg-burgundy { background-color: #8F1520; }
+  .bg-burgundy-deep { background-color: #671018; }
+  .border-burgundy { border-color: #8F1520; }
+  .bg-cinema { background-color: #081827; }
   .text-brand-blue { color: #6E9CC4; }
   .bg-brand-blue { background-color: #6E9CC4; }
-  .text-snow { color: #EEF4FA; }
+  .text-snow { color: #FCF8F0; }
+  .text-ivory { color: #F6F0E5; }
+  .bg-ivory { background-color: #F6F0E5; }
+
+  /* ---------- Sistema de componentes Natal premium ---------- */
+  .natal-surface {
+    background:
+      radial-gradient(ellipse at 12% 8%, rgba(198,154,75,0.14) 0%, transparent 58%),
+      radial-gradient(ellipse at 88% 92%, rgba(8,24,39,0.55) 0%, transparent 60%),
+      linear-gradient(160deg, #8F1520 0%, #671018 48%, #3B0910 100%);
+  }
+  .natal-card {
+    background: rgba(252,248,240,0.05);
+    border: 1px solid rgba(198,154,75,0.28);
+    border-radius: 18px;
+    backdrop-filter: blur(6px);
+    transition: transform 220ms cubic-bezier(.2,.8,.2,1), border-color 220ms ease, background-color 220ms ease;
+  }
+  .natal-card:hover { background: rgba(252,248,240,0.09); border-color: rgba(198,154,75,0.6); }
+  .natal-card:active { transform: scale(0.99); }
+  .natal-card[data-selected="true"] {
+    border-color: #C69A4B;
+    background: rgba(198,154,75,0.14);
+    box-shadow: 0 0 0 1px rgba(198,154,75,0.5);
+  }
+  .natal-btn {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: 1rem 2.25rem;
+    transition: transform 180ms cubic-bezier(.2,.8,.2,1), filter 180ms ease, opacity 180ms ease;
+  }
+  .natal-btn:active { transform: scale(0.97); }
+  .natal-btn-primary {
+    background: linear-gradient(180deg, #8F1520 0%, #671018 100%);
+    color: #FCF8F0;
+    box-shadow: 0 10px 30px -12px rgba(143,21,32,0.9), inset 0 0 0 1px rgba(198,154,75,0.45);
+  }
+  .natal-btn-primary:hover { filter: brightness(1.08); }
+  .natal-btn-gold {
+    background: linear-gradient(180deg, #E3C489 0%, #C69A4B 100%);
+    color: #3B0910;
+  }
+  .natal-btn-ghost {
+    border: 1px solid rgba(252,248,240,0.28);
+    color: rgba(252,248,240,0.9);
+    background: transparent;
+  }
+  .natal-btn-ghost:hover { background: rgba(252,248,240,0.07); }
+  .natal-input {
+    background: rgba(8,24,39,0.35);
+    border: 1px solid rgba(198,154,75,0.3);
+    border-radius: 16px;
+    color: #FCF8F0;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+  }
+  .natal-input:focus {
+    outline: none;
+    border-color: #C69A4B;
+    box-shadow: 0 0 0 3px rgba(198,154,75,0.18);
+  }
+  .natal-rule {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(198,154,75,0.7), transparent);
+  }
+  .natal-eyebrow {
+    font-size: 0.68rem;
+    letter-spacing: 0.42em;
+    text-transform: uppercase;
+    color: rgba(198,154,75,0.9);
+  }
+
 
   /* ---------- Pipoca film selection (adaptive — sized by JS via ResizeObserver) ---------- */
   .pipoca-film-choose-screen { display: flex; flex-direction: column; width: 100%; overflow: hidden; }
@@ -253,8 +339,9 @@
 
   .brand-stripe {
     height: 1px;
-    background: linear-gradient(90deg, transparent 0%, rgba(231,200,138,0.75) 50%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, rgba(198,154,75,0.75) 50%, transparent 100%);
   }
+
 
   /* Film grain texture */
   .film-grain { position: relative; }
@@ -288,13 +375,14 @@
     100% { background-position: 0% 50%; }
   }
   .bg-aurora {
-    background: radial-gradient(ellipse at 20% 15%, rgba(231,200,138,0.16) 0%, transparent 60%),
-                radial-gradient(ellipse at 80% 80%, rgba(110,156,196,0.20) 0%, transparent 58%),
-                radial-gradient(ellipse at 50% 55%, rgba(47,93,75,0.14) 0%, transparent 55%),
-                #0A1A2F;
+    background: radial-gradient(ellipse at 18% 12%, rgba(198,154,75,0.20) 0%, transparent 58%),
+                radial-gradient(ellipse at 82% 84%, rgba(8,24,39,0.55) 0%, transparent 60%),
+                radial-gradient(ellipse at 52% 52%, rgba(23,56,47,0.18) 0%, transparent 55%),
+                linear-gradient(160deg, #8F1520 0%, #671018 50%, #3B0910 100%);
     background-size: 200% 200%;
-    animation: bg-aurora 12s ease-in-out infinite;
+    animation: bg-aurora 14s ease-in-out infinite;
   }
+
 
   /* Animations */
   @keyframes fade-up {

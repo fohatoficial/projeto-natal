@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import {
   PRESET_MESSAGES,
   POSTCARD_MESSAGE_MAX,
+  FONT_STYLES,
+  DIVIDER_STYLES,
   sanitizeMessage,
   type PostcardMessageType,
+  type PostcardFontStyle,
+  type PostcardDividerStyle,
 } from "@/lib/pipoca/postcard-messages";
-import { renderPostcard } from "@/lib/pipoca/postcard-render";
+import { renderPostcard } from "@/lib/pipoca/postcard-template";
 import {
   preparePipocaPostcardUpload,
   confirmPipocaPostcard,
@@ -17,18 +21,80 @@ const LOG = "[PIPOCA_POSTCARD_UI]";
 
 type Mode = "choose" | "presets" | "custom" | "preview";
 
+/* ---------------------------- ícones refinados ---------------------------- */
+
 const IconCard = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-    <rect x="2.5" y="5" width="19" height="14" rx="2" />
-    <path d="M6 9.5h7M6 13h9M6 16h5" />
+  <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" className="w-full h-full">
+    <rect x="3" y="7" width="26" height="18" rx="2" />
+    <path d="M8 13h9M8 17h13M8 21h7" />
+    <path d="M24 11.5v3M22.5 13h3" />
   </svg>
 );
 const IconPencil = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5Z" />
+  <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
+    <path d="M5 27h9" />
+    <path d="M22 4.5a2.8 2.8 0 0 1 4 4L11 23.5 5.5 25.5 7.5 20Z" />
+    <path d="M20 6.5 24 10.5" />
   </svg>
 );
+const Arrow = ({ dir }: { dir: -1 | 1 }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+    <path d={dir === -1 ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"} />
+  </svg>
+);
+
+/** Miniaturas reais dos divisores (mesmo desenho do template). */
+function DividerGlyph({ style }: { style: PostcardDividerStyle }) {
+  const line = (x1: number, x2: number) => (
+    <line x1={x1} y1="12" x2={x2} y2="12" stroke="currentColor" strokeWidth="1" opacity="0.7" />
+  );
+  return (
+    <svg viewBox="0 0 110 24" className="w-[104px] h-6 text-gold">
+      {style !== "branch" && line(4, 40)}
+      {style !== "branch" && line(70, 106)}
+      {style === "snowflake" &&
+        [0, 1, 2, 3, 4, 5].map((i) => {
+          const a = (Math.PI / 3) * i;
+          return (
+            <line
+              key={i}
+              x1="55"
+              y1="12"
+              x2={55 + Math.cos(a) * 9}
+              y2={12 + Math.sin(a) * 9}
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+            />
+          );
+        })}
+      {style === "star" && (
+        <path
+          d="M55 3l2.2 6.3L63.5 12l-6.3 2.7L55 21l-2.2-6.3L46.5 12l6.3-2.7Z"
+          fill="currentColor"
+        />
+      )}
+      {style === "branch" && (
+        <g stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" fill="none">
+          <path d="M8 12h38M104 12H66" />
+          <path d="M18 12l-4-4M18 12l-4 4M28 12l-4-4M28 12l-4 4M38 12l-4-4M38 12l-4 4" />
+          <path d="M94 12l4-4M94 12l4 4M84 12l4-4M84 12l4 4M74 12l4-4M74 12l4 4" />
+          <circle cx="55" cy="12" r="3" fill="#8F1520" stroke="none" />
+          <circle cx="49" cy="16" r="2" fill="#8F1520" stroke="none" />
+          <circle cx="61" cy="16" r="2" fill="#8F1520" stroke="none" />
+        </g>
+      )}
+      {style === "ornament" && (
+        <g stroke="currentColor" strokeWidth="1.2" fill="none">
+          <path d="M55 3l8 9-8 9-8-9Z" />
+          <path d="M55 8.5l3.6 3.5-3.6 3.5-3.6-3.5Z" fill="currentColor" />
+        </g>
+      )}
+    </svg>
+  );
+}
+
+/* -------------------------------- componente ------------------------------ */
 
 export function PostcardComposer({
   photoUrl,
@@ -42,40 +108,58 @@ export function PostcardComposer({
   onFinalized: (postcardUrl: string) => void;
 }) {
   const [mode, setMode] = useState<Mode>("choose");
-  const [presetId, setPresetId] = useState<string | null>(null);
+  const [index, setIndex] = useState(0);
   const [custom, setCustom] = useState("");
+  const [fontStyle, setFontStyle] = useState<PostcardFontStyle>("classic");
+  const [dividerStyle, setDividerStyle] = useState<PostcardDividerStyle>("snowflake");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<PostcardMessageType>("preset");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [livePreview, setLivePreview] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const blobRef = useRef<Blob | null>(null);
   const previewRef = useRef<string | null>(null);
+  const liveRef = useRef<string | null>(null);
+  const touchX = useRef<number | null>(null);
 
   const prepareFn = useServerFn(preparePipocaPostcardUpload);
   const confirmFn = useServerFn(confirmPipocaPostcard);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-    };
-  }, []);
+      if (liveRef.current) URL.revokeObjectURL(liveRef.current);
+    },
+    [],
+  );
 
-  const buildPreview = useCallback(
-    async (text: string, type: PostcardMessageType) => {
+  const compose = useCallback(
+    async (
+      text: string,
+      type: PostcardMessageType,
+      font: PostcardFontStyle,
+      divider: PostcardDividerStyle,
+    ) => {
       setError(null);
       setRendering(true);
       try {
-        const out = await renderPostcard(photoUrl, text);
+        const out = await renderPostcard(photoUrl, {
+          message: text,
+          fontStyle: font,
+          dividerStyle: divider,
+        });
         if (previewRef.current) URL.revokeObjectURL(previewRef.current);
         previewRef.current = out.objectUrl;
         blobRef.current = out.blob;
         setPreviewUrl(out.objectUrl);
         setMessage(text);
         setMessageType(type);
+        setFontStyle(font);
+        setDividerStyle(divider);
         setMode("preview");
-        console.log(`${LOG} preview composto`, { type, chars: text.length });
+        console.log(`${LOG} preview composto`, { type, font, divider, chars: text.length });
       } catch (e) {
         console.warn(`${LOG} falha ao compor`, e);
         setError("Não conseguimos montar seu cartão-postal. Tente novamente.");
@@ -85,6 +169,36 @@ export function PostcardComposer({
     },
     [photoUrl],
   );
+
+  /* Preview ao vivo da oficina — apenas composição, nunca IA. */
+  const cleanCustom = sanitizeMessage(custom).trim();
+  useEffect(() => {
+    if (mode !== "custom") return;
+    const text = cleanCustom || "Sua mensagem de Natal aparecerá aqui.";
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const out = await renderPostcard(photoUrl, {
+          message: text,
+          fontStyle,
+          dividerStyle,
+        });
+        if (cancelled) {
+          URL.revokeObjectURL(out.objectUrl);
+          return;
+        }
+        if (liveRef.current) URL.revokeObjectURL(liveRef.current);
+        liveRef.current = out.objectUrl;
+        setLivePreview(out.objectUrl);
+      } catch (e) {
+        console.warn(`${LOG} falha no preview ao vivo`, e);
+      }
+    }, 260);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [mode, cleanCustom, fontStyle, dividerStyle, photoUrl]);
 
   async function finalize() {
     if (!blobRef.current || saving) return;
@@ -97,7 +211,14 @@ export function PostcardComposer({
         .uploadToSignedUrl(path, token, blobRef.current, { contentType: "image/jpeg" });
       if (upErr) throw upErr;
       const res = await confirmFn({
-        data: { generationId, path, messageType, messageText: message },
+        data: {
+          generationId,
+          path,
+          messageType,
+          messageText: message,
+          fontStyle,
+          dividerStyle,
+        },
       });
       console.log(`${LOG} cartão finalizado`);
       onFinalized(res.postcardUrl);
@@ -109,140 +230,263 @@ export function PostcardComposer({
     }
   }
 
-  const customValid = sanitizeMessage(custom).trim().length > 0;
+  const current = PRESET_MESSAGES[index]!;
+  const currentFontCss = useMemo(
+    () => FONT_STYLES.find((f) => f.id === current.font)?.css,
+    [current.font],
+  );
+  const move = (delta: number) =>
+    setIndex((i) => (i + delta + PRESET_MESSAGES.length) % PRESET_MESSAGES.length);
 
   return (
-    <div className="relative z-10 w-full max-w-4xl mx-auto flex flex-col items-center gap-5 py-4 px-4">
+    <div className="relative z-10 w-full max-w-5xl mx-auto flex flex-col items-center gap-6 py-4 px-5">
+      {/* ---------------------------- escolha inicial --------------------------- */}
       {mode === "choose" && (
-        <>
-          <h1 className="font-display text-3xl sm:text-5xl text-snow text-center leading-tight">
-            {firstName ? `${firstName}, como ` : "Como "}você quer escrever sua{" "}
-            <span className="text-gold">mensagem</span>?
-          </h1>
-          <div className="grid gap-4 sm:grid-cols-2 w-full mt-2">
-            <button
-              type="button"
-              onClick={() => setMode("presets")}
-              className="group rounded-2xl border border-gold/40 bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.99] transition p-7 min-h-[190px] flex flex-col items-center justify-center gap-3 text-center"
-            >
-              <span className="w-14 h-14 text-gold"><IconCard /></span>
-              <span className="font-display text-2xl text-snow">Escolher uma mensagem pronta</span>
-              <span className="text-sm text-white/65">Cinco mensagens natalinas prontas para você.</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("custom")}
-              className="group rounded-2xl border border-gold/40 bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.99] transition p-7 min-h-[190px] flex flex-col items-center justify-center gap-3 text-center"
-            >
-              <span className="w-14 h-14 text-gold"><IconPencil /></span>
-              <span className="font-display text-2xl text-snow">Criar minha própria mensagem</span>
-              <span className="text-sm text-white/65">
-                Escreva algo especial com até {POSTCARD_MESSAGE_MAX} caracteres.
-              </span>
-            </button>
+        <div className="w-full flex flex-col items-center gap-8 animate-fade-up">
+          <div className="text-center">
+            <p className="natal-eyebrow">Seu cartão-postal</p>
+            <h1 className="mt-3 font-display text-4xl sm:text-6xl text-snow leading-[1.05]">
+              {firstName ? `${firstName}, como ` : "Como "}você quer escrever sua{" "}
+              <span className="font-script text-gold text-[1.25em] leading-none">mensagem</span>?
+            </h1>
           </div>
-        </>
+          <div className="grid gap-5 sm:grid-cols-2 w-full max-w-3xl">
+            {[
+              {
+                key: "presets" as const,
+                icon: <IconCard />,
+                title: "Escolher uma mensagem pronta",
+                hint: "Cinco mensagens curadas",
+              },
+              {
+                key: "custom" as const,
+                icon: <IconPencil />,
+                title: "Criar minha própria mensagem",
+                hint: "Oficina do seu cartão",
+              },
+            ].map((o) => (
+              <button
+                key={o.key}
+                type="button"
+                onClick={() => setMode(o.key)}
+                className="natal-card p-9 min-h-[210px] flex flex-col items-center justify-center gap-4 text-center"
+              >
+                <span className="w-14 h-14 text-gold">{o.icon}</span>
+                <span className="font-display text-2xl sm:text-3xl text-snow leading-tight">
+                  {o.title}
+                </span>
+                <span className="natal-eyebrow">{o.hint}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
+      {/* ------------------------- carrossel editorial -------------------------- */}
       {mode === "presets" && (
-        <>
-          <h1 className="font-display text-3xl sm:text-4xl text-snow text-center">
-            Escolha sua <span className="text-gold">mensagem</span>
-          </h1>
-          <div className="w-full grid gap-3">
-            {PRESET_MESSAGES.map((m) => {
-              const active = presetId === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setPresetId(m.id)}
-                  className={`w-full text-left rounded-xl border px-5 py-4 transition text-base sm:text-lg ${
-                    active
-                      ? "border-gold bg-gold/15 text-snow"
-                      : "border-white/20 bg-white/[0.03] text-white/80 hover:bg-white/[0.07]"
-                  }`}
-                >
-                  {m.text}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex flex-col items-center gap-2 pt-1">
+        <div className="w-full flex flex-col items-center gap-6 animate-fade-up">
+          <p className="natal-eyebrow">Sua mensagem de Natal</p>
+          <div
+            className="w-full max-w-3xl flex items-center gap-3 sm:gap-6"
+            onTouchStart={(e) => (touchX.current = e.touches[0]?.clientX ?? null)}
+            onTouchEnd={(e) => {
+              const start = touchX.current;
+              const end = e.changedTouches[0]?.clientX ?? null;
+              if (start != null && end != null && Math.abs(end - start) > 45) {
+                move(end < start ? 1 : -1);
+              }
+              touchX.current = null;
+            }}
+          >
             <button
               type="button"
-              disabled={!presetId || rendering}
-              onClick={() => {
-                const found = PRESET_MESSAGES.find((m) => m.id === presetId);
-                if (found) void buildPreview(found.text, "preset");
-              }}
-              className="bg-gold text-[#0A1A2F] font-semibold uppercase tracking-wider rounded-md px-8 py-4 text-sm disabled:opacity-40 hover:brightness-110 transition"
+              aria-label="Mensagem anterior"
+              onClick={() => move(-1)}
+              className="shrink-0 w-12 h-12 rounded-full grid place-items-center text-gold border border-gold/35 hover:bg-gold/10 transition"
             >
-              {rendering ? "Montando…" : "Ver meu cartão-postal"}
+              <Arrow dir={-1} />
+            </button>
+            <div className="flex-1 min-h-[220px] grid place-items-center px-2">
+              <p
+                key={current.id}
+                className="story-pop text-center text-ivory text-[1.7rem] sm:text-[2.4rem] leading-[1.35]"
+                style={{ fontFamily: currentFontCss }}
+              >
+                {current.text}
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Próxima mensagem"
+              onClick={() => move(1)}
+              className="shrink-0 w-12 h-12 rounded-full grid place-items-center text-gold border border-gold/35 hover:bg-gold/10 transition"
+            >
+              <Arrow dir={1} />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            {PRESET_MESSAGES.map((m, i) => (
+              <button
+                key={m.id}
+                type="button"
+                aria-label={`Mensagem ${i + 1}`}
+                onClick={() => setIndex(i)}
+                className={`h-2 rounded-full transition-all ${
+                  i === index ? "w-6 bg-gold" : "w-2 bg-ivory/30"
+                }`}
+              />
+            ))}
+          </div>
+          <p className="text-xs tracking-[0.3em] uppercase text-ivory/50">
+            {index + 1} de {PRESET_MESSAGES.length}
+          </p>
+          <div className="flex flex-col items-center gap-3 pt-1">
+            <button
+              type="button"
+              disabled={rendering}
+              onClick={() => void compose(current.text, "preset", current.font, current.divider)}
+              className="natal-btn natal-btn-primary text-sm disabled:opacity-50"
+            >
+              {rendering ? "Montando…" : "Escolher esta mensagem"}
             </button>
             <button
               type="button"
               onClick={() => setMode("choose")}
-              className="text-xs uppercase tracking-[0.3em] text-white/60 hover:text-white py-2"
+              className="text-[0.65rem] uppercase tracking-[0.35em] text-ivory/55 hover:text-ivory py-2"
             >
               Voltar
             </button>
           </div>
-        </>
+        </div>
       )}
 
+      {/* --------------------------- oficina do cartão -------------------------- */}
       {mode === "custom" && (
-        <>
-          <h1 className="font-display text-3xl sm:text-4xl text-snow text-center">
-            Escreva sua <span className="text-gold">mensagem</span>
-          </h1>
-          <div className="w-full max-w-xl">
-            <textarea
-              value={custom}
-              onChange={(e) => setCustom(sanitizeMessage(e.target.value))}
-              maxLength={POSTCARD_MESSAGE_MAX}
-              rows={4}
-              placeholder="Escreva algo especial…"
-              className="w-full rounded-xl border border-white/25 bg-black/40 px-4 py-4 text-lg text-snow placeholder:text-white/35 focus:outline-none focus:border-gold"
-            />
-            <p className="mt-1 text-right text-xs text-white/55">
-              {custom.length}/{POSTCARD_MESSAGE_MAX}
-            </p>
+        <div className="w-full flex flex-col items-center gap-6 animate-fade-up">
+          <div className="text-center">
+            <p className="natal-eyebrow">Oficina do seu cartão</p>
+            <h1 className="mt-2 font-display text-3xl sm:text-5xl text-snow">
+              Escreva sua <span className="font-script text-gold text-[1.2em]">mensagem</span>
+            </h1>
           </div>
-          <div className="flex flex-col items-center gap-2">
+
+          <div className="w-full grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-start">
+            <div className="flex flex-col gap-6">
+              <div>
+                <textarea
+                  value={custom}
+                  onChange={(e) => setCustom(sanitizeMessage(e.target.value))}
+                  maxLength={POSTCARD_MESSAGE_MAX}
+                  rows={3}
+                  placeholder="Escreva algo especial…"
+                  className="natal-input w-full px-5 py-4 text-lg placeholder:text-ivory/35 resize-none"
+                />
+                <p className="mt-1 text-right text-xs tracking-[0.2em] text-ivory/50">
+                  {String(custom.length).padStart(2, "0")} / {POSTCARD_MESSAGE_MAX}
+                </p>
+              </div>
+
+              <div>
+                <p className="natal-eyebrow mb-3">Estilo da letra</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {FONT_STYLES.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      data-selected={fontStyle === f.id}
+                      onClick={() => setFontStyle(f.id)}
+                      className="natal-card px-3 py-4 flex flex-col items-center gap-1 text-center"
+                    >
+                      <span
+                        className="text-ivory text-2xl leading-tight"
+                        style={{ fontFamily: f.css }}
+                      >
+                        {f.label}
+                      </span>
+                      <span className="text-[0.6rem] uppercase tracking-[0.2em] text-ivory/45">
+                        {f.hint}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="natal-eyebrow mb-3">Divisor decorativo</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {DIVIDER_STYLES.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      data-selected={dividerStyle === d.id}
+                      onClick={() => setDividerStyle(d.id)}
+                      className="natal-card px-3 py-4 flex flex-col items-center gap-2"
+                    >
+                      <DividerGlyph style={d.id} />
+                      <span className="text-[0.6rem] uppercase tracking-[0.25em] text-ivory/55">
+                        {d.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <p className="natal-eyebrow">Prévia ao vivo</p>
+              <div className="rounded-2xl overflow-hidden border border-gold/30 shadow-2xl bg-black/40 aspect-[3/2] grid place-items-center">
+                {livePreview ? (
+                  <img
+                    src={livePreview}
+                    alt="Prévia ao vivo do cartão-postal"
+                    className="block w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-xs uppercase tracking-[0.3em] text-ivory/40">
+                    Montando prévia…
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
             <button
               type="button"
-              disabled={!customValid || rendering}
-              onClick={() => void buildPreview(sanitizeMessage(custom).trim(), "custom")}
-              className="bg-gold text-[#0A1A2F] font-semibold uppercase tracking-wider rounded-md px-8 py-4 text-sm disabled:opacity-40 hover:brightness-110 transition"
+              disabled={!cleanCustom || rendering}
+              onClick={() => void compose(cleanCustom, "custom", fontStyle, dividerStyle)}
+              className="natal-btn natal-btn-primary text-sm disabled:opacity-40"
             >
               {rendering ? "Montando…" : "Ver meu cartão-postal"}
             </button>
             <button
               type="button"
               onClick={() => setMode("choose")}
-              className="text-xs uppercase tracking-[0.3em] text-white/60 hover:text-white py-2"
+              className="text-[0.65rem] uppercase tracking-[0.35em] text-ivory/55 hover:text-ivory py-2"
             >
               Voltar
             </button>
           </div>
-        </>
+        </div>
       )}
 
+      {/* -------------------------------- preview ------------------------------- */}
       {mode === "preview" && previewUrl && (
-        <>
-          <h1 className="font-display text-3xl sm:text-4xl text-snow text-center">
-            Seu <span className="text-gold">cartão-postal</span>
-          </h1>
-          <div className="w-full max-w-3xl rounded-xl overflow-hidden border border-gold/30 shadow-2xl bg-black">
-            <img src={previewUrl} alt="Prévia do cartão-postal natalino" className="block w-full h-auto" />
+        <div className="w-full flex flex-col items-center gap-5 animate-fade-up">
+          <p className="natal-eyebrow">Seu cartão-postal</p>
+          <div className="w-full max-w-3xl rounded-2xl overflow-hidden border border-gold/35 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]">
+            <img
+              src={previewUrl}
+              alt="Prévia do cartão-postal natalino"
+              className="block w-full h-auto"
+            />
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
             <button
               type="button"
               onClick={() => setMode("choose")}
               disabled={saving}
-              className="border border-white/30 text-white font-medium uppercase tracking-wider rounded-md px-7 py-4 text-sm hover:bg-white/5 transition disabled:opacity-50"
+              className="natal-btn natal-btn-ghost text-sm disabled:opacity-50"
             >
               Trocar mensagem
             </button>
@@ -250,20 +494,18 @@ export function PostcardComposer({
               type="button"
               onClick={() => void finalize()}
               disabled={saving}
-              className="bg-gold text-[#0A1A2F] font-semibold uppercase tracking-wider rounded-md px-8 py-4 text-sm hover:brightness-110 transition disabled:opacity-50"
+              className="natal-btn natal-btn-primary text-sm disabled:opacity-50"
             >
               {saving ? "Finalizando…" : "Finalizar meu cartão-postal"}
             </button>
           </div>
-          <p className="text-xs text-white/45">
+          <p className="text-xs text-ivory/45">
             Trocar a mensagem não gera a fotografia novamente.
           </p>
-        </>
+        </div>
       )}
 
-      {error && (
-        <p className="text-sm text-red-300 text-center max-w-md">{error}</p>
-      )}
+      {error && <p className="text-sm text-red-200 text-center max-w-md">{error}</p>}
     </div>
   );
 }

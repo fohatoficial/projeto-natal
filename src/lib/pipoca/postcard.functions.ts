@@ -14,7 +14,10 @@ const ConfirmInput = z.object({
   path: z.string().min(1),
   messageType: z.enum(["preset", "custom"]),
   messageText: z.string().trim().min(1).max(100),
+  fontStyle: z.enum(["classic", "script", "modern"]).default("classic"),
+  dividerStyle: z.enum(["snowflake", "star", "branch", "ornament"]).default("snowflake"),
 });
+
 
 /** Cria uma signed upload URL para o cartão-postal composto no cliente. */
 export const preparePipocaPostcardUpload = createServerFn({ method: "POST" })
@@ -62,6 +65,8 @@ export const confirmPipocaPostcard = createServerFn({ method: "POST" })
         postcard_image_path: data.path,
         postcard_message: data.messageText,
         postcard_message_type: data.messageType,
+        postcard_font_style: data.fontStyle,
+        postcard_divider_style: data.dividerStyle,
         postcard_finalized_at: new Date().toISOString(),
       };
 
@@ -73,9 +78,12 @@ export const confirmPipocaPostcard = createServerFn({ method: "POST" })
           postcard_image_path: data.path,
           postcard_message: data.messageText,
           postcard_message_type: data.messageType,
+          postcard_font_style: data.fontStyle,
+          postcard_divider_style: data.dividerStyle,
           metadata: mergedMetadata,
         })
         .eq("id", gen.id);
+
 
       if (withColumns.error) {
         console.warn(`${LOG} colunas dedicadas indisponíveis, usando metadata`);
