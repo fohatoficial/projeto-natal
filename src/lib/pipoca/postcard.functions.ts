@@ -14,7 +14,10 @@ const ConfirmInput = z.object({
   path: z.string().min(1),
   messageType: z.enum(["preset", "custom"]),
   messageText: z.string().trim().min(1).max(100),
+  fontStyle: z.enum(["classic", "script", "modern"]).default("classic"),
+  dividerStyle: z.enum(["snowflake", "star", "branch", "ornament"]).default("snowflake"),
 });
+
 
 /** Cria uma signed upload URL para o cartão-postal composto no cliente. */
 export const preparePipocaPostcardUpload = createServerFn({ method: "POST" })
