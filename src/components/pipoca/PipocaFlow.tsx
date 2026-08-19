@@ -29,6 +29,7 @@ import {
 } from "@/lib/pipoca/privacy-notice";
 import { formatWhatsappMask, isValidBrWhatsapp } from "@/lib/pipoca/whatsapp";
 import { EXPERIENCE_NAME, SPONSOR } from "@/lib/pipoca/branding";
+import { PostcardComposer } from "@/components/pipoca/PostcardComposer";
 
 
 
@@ -41,6 +42,7 @@ type Step =
   | "camera_appearance"
   | "confirm"
   | "processing"
+  | "postcard"
   | "result";
 
 type CameraVariant = "identity" | "appearance";
@@ -149,6 +151,7 @@ export function PipocaFlow() {
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [publicToken, setPublicToken] = useState<string | null>(null);
   const [resultPageUrl, setResultPageUrl] = useState<string | null>(null);
+  const [postcardUrl, setPostcardUrl] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
   const identityUploadedRef = useRef(false);
   const appearanceUploadedRef = useRef(false);
@@ -210,6 +213,7 @@ export function PipocaFlow() {
       setGeneratedUrl(null);
       setPublicToken(null);
       setResultPageUrl(null);
+      setPostcardUrl(null);
       setGenError(null);
       generationStartedRef.current = false;
       setStep("choose");
@@ -458,16 +462,32 @@ export function PipocaFlow() {
             setGeneratedUrl(imageUrl);
             setPublicToken(token);
             setResultPageUrl(url);
-            transitionTo(() => setStep("result"));
+            transitionTo(() => setStep("postcard"));
           }}
           onError={(msg) => setGenError(msg)}
         />
+      )}
+      {step === "postcard" && generatedUrl && generationId && (
+        <Screen aurora>
+          <Header subtitle="Sua mensagem de Natal" />
+          <div className="relative z-10 flex-1 min-h-0 w-full overflow-y-auto flex items-center">
+            <PostcardComposer
+              photoUrl={generatedUrl}
+              generationId={generationId}
+              firstName={firstName}
+              onFinalized={(url) => {
+                setPostcardUrl(url);
+                transitionTo(() => setStep("result"));
+              }}
+            />
+          </div>
+        </Screen>
       )}
       {step === "result" && selected && (
         <Result
           movie={selected}
           firstName={firstName}
-          imageUrl={generatedUrl}
+          imageUrl={postcardUrl ?? generatedUrl}
           publicToken={publicToken}
           resultPageUrl={resultPageUrl}
           onRestart={reset}
