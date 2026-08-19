@@ -8,6 +8,7 @@ import {
   deleteCookie,
 } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { resolveDeliverablePath } from "@/lib/pipoca/postcard.server";
 
 const LOG = "[PIPOCA_PRINT]";
 const GENERATED_BUCKET = "pipoca-generated-scenes";
@@ -232,7 +233,7 @@ export const listPrintQueue = createServerFn({ method: "POST" })
         .in("id", visitorIds),
       supabaseAdmin
         .from("pipoca_generations")
-        .select("id, final_image_path, film_id")
+        .select("*")
         .in("id", generationIds),
     ]);
 
@@ -251,12 +252,13 @@ export const listPrintQueue = createServerFn({ method: "POST" })
       rows.map(async (r) => {
         const v = vMap.get(r.visitor_id);
         const g = gMap.get(r.generation_id);
-        const filmTitle = (g && fMap.get(g.film_id)) || "Tela Brasil";
+        const filmTitle = (g && fMap.get(g.film_id)) || "Natal em Brasília";
         let thumbnailUrl: string | null = null;
-        if (g?.final_image_path) {
+        const gPath = g ? resolveDeliverablePath(g) : null;
+        if (gPath) {
           const { data: signed } = await supabaseAdmin.storage
             .from(GENERATED_BUCKET)
-            .createSignedUrl(g.final_image_path, SIGNED_TTL);
+            .createSignedUrl(gPath, SIGNED_TTL);
           thumbnailUrl = signed?.signedUrl ?? null;
         }
         const filtered = data.search?.toLowerCase().trim();
@@ -310,15 +312,16 @@ export const startPrintingItem = createServerFn({ method: "POST" })
 
     const { data: gen } = await supabaseAdmin
       .from("pipoca_generations")
-      .select("final_image_path")
+      .select("*")
       .eq("id", row.generation_id)
       .single();
 
     let imageUrl: string | null = null;
-    if (gen?.final_image_path) {
+    const startPath = gen ? resolveDeliverablePath(gen) : null;
+    if (startPath) {
       const { data: signed } = await supabaseAdmin.storage
         .from(GENERATED_BUCKET)
-        .createSignedUrl(gen.final_image_path, SIGNED_TTL);
+        .createSignedUrl(startPath, SIGNED_TTL);
       imageUrl = signed?.signedUrl ?? null;
     }
     console.log(`${LOG} impressão iniciada`, { queueId: row.id });
@@ -338,19 +341,20 @@ export const getPrintItemImage = createServerFn({ method: "POST" })
     if (!row) throw new Error("Item não encontrado");
     const { data: gen } = await supabaseAdmin
       .from("pipoca_generations")
-      .select("final_image_path, film_id")
+      .select("*")
       .eq("id", row.generation_id)
       .single();
-    if (!gen?.final_image_path) throw new Error("Imagem indisponível");
+    const printPath = gen ? resolveDeliverablePath(gen) : null;
+    if (!printPath) throw new Error("Imagem indisponível");
     const { data: signed } = await supabaseAdmin.storage
       .from(GENERATED_BUCKET)
-      .createSignedUrl(gen.final_image_path, SIGNED_TTL);
+      .createSignedUrl(printPath, SIGNED_TTL);
     const { data: film } = await supabaseAdmin
       .from("pipoca_films")
       .select("title")
       .eq("id", gen.film_id)
       .maybeSingle();
-    return { imageUrl: signed?.signedUrl ?? null, filmTitle: film?.title ?? "Tela Brasil" };
+    return { imageUrl: signed?.signedUrl ?? null, filmTitle: film?.title ?? "Natal em Brasília" };
   });
 
 export const markPrintedItem = createServerFn({ method: "POST" })

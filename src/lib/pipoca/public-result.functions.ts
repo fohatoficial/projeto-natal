@@ -50,7 +50,7 @@ export const getPublicPipocaResult = createServerFn({ method: "POST" })
 
     const { data: gen, error } = await supabaseAdmin
       .from("pipoca_generations")
-      .select("id, status, final_image_path, film_id, created_at, public_token")
+      .select("*")
       .eq("public_token", publicToken)
       .eq("status", "completed")
       .single();
@@ -64,7 +64,9 @@ export const getPublicPipocaResult = createServerFn({ method: "POST" })
       if (existing) throw new Error("Resultado ainda processando");
       throw new Error("Resultado não encontrado");
     }
-    if (!gen.final_image_path) throw new Error("Imagem indisponível");
+    const { resolveDeliverablePath } = await import("@/lib/pipoca/postcard.server");
+    const deliverablePath = resolveDeliverablePath(gen);
+    if (!deliverablePath) throw new Error("Imagem indisponível");
 
     const { data: film } = await supabaseAdmin
       .from("pipoca_films")
@@ -75,7 +77,7 @@ export const getPublicPipocaResult = createServerFn({ method: "POST" })
 
     const { data: signed, error: sErr } = await supabaseAdmin.storage
       .from(GENERATED_BUCKET)
-      .createSignedUrl(gen.final_image_path, SIGNED_DOWNLOAD_TTL);
+      .createSignedUrl(deliverablePath, SIGNED_DOWNLOAD_TTL);
     if (sErr || !signed?.signedUrl) throw new Error("Falha ao gerar URL");
 
     return {
