@@ -65,6 +65,8 @@ export const confirmPipocaPostcard = createServerFn({ method: "POST" })
         postcard_image_path: data.path,
         postcard_message: data.messageText,
         postcard_message_type: data.messageType,
+        postcard_font_style: data.fontStyle,
+        postcard_divider_style: data.dividerStyle,
         postcard_finalized_at: new Date().toISOString(),
       };
 
@@ -76,9 +78,12 @@ export const confirmPipocaPostcard = createServerFn({ method: "POST" })
           postcard_image_path: data.path,
           postcard_message: data.messageText,
           postcard_message_type: data.messageType,
+          postcard_font_style: data.fontStyle,
+          postcard_divider_style: data.dividerStyle,
           metadata: mergedMetadata,
         })
         .eq("id", gen.id);
+
 
       if (withColumns.error) {
         console.warn(`${LOG} colunas dedicadas indisponíveis, usando metadata`);
