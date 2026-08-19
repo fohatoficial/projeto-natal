@@ -13,8 +13,9 @@ export const Route = createFileRoute("/imprimir/$queueId")({
   component: PrintPage,
 });
 
-const CANVAS_W = 1200;
-const CANVAS_H = 1800;
+// 15 x 10 cm (paisagem) a 300 dpi — cartão-postal final.
+const CANVAS_W = 1772;
+const CANVAS_H = 1181;
 
 async function fetchAsObjectURL(url: string): Promise<string> {
   const r = await fetch(url, { mode: "cors", credentials: "omit" });
@@ -124,16 +125,16 @@ function PrintPage() {
   return (
     <>
       <style>{`
-        @page { size: 10cm 15cm; margin: 0; }
+        @page { size: 15cm 10cm; margin: 0; }
         html, body { margin: 0; padding: 0; background: #111; }
         @media print {
-          html, body { background: white !important; width: 10cm; height: 15cm; overflow: hidden; }
+          html, body { background: white !important; width: 15cm; height: 10cm; overflow: hidden; }
           .no-print { display: none !important; }
-          .print-frame { width: 10cm !important; height: 15cm !important; margin: 0 !important; box-shadow: none !important; }
+          .print-frame { width: 15cm !important; height: 10cm !important; margin: 0 !important; box-shadow: none !important; }
           .print-frame img { width: 100% !important; height: 100% !important; object-fit: fill !important; }
         }
         .print-frame {
-          width: 10cm; height: 15cm; background: white;
+          width: 15cm; height: 10cm; background: white;
           display: block; margin: 1rem auto;
           box-shadow: 0 4px 30px rgba(0,0,0,0.3);
           overflow: hidden;
@@ -185,7 +186,7 @@ function PrintPage() {
         )}
       </div>
       <div className="print-frame">
-        {composedUrl ? <img src={composedUrl} alt="Cena para impressão" onLoad={handleImgLoad} /> : null}
+        {composedUrl ? <img src={composedUrl} alt="Cartão-postal para impressão" onLoad={handleImgLoad} /> : null}
       </div>
     </>
   );
