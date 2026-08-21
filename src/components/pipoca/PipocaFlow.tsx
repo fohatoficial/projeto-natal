@@ -1106,13 +1106,16 @@ function OrientAppearance({
 
 function Camera({
   variant,
+  party,
   onCaptured,
   onBack,
 }: {
   variant: CameraVariant;
+  party: PartySize;
   onCaptured: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
 }) {
+  const copy = PARTY_COPY[party];
   const { videoRef, ready, errorKind, retry, capture } = useCamera(true);
   const [count, setCount] = useState<number | null>(null);
   const startedRef = useRef(false);
@@ -1142,11 +1145,9 @@ function Camera({
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
   const title =
-    variant === "identity" ? "Olhem para a câmera" : "Deem um passo para trás";
+    variant === "identity" ? copy.identityTitle : copy.appearanceTitle;
   const hint =
-    variant === "identity"
-      ? "Aproxime-se até aparecerem rosto, cabelo e ombros de quem for aparecer"
-      : "Sozinho, em casal ou com a família — todos da cabeça até a cintura";
+    variant === "identity" ? copy.identityHint : copy.appearanceHint;
   const subtitle = variant === "identity" ? "Foto 1 de 2" : "Foto 2 de 2";
   const countingDown = count !== null && count > 0;
 
@@ -1187,7 +1188,7 @@ function Camera({
               letterSpacing: "0.2em",
             }}
           >
-FIQUEM PARADOS
+            {copy.still.toUpperCase()}
           </p>
         ) : null}
 
@@ -1405,7 +1406,6 @@ type StatusFn = (args: { data: { generationId: string } }) => Promise<
 
 function Processing({
   movie,
-  firstName,
   generationId,
   errored,
   pollFn,
@@ -1413,7 +1413,6 @@ function Processing({
   onError,
 }: {
   movie: Movie;
-  firstName?: string;
   generationId: string | null;
   errored: boolean;
   pollFn: StatusFn;
@@ -1512,8 +1511,7 @@ function Processing({
 
         <div className="space-y-2">
           <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-snow leading-tight">
-            {firstName ? `${firstName}, ` : ""}preparando seu{" "}
-            <span className="text-gold">Natal abaixo de zero</span>...
+            Preparando seu <span className="text-gold">Natal abaixo de zero</span>...
           </h1>
           <p className="text-white/70 text-sm sm:text-base">
             {movie.title}
@@ -1546,14 +1544,12 @@ function Processing({
 
 function Result({
   movie,
-  firstName,
   imageUrl,
   publicToken,
   resultPageUrl,
   onRestart,
 }: {
   movie: Movie;
-  firstName?: string;
   imageUrl: string | null;
   publicToken: string | null;
   resultPageUrl: string | null;
@@ -1667,8 +1663,7 @@ function Result({
         {slide === 0 && (
           <div className="flex flex-col items-center gap-3 sm:gap-4 w-full h-full animate-fade-up">
             <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95]">
-              {firstName ? `${firstName}, seu ` : "Seu "}
-              <span className="text-gold">cartão-postal</span> está pronto
+              Seu <span className="text-gold">cartão-postal</span> está pronto
             </h1>
 
             <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto flex items-center justify-center">
