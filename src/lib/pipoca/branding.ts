@@ -7,7 +7,7 @@
  * redesenhada.
  */
 
-export const EXPERIENCE_NAME = "Natal em Brasília";
+export const EXPERIENCE_NAME = "Projeto Natal";
 export const EXPERIENCE_TAGLINE = "Cartão-postal natalino com inteligência artificial";
 
 /** Marcador visível apenas em ambiente interno enquanto nada foi definido. */

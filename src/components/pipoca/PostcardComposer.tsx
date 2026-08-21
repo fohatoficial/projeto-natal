@@ -1,31 +1,29 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo, useRef, useState } from "react";
 import {
   PRESET_MESSAGES,
   POSTCARD_MESSAGE_MAX,
   FONT_STYLES,
   DIVIDER_STYLES,
   sanitizeMessage,
-  type PostcardMessageType,
   type PostcardFontStyle,
   type PostcardDividerStyle,
+  type PostcardSelection,
 } from "@/lib/pipoca/postcard-messages";
-import { renderPostcard } from "@/lib/pipoca/postcard-template";
-import {
-  preparePipocaPostcardUpload,
-  confirmPipocaPostcard,
-} from "@/lib/pipoca/postcard.functions";
 
 const LOG = "[PIPOCA_POSTCARD_UI]";
 
 /**
  * Jornada da mensagem em etapas curtas (totem-friendly):
- *   choose  → presets → preview
- *   choose  → write (conteúdo) → style (toque visual) → preview
- * Não há prévia ao vivo: o cartão completo só aparece no modo "preview".
+ *   choose  → presets ───────────────────────┐
+ *   choose  → write (conteúdo) → style (toque) ─┴→ onReady(seleção)
+ *
+ * Este componente NÃO renderiza o cartão nem fala com o servidor: ele apenas
+ * coleta mensagem, fonte e divisor. Isso permite que a geração da fotografia
+ * rode em background desde o fim da captura, usando o tempo de personalização
+ * para esconder o delay da IA. Quem verifica o status da geração e monta o
+ * cartão é o fluxo principal (PipocaFlow), ao receber onReady.
  */
-type Mode = "choose" | "presets" | "write" | "style" | "preview";
+type Mode = "choose" | "presets" | "write" | "style";
 
 /* ---------------------------- ícones refinados ---------------------------- */
 
@@ -103,103 +101,35 @@ function DividerGlyph({ style }: { style: PostcardDividerStyle }) {
 /* -------------------------------- componente ------------------------------ */
 
 export function PostcardComposer({
-  photoUrl,
-  generationId,
-  onFinalized,
+  initial,
+  onReady,
 }: {
-  photoUrl: string;
-  generationId: string;
-  onFinalized: (postcardUrl: string) => void;
+  /**
+   * Seleção anterior, usada para restaurar o estado quando o visitante volta
+   * da prévia do cartão para trocar a mensagem. Nada é perdido.
+   */
+  initial?: PostcardSelection | null;
+  /** Disparado ao tocar em "Ver meu cartão-postal" (fim da personalização). */
+  onReady: (selection: PostcardSelection) => void;
 }) {
   const [mode, setMode] = useState<Mode>("choose");
-  const [index, setIndex] = useState(0);
-  const [custom, setCustom] = useState("");
-  const [fontStyle, setFontStyle] = useState<PostcardFontStyle>("classic");
-  const [dividerStyle, setDividerStyle] = useState<PostcardDividerStyle>("snowflake");
-  const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<PostcardMessageType>("preset");
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [rendering, setRendering] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const blobRef = useRef<Blob | null>(null);
-  const previewRef = useRef<string | null>(null);
-  const touchX = useRef<number | null>(null);
-
-  const prepareFn = useServerFn(preparePipocaPostcardUpload);
-  const confirmFn = useServerFn(confirmPipocaPostcard);
-
-  useEffect(
-    () => () => {
-      if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-    },
-    [],
-  );
-
-  const compose = useCallback(
-    async (
-      text: string,
-      type: PostcardMessageType,
-      font: PostcardFontStyle,
-      divider: PostcardDividerStyle,
-    ) => {
-      setError(null);
-      setRendering(true);
-      try {
-        const out = await renderPostcard(photoUrl, {
-          message: text,
-          fontStyle: font,
-          dividerStyle: divider,
-        });
-        if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-        previewRef.current = out.objectUrl;
-        blobRef.current = out.blob;
-        setPreviewUrl(out.objectUrl);
-        setMessage(text);
-        setMessageType(type);
-        setFontStyle(font);
-        setDividerStyle(divider);
-        setMode("preview");
-        console.log(`${LOG} preview composto`, { type, font, divider, chars: text.length });
-      } catch (e) {
-        console.warn(`${LOG} falha ao compor`, e);
-        setError("Não conseguimos montar seu cartão-postal. Tente novamente.");
-      } finally {
-        setRendering(false);
-      }
-    },
-    [photoUrl],
-  );
-
-  async function finalize() {
-    if (!blobRef.current || saving) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const { path, token } = await prepareFn({ data: { generationId } });
-      const { error: upErr } = await supabase.storage
-        .from("pipoca-generated-scenes")
-        .uploadToSignedUrl(path, token, blobRef.current, { contentType: "image/jpeg" });
-      if (upErr) throw upErr;
-      const res = await confirmFn({
-        data: {
-          generationId,
-          path,
-          messageType,
-          messageText: message,
-          fontStyle,
-          dividerStyle,
-        },
-      });
-      console.log(`${LOG} cartão finalizado`);
-      onFinalized(res.postcardUrl);
-    } catch (e) {
-      console.warn(`${LOG} falha ao finalizar`, e);
-      setError("Não conseguimos salvar seu cartão-postal. Tente novamente.");
-    } finally {
-      setSaving(false);
+  const [index, setIndex] = useState(() => {
+    if (initial?.messageType === "preset") {
+      const i = PRESET_MESSAGES.findIndex((m) => m.text === initial.message);
+      return i >= 0 ? i : 0;
     }
-  }
+    return 0;
+  });
+  const [custom, setCustom] = useState(
+    initial?.messageType === "custom" ? initial.message : "",
+  );
+  const [fontStyle, setFontStyle] = useState<PostcardFontStyle>(
+    initial?.fontStyle ?? "classic",
+  );
+  const [dividerStyle, setDividerStyle] = useState<PostcardDividerStyle>(
+    initial?.dividerStyle ?? "snowflake",
+  );
+  const touchX = useRef<number | null>(null);
 
   const current = PRESET_MESSAGES[index]!;
   const currentFontCss = useMemo(
@@ -316,11 +246,18 @@ export function PostcardComposer({
           <div className="flex flex-col items-center gap-3 pt-1">
             <button
               type="button"
-              disabled={rendering}
-              onClick={() => void compose(current.text, "preset", current.font, current.divider)}
-              className="natal-btn natal-btn-primary text-sm disabled:opacity-50"
+              onClick={() => {
+                console.log(`${LOG} mensagem pronta escolhida`, { id: current.id });
+                onReady({
+                  message: current.text,
+                  messageType: "preset",
+                  fontStyle: current.font,
+                  dividerStyle: current.divider,
+                });
+              }}
+              className="natal-btn natal-btn-primary text-sm"
             >
-              {rendering ? "Montando…" : "Escolher esta mensagem"}
+              Ver meu cartão-postal
             </button>
             <button
               type="button"
@@ -444,11 +381,23 @@ export function PostcardComposer({
           <div className="flex flex-col items-center gap-3">
             <button
               type="button"
-              disabled={!cleanCustom || rendering}
-              onClick={() => void compose(cleanCustom, "custom", fontStyle, dividerStyle)}
+              disabled={!cleanCustom}
+              onClick={() => {
+                console.log(`${LOG} mensagem personalizada concluída`, {
+                  chars: cleanCustom.length,
+                  font: fontStyle,
+                  divider: dividerStyle,
+                });
+                onReady({
+                  message: cleanCustom,
+                  messageType: "custom",
+                  fontStyle,
+                  dividerStyle,
+                });
+              }}
               className="natal-btn natal-btn-primary text-sm disabled:opacity-40"
             >
-              {rendering ? "Montando…" : "Ver meu cartão-postal"}
+              Ver meu cartão-postal
             </button>
             <button
               type="button"
@@ -460,43 +409,6 @@ export function PostcardComposer({
           </div>
         </div>
       )}
-
-      {/* -------------------------------- preview ------------------------------- */}
-      {mode === "preview" && previewUrl && (
-        <div className="w-full flex flex-col items-center gap-5 animate-fade-up">
-          <p className="natal-eyebrow">Seu cartão-postal</p>
-          <div className="w-full max-w-3xl rounded-2xl overflow-hidden border border-gold/35 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]">
-            <img
-              src={previewUrl}
-              alt="Prévia do cartão-postal natalino"
-              className="block w-full h-auto"
-            />
-          </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
-            <button
-              type="button"
-              onClick={() => setMode("choose")}
-              disabled={saving}
-              className="natal-btn natal-btn-ghost text-sm disabled:opacity-50"
-            >
-              Trocar mensagem
-            </button>
-            <button
-              type="button"
-              onClick={() => void finalize()}
-              disabled={saving}
-              className="natal-btn natal-btn-primary text-sm disabled:opacity-50"
-            >
-              {saving ? "Finalizando…" : "Finalizar meu cartão-postal"}
-            </button>
-          </div>
-          <p className="text-xs text-ivory/45">
-            Trocar a mensagem não gera a fotografia novamente.
-          </p>
-        </div>
-      )}
-
-      {error && <p className="text-sm text-red-200 text-center max-w-md">{error}</p>}
     </div>
   );
 }
