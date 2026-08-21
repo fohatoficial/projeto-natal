@@ -941,9 +941,6 @@ function ScenarioHome({
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-4xl py-4 gap-6 sm:gap-8">
         <div className="flex flex-col items-center gap-3 animate-fade-up">
-          <span className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-gold/85">
-            Experiência de Natal
-          </span>
           <h1 className="font-display text-[2.4rem] leading-[1.05] sm:text-6xl lg:text-7xl text-snow max-w-3xl">
             Neste Natal, escolha onde a{" "}
             <span className="text-gold italic">magia</span> vai acontecer.

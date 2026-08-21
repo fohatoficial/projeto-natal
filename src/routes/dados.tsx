@@ -125,9 +125,6 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
       >
         <div className="px-4 sm:px-8 pt-3 pb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <div className="min-w-0">
-            <div className="text-[10px] sm:text-xs tracking-[0.3em] uppercase text-white/50">
-              Projeto Natal · Natal em Brasília
-            </div>
             <h1 className="font-display text-lg sm:text-2xl truncate">
               Painel de resultados
             </h1>
@@ -189,7 +186,7 @@ function DashboardPresentation({ onSignOut }: { onSignOut: () => void }) {
         )}
 
         <footer className="pt-6 pb-10 text-center text-[11px] text-white/40">
-          Projeto Natal · Natal em Brasília
+          Natal em Brasília
         </footer>
       </main>
 
@@ -344,7 +341,7 @@ function SectionOverview({ data }: { data: DadosSummary }) {
         }}
       >
         <div className="text-[11px] uppercase tracking-[0.3em] text-white/50">
-          Projeto Natal
+          Panorama
         </div>
         <div className="text-base sm:text-xl text-white/85 leading-relaxed max-w-3xl">
           Um panorama em tempo real da experiência. Cada captura representa uma
