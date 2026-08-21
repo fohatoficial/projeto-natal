@@ -913,75 +913,103 @@ function GhostBtn({
   );
 }
 
-/* ---------- Step 1: Boas-vindas (cenário único: Natal em Brasília) ---------- */
+/* ---------- Step 1: Home nacional — escolha do cenário ---------- */
 
-function Welcome({
-  film,
+/**
+ * A home representa a EXPERIÊNCIA NACIONAL do Projeto Natal. Brasília é
+ * apenas um dos cenários: os quatro cards são os próprios CTAs e avançam
+ * imediatamente ao toque. Cenários sem scene pack funcional aparecem como
+ * "Em breve" e não iniciam geração. Isto é escolha de CENÁRIO — nada de
+ * capital, cidade ou localização do visitante.
+ */
+function ScenarioHome({
+  films,
   loading,
   error,
   onStart,
 }: {
-  film: Movie | null;
+  films: Movie[];
   loading: boolean;
   error: string | null;
   onStart: (m: Movie) => void;
 }) {
+  const bySlug = new Map(films.map((f) => [f.slug, f]));
+  const brasilia = bySlug.get("natal-em-brasilia") ?? null;
   return (
     <Screen aurora>
       <Header />
 
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-4 gap-5 sm:gap-7">
-        <span className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-gold/85 animate-fade-up">
-          Experiência de Natal
-        </span>
-
-        <h1 className="font-display text-[2.6rem] leading-[1.05] sm:text-6xl lg:text-7xl text-snow animate-fade-up max-w-3xl">
-          Neste Natal, viva uma{" "}
-          <span className="text-gold italic">Brasília</span> que você nunca viu.
-        </h1>
-
-        <p className="text-base sm:text-lg lg:text-xl text-white/75 max-w-xl animate-fade-up leading-relaxed">
-          Crie seu cartão-postal natalino com inteligência artificial, em frente
-          à Catedral Metropolitana coberta de neve.
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-2.5 animate-fade-up">
-          <WelcomeTag>Sozinho</WelcomeTag>
-          <WelcomeTag>Em casal</WelcomeTag>
-          <WelcomeTag>Com a família</WelcomeTag>
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-4xl py-4 gap-6 sm:gap-8">
+        <div className="flex flex-col items-center gap-3 animate-fade-up">
+          <span className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-gold/85">
+            Experiência de Natal
+          </span>
+          <h1 className="font-display text-[2.4rem] leading-[1.05] sm:text-6xl lg:text-7xl text-snow max-w-3xl">
+            Neste Natal, escolha onde a{" "}
+            <span className="text-gold italic">magia</span> vai acontecer.
+          </h1>
+          <p className="text-base sm:text-lg lg:text-xl text-white/75 max-w-xl leading-relaxed">
+            Transforme sua foto em um cartão-postal natalino coberto de neve,
+            tendo como cenário lugares icônicos do Brasil.
+          </p>
         </div>
 
-        {film?.posterUrl ? (
-          <div className="relative w-[62vw] max-w-[280px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/12 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] animate-fade-up">
-            <img
-              src={film.posterUrl}
-              alt={film.title}
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-            <span className="absolute bottom-3 inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-snow/90">
-              {film.title}
-            </span>
-          </div>
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 w-full animate-fade-up">
+          {SCENARIOS.map((s) => {
+            const film = bySlug.get(s.slug) ?? null;
+            const enabled = s.available && !loading && !!film;
+            const poster =
+              film && film.posterUrl.startsWith("https://") ? film.posterUrl : null;
+            return (
+              <button
+                key={s.slug}
+                type="button"
+                disabled={!enabled}
+                onClick={() => film && onStart(film)}
+                className="natal-card group relative overflow-hidden min-h-[150px] sm:min-h-[220px] flex flex-col items-center justify-center gap-1.5 p-5 text-center disabled:cursor-not-allowed"
+              >
+                {poster ? (
+                  <>
+                    <img
+                      src={poster}
+                      alt=""
+                      aria-hidden
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
+                  </>
+                ) : (
+                  <span className="w-9 h-9 sm:w-11 sm:h-11 text-gold/50 mb-1">
+                    <IconSnowflake />
+                  </span>
+                )}
+                <span className="relative font-display text-2xl sm:text-4xl text-snow uppercase tracking-wide">
+                  {s.city}
+                </span>
+                <span className="relative natal-eyebrow">{s.landmark}</span>
+                {!s.available ? (
+                  <span className="relative mt-2 inline-block border border-gold/40 text-gold/90 text-[9px] sm:text-[10px] uppercase tracking-[0.3em] px-3 py-1 rounded-full">
+                    Em breve
+                  </span>
+                ) : null}
+                {s.available && loading ? (
+                  <span className="relative mt-2 text-[10px] uppercase tracking-[0.3em] text-white/50 animate-pulse-soft">
+                    Preparando…
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        {error ? (
+          <p className="text-sm text-white/85 max-w-md">{error}</p>
         ) : null}
-
-        <div className="pt-1">
-          {loading ? (
-            <p className="text-sm text-white/60 tracking-wide animate-pulse-soft">
-              Preparando a experiência…
-            </p>
-          ) : error ? (
-            <p className="text-sm text-white/85 max-w-md">{error}</p>
-          ) : !film ? (
-            <p className="text-sm text-white/70 max-w-md">
-              O cenário de Natal ainda não está disponível.
-            </p>
-          ) : (
-            <PrimaryCta onClick={() => onStart(film)}>
-              Criar meu cartão-postal
-            </PrimaryCta>
-          )}
-        </div>
+        {!loading && !error && !brasilia ? (
+          <p className="text-sm text-white/70 max-w-md">
+            O cenário de Brasília ainda não está disponível.
+          </p>
+        ) : null}
       </div>
 
       <div className="relative z-10 shrink-0 h-8 flex items-center justify-center">
@@ -992,15 +1020,6 @@ function Welcome({
         ) : null}
       </div>
     </Screen>
-  );
-}
-
-function WelcomeTag({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-2 border border-white/15 bg-white/5 text-white/85 px-4 py-1.5 rounded-full text-xs sm:text-sm">
-      <span className="inline-block w-1.5 h-1.5 rounded-full bg-gold" />
-      {children}
-    </span>
   );
 }
 
@@ -1630,44 +1649,15 @@ function Confirm({
 }
 
 
-/* ---------- Step 5: Processing ---------- */
+/* ---------- Espera elegante (só se a geração ainda não terminou) ---------- */
 
-type StatusFn = (args: { data: { generationId: string } }) => Promise<
-  | { status: "queued" | "processing" }
-  | { status: "failed"; error: string }
-  | {
-      status: "completed";
-      generationId: string;
-      imageUrl: string;
-      publicToken: string;
-      resultPageUrl: string;
-    }
->;
-
-function Processing({
-  movie,
-  generationId,
-  errored,
-  pollFn,
-  onDone,
-  onError,
-}: {
-  movie: Movie;
-  generationId: string | null;
-  errored: boolean;
-  pollFn: StatusFn;
-  onDone: (imageUrl: string, publicToken: string, resultPageUrl: string) => void;
-  onError: (msg: string) => void;
-}) {
-  const [phraseIdx, setPhraseIdx] = useState(0);
+/**
+ * Exibida SOMENTE quando o visitante termina a personalização antes da IA.
+ * O polling em background continua ativo no fluxo principal; esta tela é
+ * puramente apresentacional e avança sozinha quando a foto fica pronta.
+ */
+function PostcardWaiting() {
   const [iconIdx, setIconIdx] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPhraseIdx((i) => (i + 1) % LOADING_PHRASES.length);
-    }, 1600);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1676,44 +1666,9 @@ function Processing({
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!generationId || errored) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const tick = async () => {
-      if (cancelled) return;
-      try {
-        console.log(`${GEN_LOG} polling`, { generationId });
-        const res = await pollFn({ data: { generationId } });
-        if (cancelled) return;
-        if (res.status === "completed") {
-          console.log(`${GEN_LOG} concluída`);
-          onDone(res.imageUrl, res.publicToken, res.resultPageUrl);
-          return;
-        }
-        if (res.status === "failed") {
-          console.warn(`${GEN_LOG} falhou`);
-          onError(res.error || "Falha na geração");
-          return;
-        }
-        timer = setTimeout(tick, 2500);
-      } catch (e) {
-        if (cancelled) return;
-        console.warn(`${GEN_LOG} erro ao consultar`, e);
-        timer = setTimeout(tick, 4000);
-      }
-    };
-    timer = setTimeout(tick, 1500);
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [generationId, errored, pollFn, onDone, onError]);
-
   return (
     <Screen aurora>
-      <Header subtitle="Criando seu cartão-postal" />
+      <Header subtitle="Quase lá" />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center text-center gap-6 sm:gap-8 max-w-xl">
         <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full border border-gold/20 grid place-items-center relative animate-badge-in">
@@ -1730,7 +1685,7 @@ function Processing({
               } as React.CSSProperties}
             />
           ))}
-          {/* Rotating cinema icon */}
+          {/* Rotating winter icon */}
           <div className="relative w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 grid place-items-center">
             {WINTER_ICONS.map((Icon, i) => (
               <div
@@ -1747,32 +1702,71 @@ function Processing({
           </div>
         </div>
 
-
-
-        <div className="space-y-2">
+        <div className="space-y-3">
           <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-snow leading-tight">
-            Preparando seu <span className="text-gold">Natal abaixo de zero</span>...
+            Seu cartão está <span className="text-gold">quase pronto</span>.
           </h1>
           <p className="text-white/70 text-sm sm:text-base">
-            {movie.title}
+            Estamos dando os últimos toques no seu Natal.
           </p>
-        </div>
-
-        <div className="h-6 relative w-full max-w-md">
-          {LOADING_PHRASES.map((p, i) => (
-            <p
-              key={p}
-              className={`absolute inset-0 text-sm sm:text-base tracking-wide text-gold transition-opacity duration-500 ${
-                i === phraseIdx ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              {p}
-            </p>
-          ))}
         </div>
 
         <div className="w-full max-w-xs h-1.5 rounded-full bg-white/10 overflow-hidden shimmer-bar">
           <div className="h-full w-1/3 bg-gold rounded-full" />
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+/* ---------- Prévia do cartão-postal montado ---------- */
+
+/**
+ * O cartão completo só aparece aqui, já renderizado pelo template-mestre.
+ * "Trocar mensagem" volta à jornada da mensagem SEM gerar a foto novamente
+ * (a seleção anterior é restaurada no compositor).
+ */
+function PostcardPreview({
+  imageUrl,
+  saving,
+  error,
+  onEdit,
+  onFinalize,
+}: {
+  imageUrl: string;
+  saving: boolean;
+  error: string | null;
+  onEdit: () => void;
+  onFinalize: () => void;
+}) {
+  return (
+    <Screen aurora>
+      <Header subtitle="Seu cartão-postal" />
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-3 gap-4 sm:gap-5 overflow-y-auto">
+        <h1 className="font-display text-3xl sm:text-5xl text-snow leading-[1.05] animate-fade-up shrink-0">
+          Confira seu{" "}
+          <span className="font-script text-gold text-[1.2em] leading-none">cartão-postal</span>
+        </h1>
+        <div className="w-full max-w-2xl rounded-2xl overflow-hidden border border-gold/35 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)] animate-fade-up shrink-0">
+          <img
+            src={imageUrl}
+            alt="Cartão-postal natalino montado"
+            className="block w-full h-auto"
+          />
+        </div>
+        <div className="flex flex-col items-center gap-3 shrink-0">
+          <PrimaryCta onClick={onFinalize} disabled={saving}>
+            {saving ? "Finalizando…" : "Finalizar meu cartão-postal"}
+          </PrimaryCta>
+          <GhostBtn onClick={onEdit} disabled={saving}>
+            Trocar mensagem
+          </GhostBtn>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-white/45">
+            Trocar a mensagem não gera a fotografia novamente
+          </p>
+          {error ? (
+            <p className="text-sm text-red-200 max-w-md">{error}</p>
+          ) : null}
         </div>
       </div>
     </Screen>
