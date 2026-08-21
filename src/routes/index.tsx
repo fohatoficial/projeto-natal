@@ -4,17 +4,17 @@ import { PipocaFlow } from "@/components/pipoca/PipocaFlow";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Natal em Brasília — Seu cartão-postal natalino" },
+      { title: "Projeto Natal — Cartões-postais natalinos com IA" },
       {
         name: "description",
         content:
-          "Tire sua foto e receba um cartão-postal natalino em frente à Catedral Metropolitana de Brasília, criado com inteligência artificial.",
+          "Transforme sua foto em um cartão-postal natalino coberto de neve, tendo como cenário lugares icônicos do Brasil.",
       },
-      { property: "og:title", content: "Natal em Brasília — Seu cartão-postal natalino" },
+      { property: "og:title", content: "Projeto Natal — Cartões-postais natalinos com IA" },
       {
         property: "og:description",
         content:
-          "Sozinho, em casal ou com a família: viva uma Brasília coberta de neve e leve seu cartão-postal de Natal.",
+          "Neste Natal, escolha onde a magia vai acontecer: sua foto vira um cartão-postal coberto de neve em cenários icônicos do Brasil.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

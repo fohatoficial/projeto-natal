@@ -19,6 +19,16 @@ import {
   createPipocaGeneration,
   getPipocaGenerationStatus,
 } from "@/lib/pipoca/generation.functions";
+import {
+  preparePipocaPostcardUpload,
+  confirmPipocaPostcard,
+} from "@/lib/pipoca/postcard.functions";
+import {
+  renderPostcard,
+  type PostcardRender,
+} from "@/lib/pipoca/postcard-template";
+import type { PostcardSelection } from "@/lib/pipoca/postcard-messages";
+import { SCENARIOS } from "@/lib/pipoca/scenarios";
 import { deriveIdentityFaceCrop } from "@/lib/pipoca/faceCrop";
 import { EXPERIENCE_NAME, SPONSOR } from "@/lib/pipoca/branding";
 import { PostcardComposer } from "@/components/pipoca/PostcardComposer";
@@ -33,8 +43,10 @@ type Step =
   | "orient_appearance"
   | "camera_appearance"
   | "confirm"
-  | "processing"
   | "postcard"
+  | "postcard_wait"
+  | "postcard_preview"
+  | "postcard_error"
   | "result";
 
 type CameraVariant = "identity" | "appearance";
@@ -92,12 +104,6 @@ const PARTY_COPY: Record<
   },
 };
 
-const LOADING_PHRASES = [
-  "Preparando seu Natal abaixo de zero...",
-  "Fazendo a neve cair sobre Brasília...",
-  "Acendendo as luzes da Catedral...",
-  "Finalizando seu cartão-postal...",
-];
 
 const IconSnowflake = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
@@ -197,15 +203,24 @@ export function PipocaFlow() {
   const [resultPageUrl, setResultPageUrl] = useState<string | null>(null);
   const [postcardUrl, setPostcardUrl] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
+  const [selection, setSelection] = useState<PostcardSelection | null>(null);
+  const [postcardRender, setPostcardRender] = useState<PostcardRender | null>(null);
+  const [postcardSaveError, setPostcardSaveError] = useState<string | null>(null);
+  const [savingPostcard, setSavingPostcard] = useState(false);
+  const [renderFailed, setRenderFailed] = useState(false);
   const identityUploadedRef = useRef(false);
   const appearanceUploadedRef = useRef(false);
   const generationStartedRef = useRef(false);
+  const postcardRenderRef = useRef<PostcardRender | null>(null);
+  const renderingCardRef = useRef(false);
   const { films, loading, error } = usePipocaFilms();
 
   const prepareFn = useServerFn(createPipocaCaptureUpload);
   const confirmFn = useServerFn(confirmPipocaCaptureUpload);
   const createGenFn = useServerFn(createPipocaGeneration);
   const statusGenFn = useServerFn(getPipocaGenerationStatus);
+  const preparePostcardFn = useServerFn(preparePipocaPostcardUpload);
+  const confirmPostcardFn = useServerFn(confirmPipocaPostcard);
   
 
   // Keep refs in sync so the unmount cleanup can revoke without re-running
@@ -222,6 +237,7 @@ export function PipocaFlow() {
     return () => {
       if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
       if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
+      if (postcardRenderRef.current) URL.revokeObjectURL(postcardRenderRef.current.objectUrl);
       // Encerra a câmera ao desmontar o fluxo principal.
       releaseSharedCamera();
     };
@@ -258,6 +274,14 @@ export function PipocaFlow() {
       setResultPageUrl(null);
       setPostcardUrl(null);
       setGenError(null);
+      setSelection(null);
+      if (postcardRenderRef.current) URL.revokeObjectURL(postcardRenderRef.current.objectUrl);
+      postcardRenderRef.current = null;
+      setPostcardRender(null);
+      setPostcardSaveError(null);
+      setSavingPostcard(false);
+      setRenderFailed(false);
+      renderingCardRef.current = false;
       generationStartedRef.current = false;
       setStep("choose");
     });
@@ -352,7 +376,9 @@ export function PipocaFlow() {
       });
       setUploadStatus("idle");
       releaseSharedCamera();
-      transitionTo(() => setStep("processing"));
+      // A geração da fotografia começa IMEDIATAMENTE em background; o
+      // visitante segue direto para a mensagem, sem tela de loading.
+      transitionTo(() => setStep("postcard"));
       void startGeneration(current.sessionId, current.captureId);
     } catch (err) {
       const stage = !current
@@ -371,6 +397,7 @@ export function PipocaFlow() {
   const retryGeneration = useCallback(() => {
     if (!prepared) return;
     setGenError(null);
+    setRenderFailed(false);
     setGenerationId(null);
     setGeneratedUrl(null);
     setPublicToken(null);
@@ -391,16 +418,149 @@ export function PipocaFlow() {
       setPublicToken(null);
       setResultPageUrl(null);
       setGenError(null);
+      setRenderFailed(false);
       setUploadStatus("idle");
       setUploadError(null);
       setStep("camera_identity");
     });
 
+  /* ----- Geração em background: polling silencioso durante a mensagem ----- */
+
+  useEffect(() => {
+    if (!generationId || generatedUrl || genError) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        console.log(`${GEN_LOG} polling (background)`, { generationId });
+        const res = await statusGenFn({ data: { generationId } });
+        if (cancelled) return;
+        if (res.status === "completed") {
+          console.log(`${GEN_LOG} concluída em background`);
+          setGeneratedUrl(res.imageUrl);
+          setPublicToken(res.publicToken);
+          setResultPageUrl(res.resultPageUrl);
+          return;
+        }
+        if (res.status === "failed") {
+          // NÃO interrompe a personalização — o erro só aparece ao pedir o cartão.
+          console.warn(`${GEN_LOG} falhou em background`);
+          setGenError(res.error || "Falha na geração");
+          return;
+        }
+        timer = setTimeout(tick, 2500);
+      } catch (e) {
+        if (cancelled) return;
+        console.warn(`${GEN_LOG} erro ao consultar`, e);
+        timer = setTimeout(tick, 4000);
+      }
+    };
+    timer = setTimeout(tick, 1500);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [generationId, generatedUrl, genError, statusGenFn]);
+
+  /** Monta o cartão-postal no template-mestre e abre a prévia. */
+  const renderAndShow = useCallback(
+    async (sel: PostcardSelection, imageUrl: string) => {
+      if (renderingCardRef.current) return;
+      renderingCardRef.current = true;
+      try {
+        const out = await renderPostcard(imageUrl, {
+          message: sel.message,
+          fontStyle: sel.fontStyle,
+          dividerStyle: sel.dividerStyle,
+        });
+        if (postcardRenderRef.current) URL.revokeObjectURL(postcardRenderRef.current.objectUrl);
+        postcardRenderRef.current = out;
+        setPostcardRender(out);
+        setPostcardSaveError(null);
+        setRenderFailed(false);
+        transitionTo(() => setStep("postcard_preview"));
+      } catch (e) {
+        console.warn(`${GEN_LOG} falha ao montar cartão-postal`, e);
+        setRenderFailed(true);
+        transitionTo(() => setStep("postcard_error"));
+      } finally {
+        renderingCardRef.current = false;
+      }
+    },
+    [],
+  );
+
+  // Espera elegante: assim que a geração conclui, monta e avança sem novo clique.
+  useEffect(() => {
+    if (step !== "postcard_wait") return;
+    if (genError) {
+      transitionTo(() => setStep("postcard_error"));
+      return;
+    }
+    if (generatedUrl && selection) void renderAndShow(selection, generatedUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, genError, generatedUrl, selection, renderAndShow]);
+
+  /** "Ver meu cartão-postal": verifica o status da geração e decide o caminho. */
+  const handlePostcardReady = useCallback(
+    (sel: PostcardSelection) => {
+      console.log(`${UX} mensagem concluída, verificando geração`, {
+        type: sel.messageType,
+        chars: sel.message.length,
+      });
+      setSelection(sel);
+      if (genError) {
+        transitionTo(() => setStep("postcard_error"));
+      } else if (generatedUrl) {
+        // CASO A — geração já concluída durante a personalização.
+        void renderAndShow(sel, generatedUrl);
+      } else {
+        // CASO B — ainda processando: tela elegante de espera com polling.
+        transitionTo(() => setStep("postcard_wait"));
+      }
+    },
+    [genError, generatedUrl, renderAndShow],
+  );
+
+  const finalizePostcard = useCallback(async () => {
+    const render = postcardRenderRef.current;
+    if (!render || !generationId || !selection || savingPostcard) return;
+    setSavingPostcard(true);
+    setPostcardSaveError(null);
+    try {
+      const { path, token } = await preparePostcardFn({ data: { generationId } });
+      const { error: upErr } = await supabase.storage
+        .from("pipoca-generated-scenes")
+        .uploadToSignedUrl(path, token, render.blob, { contentType: "image/jpeg" });
+      if (upErr) throw upErr;
+      const res = await confirmPostcardFn({
+        data: {
+          generationId,
+          path,
+          messageType: selection.messageType,
+          messageText: selection.message,
+          fontStyle: selection.fontStyle,
+          dividerStyle: selection.dividerStyle,
+        },
+      });
+      console.log(`${GEN_LOG} cartão-postal finalizado`);
+      setPostcardUrl(res.postcardUrl);
+      transitionTo(() => setStep("result"));
+    } catch (e) {
+      console.warn(`${GEN_LOG} falha ao finalizar cartão-postal`, e);
+      setPostcardSaveError("Não conseguimos salvar seu cartão-postal. Tente novamente.");
+    } finally {
+      setSavingPostcard(false);
+    }
+  }, [generationId, selection, savingPostcard, preparePostcardFn, confirmPostcardFn]);
+
   return (
     <div className="bg-cinema text-white relative">
       {step === "choose" && (
-        <Welcome
-          film={films[0] ?? null}
+        <ScenarioHome
+          films={films}
           loading={loading}
           error={error}
           onStart={(m) => {
@@ -496,35 +656,23 @@ export function PipocaFlow() {
           }}
         />
       )}
-      {step === "processing" && selected && (
-        <Processing
-          movie={selected}
-          generationId={generationId}
-          errored={Boolean(genError)}
-          pollFn={statusGenFn}
-          onDone={(imageUrl, token, url) => {
-            setGeneratedUrl(imageUrl);
-            setPublicToken(token);
-            setResultPageUrl(url);
-            transitionTo(() => setStep("postcard"));
-          }}
-          onError={(msg) => setGenError(msg)}
-        />
-      )}
-      {step === "postcard" && generatedUrl && generationId && (
+      {step === "postcard" && (
         <Screen aurora>
           <Header subtitle="Sua mensagem de Natal" />
           <div className="relative z-10 flex-1 min-h-0 w-full overflow-y-auto flex items-center">
-            <PostcardComposer
-              photoUrl={generatedUrl}
-              generationId={generationId}
-              onFinalized={(url) => {
-                setPostcardUrl(url);
-                transitionTo(() => setStep("result"));
-              }}
-            />
+            <PostcardComposer initial={selection} onReady={handlePostcardReady} />
           </div>
         </Screen>
+      )}
+      {step === "postcard_wait" && <PostcardWaiting />}
+      {step === "postcard_preview" && postcardRender && (
+        <PostcardPreview
+          imageUrl={postcardRender.objectUrl}
+          saving={savingPostcard}
+          error={postcardSaveError}
+          onEdit={() => transitionTo(() => setStep("postcard"))}
+          onFinalize={() => void finalizePostcard()}
+        />
       )}
       {step === "result" && selected && (
         <Result
@@ -536,10 +684,22 @@ export function PipocaFlow() {
         />
       )}
 
-      {step === "processing" && genError && (
+      {step === "postcard_error" && (
         <GenerationError
-          message={genError}
-          onRetry={retryGeneration}
+          message={
+            genError ??
+            "Não conseguimos montar seu cartão-postal. Toque para tentar novamente."
+          }
+          onRetry={() => {
+            if (genError) {
+              // Nova tentativa preserva cenário, participantes, mensagem e estilo.
+              retryGeneration();
+              transitionTo(() => setStep("postcard_wait"));
+            } else if (generatedUrl && selection) {
+              setRenderFailed(false);
+              void renderAndShow(selection, generatedUrl);
+            }
+          }}
           onRestart={reset}
         />
       )}
@@ -753,75 +913,103 @@ function GhostBtn({
   );
 }
 
-/* ---------- Step 1: Boas-vindas (cenário único: Natal em Brasília) ---------- */
+/* ---------- Step 1: Home nacional — escolha do cenário ---------- */
 
-function Welcome({
-  film,
+/**
+ * A home representa a EXPERIÊNCIA NACIONAL do Projeto Natal. Brasília é
+ * apenas um dos cenários: os quatro cards são os próprios CTAs e avançam
+ * imediatamente ao toque. Cenários sem scene pack funcional aparecem como
+ * "Em breve" e não iniciam geração. Isto é escolha de CENÁRIO — nada de
+ * capital, cidade ou localização do visitante.
+ */
+function ScenarioHome({
+  films,
   loading,
   error,
   onStart,
 }: {
-  film: Movie | null;
+  films: Movie[];
   loading: boolean;
   error: string | null;
   onStart: (m: Movie) => void;
 }) {
+  const bySlug = new Map(films.map((f) => [f.slug, f]));
+  const brasilia = bySlug.get("natal-em-brasilia") ?? null;
   return (
     <Screen aurora>
       <Header />
 
-      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-4 gap-5 sm:gap-7">
-        <span className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-gold/85 animate-fade-up">
-          Experiência de Natal
-        </span>
-
-        <h1 className="font-display text-[2.6rem] leading-[1.05] sm:text-6xl lg:text-7xl text-snow animate-fade-up max-w-3xl">
-          Neste Natal, viva uma{" "}
-          <span className="text-gold italic">Brasília</span> que você nunca viu.
-        </h1>
-
-        <p className="text-base sm:text-lg lg:text-xl text-white/75 max-w-xl animate-fade-up leading-relaxed">
-          Crie seu cartão-postal natalino com inteligência artificial, em frente
-          à Catedral Metropolitana coberta de neve.
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-2.5 animate-fade-up">
-          <WelcomeTag>Sozinho</WelcomeTag>
-          <WelcomeTag>Em casal</WelcomeTag>
-          <WelcomeTag>Com a família</WelcomeTag>
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-4xl py-4 gap-6 sm:gap-8">
+        <div className="flex flex-col items-center gap-3 animate-fade-up">
+          <span className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-gold/85">
+            Experiência de Natal
+          </span>
+          <h1 className="font-display text-[2.4rem] leading-[1.05] sm:text-6xl lg:text-7xl text-snow max-w-3xl">
+            Neste Natal, escolha onde a{" "}
+            <span className="text-gold italic">magia</span> vai acontecer.
+          </h1>
+          <p className="text-base sm:text-lg lg:text-xl text-white/75 max-w-xl leading-relaxed">
+            Transforme sua foto em um cartão-postal natalino coberto de neve,
+            tendo como cenário lugares icônicos do Brasil.
+          </p>
         </div>
 
-        {film?.posterUrl ? (
-          <div className="relative w-[62vw] max-w-[280px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/12 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] animate-fade-up">
-            <img
-              src={film.posterUrl}
-              alt={film.title}
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-            <span className="absolute bottom-3 inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-snow/90">
-              {film.title}
-            </span>
-          </div>
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 w-full animate-fade-up">
+          {SCENARIOS.map((s) => {
+            const film = bySlug.get(s.slug) ?? null;
+            const enabled = s.available && !loading && !!film;
+            const poster =
+              film && film.posterUrl.startsWith("https://") ? film.posterUrl : null;
+            return (
+              <button
+                key={s.slug}
+                type="button"
+                disabled={!enabled}
+                onClick={() => film && onStart(film)}
+                className="natal-card group relative overflow-hidden min-h-[150px] sm:min-h-[220px] flex flex-col items-center justify-center gap-1.5 p-5 text-center disabled:cursor-not-allowed"
+              >
+                {poster ? (
+                  <>
+                    <img
+                      src={poster}
+                      alt=""
+                      aria-hidden
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/15" />
+                  </>
+                ) : (
+                  <span className="w-9 h-9 sm:w-11 sm:h-11 text-gold/50 mb-1">
+                    <IconSnowflake />
+                  </span>
+                )}
+                <span className="relative font-display text-2xl sm:text-4xl text-snow uppercase tracking-wide">
+                  {s.city}
+                </span>
+                <span className="relative natal-eyebrow">{s.landmark}</span>
+                {!s.available ? (
+                  <span className="relative mt-2 inline-block border border-gold/40 text-gold/90 text-[9px] sm:text-[10px] uppercase tracking-[0.3em] px-3 py-1 rounded-full">
+                    Em breve
+                  </span>
+                ) : null}
+                {s.available && loading ? (
+                  <span className="relative mt-2 text-[10px] uppercase tracking-[0.3em] text-white/50 animate-pulse-soft">
+                    Preparando…
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        {error ? (
+          <p className="text-sm text-white/85 max-w-md">{error}</p>
         ) : null}
-
-        <div className="pt-1">
-          {loading ? (
-            <p className="text-sm text-white/60 tracking-wide animate-pulse-soft">
-              Preparando a experiência…
-            </p>
-          ) : error ? (
-            <p className="text-sm text-white/85 max-w-md">{error}</p>
-          ) : !film ? (
-            <p className="text-sm text-white/70 max-w-md">
-              O cenário de Natal ainda não está disponível.
-            </p>
-          ) : (
-            <PrimaryCta onClick={() => onStart(film)}>
-              Criar meu cartão-postal
-            </PrimaryCta>
-          )}
-        </div>
+        {!loading && !error && !brasilia ? (
+          <p className="text-sm text-white/70 max-w-md">
+            O cenário de Brasília ainda não está disponível.
+          </p>
+        ) : null}
       </div>
 
       <div className="relative z-10 shrink-0 h-8 flex items-center justify-center">
@@ -832,15 +1020,6 @@ function Welcome({
         ) : null}
       </div>
     </Screen>
-  );
-}
-
-function WelcomeTag({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-2 border border-white/15 bg-white/5 text-white/85 px-4 py-1.5 rounded-full text-xs sm:text-sm">
-      <span className="inline-block w-1.5 h-1.5 rounded-full bg-gold" />
-      {children}
-    </span>
   );
 }
 
@@ -1470,44 +1649,15 @@ function Confirm({
 }
 
 
-/* ---------- Step 5: Processing ---------- */
+/* ---------- Espera elegante (só se a geração ainda não terminou) ---------- */
 
-type StatusFn = (args: { data: { generationId: string } }) => Promise<
-  | { status: "queued" | "processing" }
-  | { status: "failed"; error: string }
-  | {
-      status: "completed";
-      generationId: string;
-      imageUrl: string;
-      publicToken: string;
-      resultPageUrl: string;
-    }
->;
-
-function Processing({
-  movie,
-  generationId,
-  errored,
-  pollFn,
-  onDone,
-  onError,
-}: {
-  movie: Movie;
-  generationId: string | null;
-  errored: boolean;
-  pollFn: StatusFn;
-  onDone: (imageUrl: string, publicToken: string, resultPageUrl: string) => void;
-  onError: (msg: string) => void;
-}) {
-  const [phraseIdx, setPhraseIdx] = useState(0);
+/**
+ * Exibida SOMENTE quando o visitante termina a personalização antes da IA.
+ * O polling em background continua ativo no fluxo principal; esta tela é
+ * puramente apresentacional e avança sozinha quando a foto fica pronta.
+ */
+function PostcardWaiting() {
   const [iconIdx, setIconIdx] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPhraseIdx((i) => (i + 1) % LOADING_PHRASES.length);
-    }, 1600);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1516,44 +1666,9 @@ function Processing({
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!generationId || errored) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const tick = async () => {
-      if (cancelled) return;
-      try {
-        console.log(`${GEN_LOG} polling`, { generationId });
-        const res = await pollFn({ data: { generationId } });
-        if (cancelled) return;
-        if (res.status === "completed") {
-          console.log(`${GEN_LOG} concluída`);
-          onDone(res.imageUrl, res.publicToken, res.resultPageUrl);
-          return;
-        }
-        if (res.status === "failed") {
-          console.warn(`${GEN_LOG} falhou`);
-          onError(res.error || "Falha na geração");
-          return;
-        }
-        timer = setTimeout(tick, 2500);
-      } catch (e) {
-        if (cancelled) return;
-        console.warn(`${GEN_LOG} erro ao consultar`, e);
-        timer = setTimeout(tick, 4000);
-      }
-    };
-    timer = setTimeout(tick, 1500);
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [generationId, errored, pollFn, onDone, onError]);
-
   return (
     <Screen aurora>
-      <Header subtitle="Criando seu cartão-postal" />
+      <Header subtitle="Quase lá" />
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center text-center gap-6 sm:gap-8 max-w-xl">
         <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full border border-gold/20 grid place-items-center relative animate-badge-in">
@@ -1570,7 +1685,7 @@ function Processing({
               } as React.CSSProperties}
             />
           ))}
-          {/* Rotating cinema icon */}
+          {/* Rotating winter icon */}
           <div className="relative w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 grid place-items-center">
             {WINTER_ICONS.map((Icon, i) => (
               <div
@@ -1587,32 +1702,71 @@ function Processing({
           </div>
         </div>
 
-
-
-        <div className="space-y-2">
+        <div className="space-y-3">
           <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-snow leading-tight">
-            Preparando seu <span className="text-gold">Natal abaixo de zero</span>...
+            Seu cartão está <span className="text-gold">quase pronto</span>.
           </h1>
           <p className="text-white/70 text-sm sm:text-base">
-            {movie.title}
+            Estamos dando os últimos toques no seu Natal.
           </p>
-        </div>
-
-        <div className="h-6 relative w-full max-w-md">
-          {LOADING_PHRASES.map((p, i) => (
-            <p
-              key={p}
-              className={`absolute inset-0 text-sm sm:text-base tracking-wide text-gold transition-opacity duration-500 ${
-                i === phraseIdx ? "opacity-100" : "opacity-0"
-              }`}
-            >
-              {p}
-            </p>
-          ))}
         </div>
 
         <div className="w-full max-w-xs h-1.5 rounded-full bg-white/10 overflow-hidden shimmer-bar">
           <div className="h-full w-1/3 bg-gold rounded-full" />
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+/* ---------- Prévia do cartão-postal montado ---------- */
+
+/**
+ * O cartão completo só aparece aqui, já renderizado pelo template-mestre.
+ * "Trocar mensagem" volta à jornada da mensagem SEM gerar a foto novamente
+ * (a seleção anterior é restaurada no compositor).
+ */
+function PostcardPreview({
+  imageUrl,
+  saving,
+  error,
+  onEdit,
+  onFinalize,
+}: {
+  imageUrl: string;
+  saving: boolean;
+  error: string | null;
+  onEdit: () => void;
+  onFinalize: () => void;
+}) {
+  return (
+    <Screen aurora>
+      <Header subtitle="Seu cartão-postal" />
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-3xl py-3 gap-4 sm:gap-5 overflow-y-auto">
+        <h1 className="font-display text-3xl sm:text-5xl text-snow leading-[1.05] animate-fade-up shrink-0">
+          Confira seu{" "}
+          <span className="font-script text-gold text-[1.2em] leading-none">cartão-postal</span>
+        </h1>
+        <div className="w-full max-w-2xl rounded-2xl overflow-hidden border border-gold/35 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)] animate-fade-up shrink-0">
+          <img
+            src={imageUrl}
+            alt="Cartão-postal natalino montado"
+            className="block w-full h-auto"
+          />
+        </div>
+        <div className="flex flex-col items-center gap-3 shrink-0">
+          <PrimaryCta onClick={onFinalize} disabled={saving}>
+            {saving ? "Finalizando…" : "Finalizar meu cartão-postal"}
+          </PrimaryCta>
+          <GhostBtn onClick={onEdit} disabled={saving}>
+            Trocar mensagem
+          </GhostBtn>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-white/45">
+            Trocar a mensagem não gera a fotografia novamente
+          </p>
+          {error ? (
+            <p className="text-sm text-red-200 max-w-md">{error}</p>
+          ) : null}
         </div>
       </div>
     </Screen>

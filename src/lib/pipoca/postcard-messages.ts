@@ -6,6 +6,18 @@ export type PostcardMessageType = "preset" | "custom";
 export type PostcardFontStyle = "classic" | "script" | "modern";
 export type PostcardDividerStyle = "snowflake" | "star" | "branch" | "ornament";
 
+/**
+ * Escolha completa do visitante na jornada da mensagem. Coletada enquanto a
+ * fotografia ainda está sendo gerada em background e usada depois na
+ * montagem determinística do cartão (template-mestre, sem IA).
+ */
+export type PostcardSelection = {
+  message: string;
+  messageType: PostcardMessageType;
+  fontStyle: PostcardFontStyle;
+  dividerStyle: PostcardDividerStyle;
+};
+
 export const PRESET_MESSAGES: {
   id: string;
   text: string;
