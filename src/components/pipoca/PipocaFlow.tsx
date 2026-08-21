@@ -19,15 +19,7 @@ import {
   createPipocaGeneration,
   getPipocaGenerationStatus,
 } from "@/lib/pipoca/generation.functions";
-import { createPipocaVisitor } from "@/lib/pipoca/visitors.functions";
 import { deriveIdentityFaceCrop } from "@/lib/pipoca/faceCrop";
-import {
-  PRIVACY_NOTICE_PARAGRAPHS,
-  PRIVACY_NOTICE_TITLE,
-  PRIVACY_NOTICE_VERSION,
-  PRIVACY_CHECKBOX_LABEL,
-} from "@/lib/pipoca/privacy-notice";
-import { formatWhatsappMask, isValidBrWhatsapp } from "@/lib/pipoca/whatsapp";
 import { EXPERIENCE_NAME, SPONSOR } from "@/lib/pipoca/branding";
 import { PostcardComposer } from "@/components/pipoca/PostcardComposer";
 
@@ -35,7 +27,7 @@ import { PostcardComposer } from "@/components/pipoca/PostcardComposer";
 
 type Step =
   | "choose"
-  | "visitor_registration"
+  | "participants"
   | "stories"
   | "camera_identity"
   | "orient_appearance"
@@ -46,6 +38,59 @@ type Step =
   | "result";
 
 type CameraVariant = "identity" | "appearance";
+
+/** Quem participa da foto — adapta as orientações de captura. */
+type PartySize = "solo" | "couple" | "family";
+
+const PARTY_COPY: Record<
+  PartySize,
+  {
+    identityTitle: string;
+    identityHint: string;
+    appearanceTitle: string;
+    appearanceHint: string;
+    still: string;
+    orientTitle: string;
+    orientBody: string;
+    photosTail: string;
+    photosNote: string;
+  }
+> = {
+  solo: {
+    identityTitle: "Olhe para a câmera",
+    identityHint: "Posicione-se de frente e mantenha o rosto bem visível.",
+    appearanceTitle: "Dê um passo para trás",
+    appearanceHint: "Fique bem no centro, da cabeça até a cintura.",
+    still: "Não se mova",
+    orientTitle: "dê um passo para trás",
+    orientBody: "Vamos registrar você da cintura para cima.",
+    photosTail: "suas",
+    photosNote: "As duas fotos são só suas.",
+  },
+  couple: {
+    identityTitle: "Olhem para a câmera",
+    identityHint: "Aproximem-se e mantenham os dois rostos bem visíveis.",
+    appearanceTitle: "Deem um passo para trás",
+    appearanceHint: "Os dois bem juntinhos, da cabeça até a cintura.",
+    still: "Não se movam",
+    orientTitle: "deem um passo para trás",
+    orientBody: "Vamos registrar vocês dois da cintura para cima.",
+    photosTail: "de vocês",
+    photosNote: "Os dois aparecem nas duas fotos.",
+  },
+  family: {
+    identityTitle: "Olhem para a câmera",
+    identityHint: "Garanta que todos os rostos estejam bem visíveis.",
+    appearanceTitle: "Deem um passo para trás",
+    appearanceHint:
+      "Garanta que todos estejam dentro do enquadramento, da cabeça até a cintura.",
+    still: "Não se movam",
+    orientTitle: "deem um passo para trás",
+    orientBody: "Vamos registrar todos da cintura para cima.",
+    photosTail: "de todos",
+    photosNote: "Todos aparecem nas duas fotos.",
+  },
+};
 
 const LOADING_PHRASES = [
   "Preparando seu Natal abaixo de zero...",
@@ -139,8 +184,7 @@ const GEN_LOG = "[PIPOCA_GENERATION]";
 export function PipocaFlow() {
   const [step, setStep] = useState<Step>("choose");
   const [selected, setSelected] = useState<Movie | null>(null);
-  const [visitorId, setVisitorId] = useState<string | null>(null);
-  const [firstName, setFirstName] = useState<string>("");
+  const [party, setParty] = useState<PartySize | null>(null);
   const [identityPhoto, setIdentityPhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [appearancePhoto, setAppearancePhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
@@ -162,7 +206,7 @@ export function PipocaFlow() {
   const confirmFn = useServerFn(confirmPipocaCaptureUpload);
   const createGenFn = useServerFn(createPipocaGeneration);
   const statusGenFn = useServerFn(getPipocaGenerationStatus);
-  const createVisitorFn = useServerFn(createPipocaVisitor);
+  
 
   // Keep refs in sync so the unmount cleanup can revoke without re-running
   // the effect (and prematurely revoking) whenever a photo state changes.
@@ -204,8 +248,7 @@ export function PipocaFlow() {
       clearPhotos();
       releaseSharedCamera();
       setSelected(null);
-      setVisitorId(null);
-      setFirstName("");
+      setParty(null);
       setPrepared(null);
       setUploadStatus("idle");
       setUploadError(null);
@@ -254,7 +297,8 @@ export function PipocaFlow() {
             filmId: selected.id,
             deviceId: getDeviceId(),
             contentType: "image/jpeg",
-            visitorId: visitorId ?? null,
+            visitorId: null,
+            partySize: party,
           },
         });
         current = res as Prepared;
@@ -322,7 +366,7 @@ export function PipocaFlow() {
       setUploadStatus("error");
       setUploadError(stage);
     }
-  }, [identityPhoto, appearancePhoto, selected, prepared, prepareFn, confirmFn, startGeneration, visitorId]);
+  }, [identityPhoto, appearancePhoto, selected, prepared, prepareFn, confirmFn, startGeneration, party]);
 
   const retryGeneration = useCallback(() => {
     if (!prepared) return;
