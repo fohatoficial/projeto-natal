@@ -407,18 +407,16 @@ export function PipocaFlow() {
             console.log(`${UX} cenário selecionado`, { id: m.id, title: m.title });
             transitionTo(() => {
               setSelected(m);
-              setStep("visitor_registration");
+              setStep("participants");
             });
           }}
         />
       )}
-      {step === "visitor_registration" && selected && (
-        <VisitorRegistration
-          createVisitorFn={createVisitorFn}
-          onDone={(id, name) => {
-            console.log(`${UX} visitante registrado`);
-            setVisitorId(id);
-            setFirstName(name);
+      {step === "participants" && selected && (
+        <PartySelect
+          onSelect={(p) => {
+            console.log(`${UX} participantes escolhidos`, { party: p });
+            setParty(p);
             void prewarmCamera().catch(() => {});
             transitionTo(() => setStep("stories"));
           }}
@@ -430,10 +428,10 @@ export function PipocaFlow() {
           }
         />
       )}
-      {step === "stories" && selected && (
+      {step === "stories" && selected && party && (
         <Stories
           movie={selected}
-          firstName={firstName}
+          party={party}
           onDone={() => {
             console.log(`${UX} stories concluídos, abrindo câmera`);
             transitionTo(() => setStep("camera_identity"));
@@ -447,9 +445,10 @@ export function PipocaFlow() {
           }}
         />
       )}
-      {step === "camera_identity" && (
+      {step === "camera_identity" && party && (
         <Camera
           variant="identity"
+          party={party}
           onCaptured={(p) => {
             console.log(`${CAPTURE_LOG} foto de identidade capturada`);
             setIdentityPhoto(p);
@@ -462,16 +461,18 @@ export function PipocaFlow() {
           }
         />
       )}
-      {step === "orient_appearance" && (
+      {step === "orient_appearance" && party && (
         <OrientAppearance
+          party={party}
           onNext={() => {
             transitionTo(() => setStep("camera_appearance"));
           }}
         />
       )}
-      {step === "camera_appearance" && (
+      {step === "camera_appearance" && party && (
         <Camera
           variant="appearance"
+          party={party}
           onCaptured={(p) => {
             console.log(`${CAPTURE_LOG} foto de aparência capturada`);
             setAppearancePhoto(p);
@@ -498,7 +499,6 @@ export function PipocaFlow() {
       {step === "processing" && selected && (
         <Processing
           movie={selected}
-          firstName={firstName}
           generationId={generationId}
           errored={Boolean(genError)}
           pollFn={statusGenFn}
@@ -518,7 +518,6 @@ export function PipocaFlow() {
             <PostcardComposer
               photoUrl={generatedUrl}
               generationId={generationId}
-              firstName={firstName}
               onFinalized={(url) => {
                 setPostcardUrl(url);
                 transitionTo(() => setStep("result"));
@@ -530,7 +529,6 @@ export function PipocaFlow() {
       {step === "result" && selected && (
         <Result
           movie={selected}
-          firstName={firstName}
           imageUrl={postcardUrl ?? generatedUrl}
           publicToken={publicToken}
           resultPageUrl={resultPageUrl}
