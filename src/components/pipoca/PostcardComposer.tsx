@@ -19,7 +19,13 @@ import {
 
 const LOG = "[PIPOCA_POSTCARD_UI]";
 
-type Mode = "choose" | "presets" | "custom" | "preview";
+/**
+ * Jornada da mensagem em etapas curtas (totem-friendly):
+ *   choose  → presets → preview
+ *   choose  → write (conteúdo) → style (toque visual) → preview
+ * Não há prévia ao vivo: o cartão completo só aparece no modo "preview".
+ */
+type Mode = "choose" | "presets" | "write" | "style" | "preview";
 
 /* ---------------------------- ícones refinados ---------------------------- */
 
@@ -99,12 +105,10 @@ function DividerGlyph({ style }: { style: PostcardDividerStyle }) {
 export function PostcardComposer({
   photoUrl,
   generationId,
-  firstName,
   onFinalized,
 }: {
   photoUrl: string;
   generationId: string;
-  firstName?: string;
   onFinalized: (postcardUrl: string) => void;
 }) {
   const [mode, setMode] = useState<Mode>("choose");
@@ -115,13 +119,11 @@ export function PostcardComposer({
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<PostcardMessageType>("preset");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [livePreview, setLivePreview] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const blobRef = useRef<Blob | null>(null);
   const previewRef = useRef<string | null>(null);
-  const liveRef = useRef<string | null>(null);
   const touchX = useRef<number | null>(null);
 
   const prepareFn = useServerFn(preparePipocaPostcardUpload);
@@ -130,7 +132,6 @@ export function PostcardComposer({
   useEffect(
     () => () => {
       if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-      if (liveRef.current) URL.revokeObjectURL(liveRef.current);
     },
     [],
   );
@@ -170,36 +171,6 @@ export function PostcardComposer({
     [photoUrl],
   );
 
-  /* Preview ao vivo da oficina — apenas composição, nunca IA. */
-  const cleanCustom = sanitizeMessage(custom).trim();
-  useEffect(() => {
-    if (mode !== "custom") return;
-    const text = cleanCustom || "Sua mensagem de Natal aparecerá aqui.";
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      try {
-        const out = await renderPostcard(photoUrl, {
-          message: text,
-          fontStyle,
-          dividerStyle,
-        });
-        if (cancelled) {
-          URL.revokeObjectURL(out.objectUrl);
-          return;
-        }
-        if (liveRef.current) URL.revokeObjectURL(liveRef.current);
-        liveRef.current = out.objectUrl;
-        setLivePreview(out.objectUrl);
-      } catch (e) {
-        console.warn(`${LOG} falha no preview ao vivo`, e);
-      }
-    }, 260);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [mode, cleanCustom, fontStyle, dividerStyle, photoUrl]);
-
   async function finalize() {
     if (!blobRef.current || saving) return;
     setSaving(true);
@@ -238,6 +209,8 @@ export function PostcardComposer({
   const move = (delta: number) =>
     setIndex((i) => (i + delta + PRESET_MESSAGES.length) % PRESET_MESSAGES.length);
 
+  const cleanCustom = sanitizeMessage(custom).trim();
+
   return (
     <div className="relative z-10 w-full max-w-5xl mx-auto flex flex-col items-center gap-6 py-4 px-5">
       {/* ---------------------------- escolha inicial --------------------------- */}
@@ -246,7 +219,7 @@ export function PostcardComposer({
           <div className="text-center">
             <p className="natal-eyebrow">Seu cartão-postal</p>
             <h1 className="mt-3 font-display text-4xl sm:text-6xl text-snow leading-[1.05]">
-              {firstName ? `${firstName}, como ` : "Como "}você quer escrever sua{" "}
+              Como você quer escrever sua{" "}
               <span className="font-script text-gold text-[1.25em] leading-none">mensagem</span>?
             </h1>
           </div>
@@ -259,10 +232,10 @@ export function PostcardComposer({
                 hint: "Cinco mensagens curadas",
               },
               {
-                key: "custom" as const,
+                key: "write" as const,
                 icon: <IconPencil />,
                 title: "Criar minha própria mensagem",
-                hint: "Oficina do seu cartão",
+                hint: "Do seu jeito, em duas etapas",
               },
             ].map((o) => (
               <button
@@ -360,93 +333,111 @@ export function PostcardComposer({
         </div>
       )}
 
-      {/* --------------------------- oficina do cartão -------------------------- */}
-      {mode === "custom" && (
-        <div className="w-full flex flex-col items-center gap-6 animate-fade-up">
+      {/* -------------------- etapa A — escrever a mensagem -------------------- */}
+      {mode === "write" && (
+        <div className="w-full max-w-2xl flex flex-col items-center gap-7 animate-fade-up">
           <div className="text-center">
-            <p className="natal-eyebrow">Oficina do seu cartão</p>
-            <h1 className="mt-2 font-display text-3xl sm:text-5xl text-snow">
-              Escreva sua <span className="font-script text-gold text-[1.2em]">mensagem</span>
+            <p className="natal-eyebrow">Mensagem personalizada</p>
+            <h1 className="mt-2 font-display text-3xl sm:text-5xl text-snow leading-[1.05]">
+              Escreva sua{" "}
+              <span className="font-script text-gold text-[1.2em] leading-none">mensagem</span>
             </h1>
+            <p className="mt-3 text-sm sm:text-base text-ivory/60 max-w-md mx-auto">
+              Primeiro o conteúdo. O toque final vem na próxima etapa.
+            </p>
           </div>
 
-          <div className="w-full grid gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-start">
-            <div className="flex flex-col gap-6">
-              <div>
-                <textarea
-                  value={custom}
-                  onChange={(e) => setCustom(sanitizeMessage(e.target.value))}
-                  maxLength={POSTCARD_MESSAGE_MAX}
-                  rows={3}
-                  placeholder="Escreva algo especial…"
-                  className="natal-input w-full px-5 py-4 text-lg placeholder:text-ivory/35 resize-none"
-                />
-                <p className="mt-1 text-right text-xs tracking-[0.2em] text-ivory/50">
-                  {String(custom.length).padStart(2, "0")} / {POSTCARD_MESSAGE_MAX}
-                </p>
-              </div>
+          <div className="w-full">
+            <textarea
+              value={custom}
+              onChange={(e) => setCustom(sanitizeMessage(e.target.value))}
+              maxLength={POSTCARD_MESSAGE_MAX}
+              rows={3}
+              autoFocus
+              placeholder="Escreva algo especial…"
+              className="natal-input w-full px-5 py-4 text-lg placeholder:text-ivory/35 resize-none"
+            />
+            <p className="mt-1 text-right text-xs tracking-[0.2em] text-ivory/50">
+              {String(custom.length).padStart(2, "0")} / {POSTCARD_MESSAGE_MAX}
+            </p>
+          </div>
 
-              <div>
-                <p className="natal-eyebrow mb-3">Estilo da letra</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {FONT_STYLES.map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      data-selected={fontStyle === f.id}
-                      onClick={() => setFontStyle(f.id)}
-                      className="natal-card px-3 py-4 flex flex-col items-center gap-1 text-center"
-                    >
-                      <span
-                        className="text-ivory text-2xl leading-tight"
-                        style={{ fontFamily: f.css }}
-                      >
-                        {f.label}
-                      </span>
-                      <span className="text-[0.6rem] uppercase tracking-[0.2em] text-ivory/45">
-                        {f.hint}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <div className="flex flex-col items-center gap-3">
+            <button
+              type="button"
+              disabled={!cleanCustom}
+              onClick={() => setMode("style")}
+              className="natal-btn natal-btn-primary text-sm disabled:opacity-40"
+            >
+              Continuar
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("choose")}
+              className="text-[0.65rem] uppercase tracking-[0.35em] text-ivory/55 hover:text-ivory py-2"
+            >
+              Voltar
+            </button>
+          </div>
+        </div>
+      )}
 
-              <div>
-                <p className="natal-eyebrow mb-3">Divisor decorativo</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {DIVIDER_STYLES.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      data-selected={dividerStyle === d.id}
-                      onClick={() => setDividerStyle(d.id)}
-                      className="natal-card px-3 py-4 flex flex-col items-center gap-2"
-                    >
-                      <DividerGlyph style={d.id} />
-                      <span className="text-[0.6rem] uppercase tracking-[0.25em] text-ivory/55">
-                        {d.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+      {/* -------------------- etapa B — dê seu toque ao cartão ------------------ */}
+      {mode === "style" && (
+        <div className="w-full max-w-2xl flex flex-col items-center gap-7 animate-fade-up">
+          <div className="text-center">
+            <p className="natal-eyebrow">Toque final</p>
+            <h1 className="mt-2 font-display text-3xl sm:text-5xl text-snow leading-[1.05]">
+              Dê seu toque ao{" "}
+              <span className="font-script text-gold text-[1.2em] leading-none">cartão</span>
+            </h1>
+            <p className="mt-3 text-sm text-ivory/55 italic max-w-md mx-auto">
+              “{cleanCustom}”
+            </p>
+          </div>
 
-            <div className="flex flex-col gap-3">
-              <p className="natal-eyebrow">Prévia ao vivo</p>
-              <div className="rounded-2xl overflow-hidden border border-gold/30 shadow-2xl bg-black/40 aspect-[3/2] grid place-items-center">
-                {livePreview ? (
-                  <img
-                    src={livePreview}
-                    alt="Prévia ao vivo do cartão-postal"
-                    className="block w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-xs uppercase tracking-[0.3em] text-ivory/40">
-                    Montando prévia…
+          <div className="w-full">
+            <p className="natal-eyebrow mb-3">Estilo da letra</p>
+            <div className="grid grid-cols-3 gap-3">
+              {FONT_STYLES.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  data-selected={fontStyle === f.id}
+                  onClick={() => setFontStyle(f.id)}
+                  className="natal-card px-3 py-5 flex flex-col items-center gap-1 text-center"
+                >
+                  <span
+                    className="text-ivory text-2xl leading-tight"
+                    style={{ fontFamily: f.css }}
+                  >
+                    {f.label}
                   </span>
-                )}
-              </div>
+                  <span className="text-[0.6rem] uppercase tracking-[0.2em] text-ivory/45">
+                    {f.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="w-full">
+            <p className="natal-eyebrow mb-3">Divisor decorativo</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {DIVIDER_STYLES.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  data-selected={dividerStyle === d.id}
+                  onClick={() => setDividerStyle(d.id)}
+                  className="natal-card px-3 py-4 flex flex-col items-center gap-2"
+                >
+                  <DividerGlyph style={d.id} />
+                  <span className="text-[0.6rem] uppercase tracking-[0.25em] text-ivory/55">
+                    {d.label}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -461,7 +452,7 @@ export function PostcardComposer({
             </button>
             <button
               type="button"
-              onClick={() => setMode("choose")}
+              onClick={() => setMode("write")}
               className="text-[0.65rem] uppercase tracking-[0.35em] text-ivory/55 hover:text-ivory py-2"
             >
               Voltar
