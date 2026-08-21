@@ -136,9 +136,11 @@ function PublicResultPage() {
             className="h-8 w-auto opacity-95"
           />
         ) : null}
-        <span className="font-display text-2xl text-snow">
-          {SPONSOR.actionName ?? EXPERIENCE_NAME}
-        </span>
+        {SPONSOR.actionName ?? EXPERIENCE_NAME ? (
+          <span className="font-display text-2xl text-snow">
+            {SPONSOR.actionName ?? EXPERIENCE_NAME}
+          </span>
+        ) : null}
         <span className="mt-1 text-[10px] uppercase tracking-[0.3em] text-gold">
           Cartão-postal natalino
         </span>

@@ -856,9 +856,11 @@ function Header({ subtitle }: { subtitle?: string }) {
           className="h-7 sm:h-9 w-auto opacity-95"
         />
       ) : null}
-      <span className="font-display text-xl sm:text-2xl lg:text-3xl text-snow tracking-wide">
-        {SPONSOR.actionName ?? EXPERIENCE_NAME}
-      </span>
+      {SPONSOR.actionName ?? EXPERIENCE_NAME ? (
+        <span className="font-display text-xl sm:text-2xl lg:text-3xl text-snow tracking-wide">
+          {SPONSOR.actionName ?? EXPERIENCE_NAME}
+        </span>
+      ) : null}
       <div className="brand-stripe w-24 sm:w-32 lg:w-44 rounded-full opacity-90" />
       {subtitle ? (
         <span className="mt-1 text-[10px] sm:text-xs lg:text-sm uppercase tracking-[0.3em] text-gold/85">
@@ -941,9 +943,6 @@ function ScenarioHome({
 
       <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-4xl py-4 gap-6 sm:gap-8">
         <div className="flex flex-col items-center gap-3 animate-fade-up">
-          <span className="text-[10px] sm:text-xs uppercase tracking-[0.4em] text-gold/85">
-            Experiência de Natal
-          </span>
           <h1 className="font-display text-[2.4rem] leading-[1.05] sm:text-6xl lg:text-7xl text-snow max-w-3xl">
             Neste Natal, escolha onde a{" "}
             <span className="text-gold italic">magia</span> vai acontecer.
