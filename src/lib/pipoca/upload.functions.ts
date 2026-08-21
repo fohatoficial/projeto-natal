@@ -13,6 +13,8 @@ const PrepareInput = z.object({
   deviceId: z.string().max(120).nullish(),
   contentType: z.literal("image/jpeg"),
   visitorId: z.string().uuid().nullish(),
+  /** Quem participa da foto (orientação de captura). Coluna party_size. */
+  partySize: z.enum(["solo", "couple", "family"]).nullish(),
 });
 
 export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
@@ -82,15 +84,31 @@ export const createPipocaCaptureUpload = createServerFn({ method: "POST" })
       .single();
     if (sessionError || !session) throw new Error("Falha ao criar sessão");
 
-    const { data: capture, error: captureError } = await supabaseAdmin
+    // party_size só existe após a migration 20260821; enquanto isso, a
+    // captura é criada sem a coluna (fallback compatível).
+    const baseCapture = {
+      session_id: session.id,
+      validation_status: "pending",
+    };
+    let capture: { id: string } | null = null;
+    const withParty = await supabaseAdmin
       .from("pipoca_captures")
-      .insert({
-        session_id: session.id,
-        validation_status: "pending",
-      })
+      .insert({ ...baseCapture, party_size: data.partySize ?? null })
       .select("id")
       .single();
-    if (captureError || !capture) throw new Error("Falha ao criar captura");
+    if (withParty.error) {
+      console.warn(`${LOG} coluna party_size indisponível, inserindo sem ela`);
+      const fallback = await supabaseAdmin
+        .from("pipoca_captures")
+        .insert(baseCapture)
+        .select("id")
+        .single();
+      if (fallback.error) throw new Error("Falha ao criar captura");
+      capture = fallback.data;
+    } else {
+      capture = withParty.data;
+    }
+    if (!capture) throw new Error("Falha ao criar captura");
 
     const identityPath = `${session.id}/${capture.id}/${IDENTITY_NAME}`;
     const appearancePath = `${session.id}/${capture.id}/${APPEARANCE_NAME}`;

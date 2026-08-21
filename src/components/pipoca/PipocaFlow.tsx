@@ -19,15 +19,7 @@ import {
   createPipocaGeneration,
   getPipocaGenerationStatus,
 } from "@/lib/pipoca/generation.functions";
-import { createPipocaVisitor } from "@/lib/pipoca/visitors.functions";
 import { deriveIdentityFaceCrop } from "@/lib/pipoca/faceCrop";
-import {
-  PRIVACY_NOTICE_PARAGRAPHS,
-  PRIVACY_NOTICE_TITLE,
-  PRIVACY_NOTICE_VERSION,
-  PRIVACY_CHECKBOX_LABEL,
-} from "@/lib/pipoca/privacy-notice";
-import { formatWhatsappMask, isValidBrWhatsapp } from "@/lib/pipoca/whatsapp";
 import { EXPERIENCE_NAME, SPONSOR } from "@/lib/pipoca/branding";
 import { PostcardComposer } from "@/components/pipoca/PostcardComposer";
 
@@ -35,7 +27,7 @@ import { PostcardComposer } from "@/components/pipoca/PostcardComposer";
 
 type Step =
   | "choose"
-  | "visitor_registration"
+  | "participants"
   | "stories"
   | "camera_identity"
   | "orient_appearance"
@@ -46,6 +38,59 @@ type Step =
   | "result";
 
 type CameraVariant = "identity" | "appearance";
+
+/** Quem participa da foto — adapta as orientações de captura. */
+type PartySize = "solo" | "couple" | "family";
+
+const PARTY_COPY: Record<
+  PartySize,
+  {
+    identityTitle: string;
+    identityHint: string;
+    appearanceTitle: string;
+    appearanceHint: string;
+    still: string;
+    orientTitle: string;
+    orientBody: string;
+    photosTail: string;
+    photosNote: string;
+  }
+> = {
+  solo: {
+    identityTitle: "Olhe para a câmera",
+    identityHint: "Posicione-se de frente e mantenha o rosto bem visível.",
+    appearanceTitle: "Dê um passo para trás",
+    appearanceHint: "Fique bem no centro, da cabeça até a cintura.",
+    still: "Não se mova",
+    orientTitle: "dê um passo para trás",
+    orientBody: "Vamos registrar você da cintura para cima.",
+    photosTail: "suas",
+    photosNote: "As duas fotos são só suas.",
+  },
+  couple: {
+    identityTitle: "Olhem para a câmera",
+    identityHint: "Aproximem-se e mantenham os dois rostos bem visíveis.",
+    appearanceTitle: "Deem um passo para trás",
+    appearanceHint: "Os dois bem juntinhos, da cabeça até a cintura.",
+    still: "Não se movam",
+    orientTitle: "deem um passo para trás",
+    orientBody: "Vamos registrar vocês dois da cintura para cima.",
+    photosTail: "de vocês",
+    photosNote: "Os dois aparecem nas duas fotos.",
+  },
+  family: {
+    identityTitle: "Olhem para a câmera",
+    identityHint: "Garanta que todos os rostos estejam bem visíveis.",
+    appearanceTitle: "Deem um passo para trás",
+    appearanceHint:
+      "Garanta que todos estejam dentro do enquadramento, da cabeça até a cintura.",
+    still: "Não se movam",
+    orientTitle: "deem um passo para trás",
+    orientBody: "Vamos registrar todos da cintura para cima.",
+    photosTail: "de todos",
+    photosNote: "Todos aparecem nas duas fotos.",
+  },
+};
 
 const LOADING_PHRASES = [
   "Preparando seu Natal abaixo de zero...",
@@ -139,8 +184,7 @@ const GEN_LOG = "[PIPOCA_GENERATION]";
 export function PipocaFlow() {
   const [step, setStep] = useState<Step>("choose");
   const [selected, setSelected] = useState<Movie | null>(null);
-  const [visitorId, setVisitorId] = useState<string | null>(null);
-  const [firstName, setFirstName] = useState<string>("");
+  const [party, setParty] = useState<PartySize | null>(null);
   const [identityPhoto, setIdentityPhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [appearancePhoto, setAppearancePhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [transitioning, setTransitioning] = useState(false);
@@ -162,7 +206,7 @@ export function PipocaFlow() {
   const confirmFn = useServerFn(confirmPipocaCaptureUpload);
   const createGenFn = useServerFn(createPipocaGeneration);
   const statusGenFn = useServerFn(getPipocaGenerationStatus);
-  const createVisitorFn = useServerFn(createPipocaVisitor);
+  
 
   // Keep refs in sync so the unmount cleanup can revoke without re-running
   // the effect (and prematurely revoking) whenever a photo state changes.
@@ -204,8 +248,7 @@ export function PipocaFlow() {
       clearPhotos();
       releaseSharedCamera();
       setSelected(null);
-      setVisitorId(null);
-      setFirstName("");
+      setParty(null);
       setPrepared(null);
       setUploadStatus("idle");
       setUploadError(null);
@@ -254,7 +297,8 @@ export function PipocaFlow() {
             filmId: selected.id,
             deviceId: getDeviceId(),
             contentType: "image/jpeg",
-            visitorId: visitorId ?? null,
+            visitorId: null,
+            partySize: party,
           },
         });
         current = res as Prepared;
@@ -322,7 +366,7 @@ export function PipocaFlow() {
       setUploadStatus("error");
       setUploadError(stage);
     }
-  }, [identityPhoto, appearancePhoto, selected, prepared, prepareFn, confirmFn, startGeneration, visitorId]);
+  }, [identityPhoto, appearancePhoto, selected, prepared, prepareFn, confirmFn, startGeneration, party]);
 
   const retryGeneration = useCallback(() => {
     if (!prepared) return;
@@ -363,18 +407,16 @@ export function PipocaFlow() {
             console.log(`${UX} cenário selecionado`, { id: m.id, title: m.title });
             transitionTo(() => {
               setSelected(m);
-              setStep("visitor_registration");
+              setStep("participants");
             });
           }}
         />
       )}
-      {step === "visitor_registration" && selected && (
-        <VisitorRegistration
-          createVisitorFn={createVisitorFn}
-          onDone={(id, name) => {
-            console.log(`${UX} visitante registrado`);
-            setVisitorId(id);
-            setFirstName(name);
+      {step === "participants" && selected && (
+        <PartySelect
+          onSelect={(p) => {
+            console.log(`${UX} participantes escolhidos`, { party: p });
+            setParty(p);
             void prewarmCamera().catch(() => {});
             transitionTo(() => setStep("stories"));
           }}
@@ -386,10 +428,10 @@ export function PipocaFlow() {
           }
         />
       )}
-      {step === "stories" && selected && (
+      {step === "stories" && selected && party && (
         <Stories
           movie={selected}
-          firstName={firstName}
+          party={party}
           onDone={() => {
             console.log(`${UX} stories concluídos, abrindo câmera`);
             transitionTo(() => setStep("camera_identity"));
@@ -403,9 +445,10 @@ export function PipocaFlow() {
           }}
         />
       )}
-      {step === "camera_identity" && (
+      {step === "camera_identity" && party && (
         <Camera
           variant="identity"
+          party={party}
           onCaptured={(p) => {
             console.log(`${CAPTURE_LOG} foto de identidade capturada`);
             setIdentityPhoto(p);
@@ -418,16 +461,18 @@ export function PipocaFlow() {
           }
         />
       )}
-      {step === "orient_appearance" && (
+      {step === "orient_appearance" && party && (
         <OrientAppearance
+          party={party}
           onNext={() => {
             transitionTo(() => setStep("camera_appearance"));
           }}
         />
       )}
-      {step === "camera_appearance" && (
+      {step === "camera_appearance" && party && (
         <Camera
           variant="appearance"
+          party={party}
           onCaptured={(p) => {
             console.log(`${CAPTURE_LOG} foto de aparência capturada`);
             setAppearancePhoto(p);
@@ -454,7 +499,6 @@ export function PipocaFlow() {
       {step === "processing" && selected && (
         <Processing
           movie={selected}
-          firstName={firstName}
           generationId={generationId}
           errored={Boolean(genError)}
           pollFn={statusGenFn}
@@ -474,7 +518,6 @@ export function PipocaFlow() {
             <PostcardComposer
               photoUrl={generatedUrl}
               generationId={generationId}
-              firstName={firstName}
               onFinalized={(url) => {
                 setPostcardUrl(url);
                 transitionTo(() => setStep("result"));
@@ -486,7 +529,6 @@ export function PipocaFlow() {
       {step === "result" && selected && (
         <Result
           movie={selected}
-          firstName={firstName}
           imageUrl={postcardUrl ?? generatedUrl}
           publicToken={publicToken}
           resultPageUrl={resultPageUrl}
@@ -802,18 +844,98 @@ function WelcomeTag({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ---------- Step 1b: Quem vai participar ---------- */
+
+const IconPerson = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-full h-full">
+    <circle cx="12" cy="8" r="3.6" />
+    <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" />
+  </svg>
+);
+const IconCouple = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-full h-full">
+    <circle cx="8.5" cy="8.5" r="3" />
+    <circle cx="15.5" cy="8.5" r="3" />
+    <path d="M3 20c0-3 2.4-5 5.5-5 1.2 0 2.3.3 3.2 1 .9-.7 2-1 3.3-1 3.1 0 5.5 2 5.5 5" />
+  </svg>
+);
+const IconFamily = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-full h-full">
+    <circle cx="6" cy="9" r="2.6" />
+    <circle cx="18" cy="9" r="2.6" />
+    <circle cx="12" cy="7.4" r="2" />
+    <path d="M2.2 20c0-2.8 1.7-4.6 3.8-4.6 1 0 1.8.3 2.5.9" />
+    <path d="M21.8 20c0-2.8-1.7-4.6-3.8-4.6-1 0-1.8.3-2.5.9" />
+    <path d="M8.6 20c0-2.6 1.5-4.3 3.4-4.3s3.4 1.7 3.4 4.3" />
+  </svg>
+);
+
+/**
+ * Etapa imersiva "Quem vai participar?". Substitui o cadastro na jornada
+ * pública atual: a resposta (solo/couple/family) adapta as orientações de
+ * captura e é persistida na captura quando a coluna existir.
+ */
+function PartySelect({
+  onSelect,
+  onBack,
+}: {
+  onSelect: (p: PartySize) => void;
+  onBack: () => void;
+}) {
+  const options: { id: PartySize; label: string; hint: string; icon: React.ReactNode }[] = [
+    { id: "solo", label: "Só eu", hint: "Um protagonista", icon: <IconPerson /> },
+    { id: "couple", label: "Casal", hint: "Dois na neve", icon: <IconCouple /> },
+    { id: "family", label: "Família", hint: "Todo mundo junto", icon: <IconFamily /> },
+  ];
+  return (
+    <Screen aurora>
+      <Header subtitle="Antes da foto" />
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-4xl py-4 gap-7 sm:gap-9">
+        <div className="flex flex-col items-center gap-3 animate-fade-up">
+          <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-snow leading-[1.05] max-w-2xl">
+            Quem vai entrar neste{" "}
+            <span className="font-script text-gold text-[1.2em] leading-none">cartão-postal</span>?
+          </h1>
+          <p className="text-sm sm:text-base text-white/70 max-w-md">
+            Toque em uma opção — as orientações da foto se ajustam para você.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:gap-5 sm:grid-cols-3 w-full animate-fade-up">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onSelect(o.id)}
+              className="natal-card px-6 py-8 sm:py-10 min-h-[170px] sm:min-h-[220px] flex flex-col items-center justify-center gap-3 text-center"
+            >
+              <span className="w-14 h-14 sm:w-16 sm:h-16 text-gold">{o.icon}</span>
+              <span className="font-display text-2xl sm:text-3xl text-snow uppercase tracking-wide">
+                {o.label}
+              </span>
+              <span className="natal-eyebrow">{o.hint}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="relative z-10 shrink-0">
+        <GhostBtn onClick={onBack}>Voltar</GhostBtn>
+      </div>
+    </Screen>
+  );
+}
+
 /* ---------- Step 2: Stories (after film pick, prewarms camera) ---------- */
 
 const STORY_DURATIONS_MS = [3000, 4500, 2000];
 
 function Stories({
   movie,
-  firstName,
+  party,
   onDone,
   onRestart,
 }: {
   movie: Movie;
-  firstName?: string;
+  party: PartySize;
   onDone: () => void;
   onRestart: () => void;
 }) {
@@ -888,9 +1010,9 @@ function Stories({
       />
 
       <div className="relative z-20 flex-1 min-h-0 w-full flex flex-col items-center justify-center max-w-2xl py-3 pointer-events-none">
-        {idx === 0 && <StoryScene movie={movie} firstName={firstName} />}
-        {idx === 1 && <StoryTwoPhotos firstName={firstName} />}
-        {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} firstName={firstName} />}
+        {idx === 0 && <StoryScene movie={movie} />}
+        {idx === 1 && <StoryTwoPhotos party={party} />}
+        {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} />}
       </div>
 
       <div className="relative z-30 shrink-0">
@@ -915,12 +1037,11 @@ function Stories({
   );
 }
 
-function StoryScene({ movie, firstName }: { movie: Movie; firstName?: string }) {
-  const prefix = firstName ? `${firstName.toUpperCase()}, seu cenário é` : "Seu cenário é";
+function StoryScene({ movie }: { movie: Movie }) {
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
-        {prefix}
+        Seu cenário é
       </span>
       <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/12 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] bg-white/5">
         {movie.posterUrl ? (
@@ -944,14 +1065,15 @@ function StoryScene({ movie, firstName }: { movie: Movie; firstName?: string }) 
   );
 }
 
-function StoryTwoPhotos({ firstName }: { firstName?: string }) {
+function StoryTwoPhotos({ party }: { party: PartySize }) {
+  const copy = PARTY_COPY[party];
   return (
     <div className="flex flex-col items-center gap-6 sm:gap-7 animate-fade-up max-w-md">
       <h1 className="font-display text-3xl sm:text-5xl text-white leading-[0.95]">
-        {firstName ? `${firstName}, vamos` : "Vamos"} tirar <span className="text-gold">duas fotos</span>
+        Vamos tirar <span className="text-gold">duas fotos</span> {copy.photosTail}
       </h1>
       <p className="text-sm sm:text-base text-white/75 -mt-2">
-        Você pode aparecer sozinho, em casal ou com sua família.
+        {copy.photosNote}
       </p>
       <div className="grid grid-cols-2 gap-4 w-full">
         <div className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-4">
@@ -977,7 +1099,7 @@ function StoryTwoPhotos({ firstName }: { firstName?: string }) {
   );
 }
 
-function StoryPrepare({ cameraStatus, firstName }: { cameraStatus: ReturnType<typeof getSharedStatus>; firstName?: string }) {
+function StoryPrepare({ cameraStatus }: { cameraStatus: ReturnType<typeof getSharedStatus> }) {
   const camHint =
     cameraStatus === "ready"
       ? "Câmera pronta"
@@ -993,7 +1115,7 @@ function StoryPrepare({ cameraStatus, firstName }: { cameraStatus: ReturnType<ty
         </svg>
       </div>
       <h1 className="font-display text-4xl sm:text-6xl text-white leading-[0.95]">
-        {firstName ? `${firstName}, ` : ""}<span className="text-gold">prepare-se</span>
+        <span className="text-gold">Prepare-se</span>
       </h1>
       <p className="text-sm sm:text-base text-white/75 max-w-sm">
         A câmera será aberta agora.
@@ -1009,10 +1131,13 @@ function StoryPrepare({ cameraStatus, firstName }: { cameraStatus: ReturnType<ty
 /* ---------- Step 2b: Orient appearance (between identity and appearance captures) ---------- */
 
 function OrientAppearance({
+  party,
   onNext,
 }: {
+  party: PartySize;
   onNext: () => void;
 }) {
+  const copy = PARTY_COPY[party];
   const firedRef = useRef(false);
   useEffect(() => {
     if (firedRef.current) return;
@@ -1036,10 +1161,10 @@ function OrientAppearance({
           </svg>
         </div>
         <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl text-white leading-[0.95] animate-fade-up text-center">
-          Agora, <span className="text-gold">dê um passo para trás</span>
+          Agora, <span className="text-gold">{copy.orientTitle}</span>
         </h1>
         <p className="text-base sm:text-lg text-white/80 max-w-md animate-fade-up text-center">
-          Vamos registrar seu corpo da cintura para cima.
+          {copy.orientBody}
         </p>
       </div>
       <div className="relative z-10 shrink-0">
@@ -1061,13 +1186,16 @@ function OrientAppearance({
 
 function Camera({
   variant,
+  party,
   onCaptured,
   onBack,
 }: {
   variant: CameraVariant;
+  party: PartySize;
   onCaptured: (p: { blob: Blob; url: string }) => void;
   onBack: () => void;
 }) {
+  const copy = PARTY_COPY[party];
   const { videoRef, ready, errorKind, retry, capture } = useCamera(true);
   const [count, setCount] = useState<number | null>(null);
   const startedRef = useRef(false);
@@ -1097,11 +1225,9 @@ function Camera({
   if (errorKind) return <CameraError kind={errorKind} onRetry={retry} onBack={onBack} />;
 
   const title =
-    variant === "identity" ? "Olhem para a câmera" : "Deem um passo para trás";
+    variant === "identity" ? copy.identityTitle : copy.appearanceTitle;
   const hint =
-    variant === "identity"
-      ? "Aproxime-se até aparecerem rosto, cabelo e ombros de quem for aparecer"
-      : "Sozinho, em casal ou com a família — todos da cabeça até a cintura";
+    variant === "identity" ? copy.identityHint : copy.appearanceHint;
   const subtitle = variant === "identity" ? "Foto 1 de 2" : "Foto 2 de 2";
   const countingDown = count !== null && count > 0;
 
@@ -1142,7 +1268,7 @@ function Camera({
               letterSpacing: "0.2em",
             }}
           >
-FIQUEM PARADOS
+            {copy.still.toUpperCase()}
           </p>
         ) : null}
 
@@ -1360,7 +1486,6 @@ type StatusFn = (args: { data: { generationId: string } }) => Promise<
 
 function Processing({
   movie,
-  firstName,
   generationId,
   errored,
   pollFn,
@@ -1368,7 +1493,6 @@ function Processing({
   onError,
 }: {
   movie: Movie;
-  firstName?: string;
   generationId: string | null;
   errored: boolean;
   pollFn: StatusFn;
@@ -1467,8 +1591,7 @@ function Processing({
 
         <div className="space-y-2">
           <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-snow leading-tight">
-            {firstName ? `${firstName}, ` : ""}preparando seu{" "}
-            <span className="text-gold">Natal abaixo de zero</span>...
+            Preparando seu <span className="text-gold">Natal abaixo de zero</span>...
           </h1>
           <p className="text-white/70 text-sm sm:text-base">
             {movie.title}
@@ -1501,14 +1624,12 @@ function Processing({
 
 function Result({
   movie,
-  firstName,
   imageUrl,
   publicToken,
   resultPageUrl,
   onRestart,
 }: {
   movie: Movie;
-  firstName?: string;
   imageUrl: string | null;
   publicToken: string | null;
   resultPageUrl: string | null;
@@ -1622,8 +1743,7 @@ function Result({
         {slide === 0 && (
           <div className="flex flex-col items-center gap-3 sm:gap-4 w-full h-full animate-fade-up">
             <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl text-white leading-[0.95]">
-              {firstName ? `${firstName}, seu ` : "Seu "}
-              <span className="text-gold">cartão-postal</span> está pronto
+              Seu <span className="text-gold">cartão-postal</span> está pronto
             </h1>
 
             <div className="relative w-full flex-1 min-h-0 max-w-[560px] mx-auto flex items-center justify-center">
@@ -1691,152 +1811,4 @@ function Result({
   );
 }
 
-/* ---------- Visitor registration ---------- */
-
-function VisitorRegistration({
-  createVisitorFn,
-  onDone,
-  onBack,
-}: {
-  createVisitorFn: (args: { data: { fullName: string; whatsapp: string; experienceConsent: true; privacyNoticeVersion: string } }) => Promise<{ visitorId: string; firstName: string }>;
-  onDone: (id: string, firstName: string) => void;
-  onBack: () => void;
-}) {
-  const [fullName, setFullName] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
-  const [showNotice, setShowNotice] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const nameOk = fullName.replace(/\s+/g, " ").trim().length >= 2 && !/^\d+$/.test(fullName.trim());
-  const phoneOk = isValidBrWhatsapp(whatsapp);
-  const canSubmit = nameOk && phoneOk && !loading;
-
-  async function submit() {
-    if (!canSubmit) return;
-    console.log("[PIPOCA_CONSENT]", {
-      consentClicked: true,
-      acceptedAtAvailable: true,
-      privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
-      visitorCreationStarted: true,
-    });
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await createVisitorFn({
-        data: {
-          fullName: fullName.replace(/\s+/g, " ").trim(),
-          whatsapp,
-          experienceConsent: true,
-          privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
-        },
-      });
-      if (!res?.visitorId || !res?.firstName) {
-        throw new Error("Resposta inválida do servidor");
-      }
-      console.log("[PIPOCA_CONSENT]", {
-        visitorCreationCompleted: true,
-        privacyNoticeVersion: PRIVACY_NOTICE_VERSION,
-      });
-      onDone(res.visitorId, res.firstName);
-    } catch (e) {
-      console.warn("[PIPOCA_CONSENT]", {
-        visitorCreationCompleted: false,
-        errorCode: e instanceof Error ? e.message.slice(0, 80) : "unknown",
-      });
-      setError(e instanceof Error ? e.message : "Falha ao cadastrar");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <Screen aurora>
-      <Header />
-      <div className="relative z-10 flex-1 min-h-0 w-full max-w-md mx-auto flex flex-col items-stretch justify-center gap-4 py-3">
-        <h1 className="font-display text-3xl sm:text-4xl text-white text-center leading-[0.95]">
-          Antes de criar seu <span className="text-gold">cartão-postal</span>
-        </h1>
-        <label className="flex flex-col gap-1 text-left">
-          <span className="text-xs uppercase tracking-[0.25em] text-white/70">Nome</span>
-          <input
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Nome completo"
-            maxLength={120}
-            disabled={loading}
-            className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base disabled:opacity-60"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-left">
-          <span className="text-xs uppercase tracking-[0.25em] text-white/70">WhatsApp</span>
-          <input
-            value={whatsapp}
-            onChange={(e) => setWhatsapp(formatWhatsappMask(e.target.value))}
-            placeholder="(00) 00000-0000"
-            inputMode="numeric"
-            disabled={loading}
-            className="bg-black/40 border border-white/25 rounded-md px-3 py-3 text-base disabled:opacity-60"
-          />
-        </label>
-        <p className="text-left text-sm text-white/85 leading-snug">
-          Li o{" "}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowNotice(true);
-            }}
-            className="text-gold underline underline-offset-2 hover:text-gold/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-gold rounded-sm"
-          >
-            Aviso de Privacidade
-          </button>{" "}
-          e autorizo o tratamento do meu nome, WhatsApp e imagens para criar, disponibilizar e produzir meu cartão-postal natalino.
-        </p>
-        {error && (
-          <div className="rounded-md border border-red-400/40 bg-red-950/30 p-3 text-center">
-            <p className="text-sm font-semibold text-red-200 uppercase tracking-wide">
-              Não conseguimos registrar seus dados
-            </p>
-            <p className="text-xs text-red-200/80 mt-1">
-              Seu nome e WhatsApp continuam preenchidos. Tente novamente.
-            </p>
-            <p className="text-[10px] text-red-200/50 mt-2 break-words">{error}</p>
-          </div>
-        )}
-        <div className="flex flex-col items-center gap-2 pt-2">
-          <PrimaryCta onClick={submit} disabled={!canSubmit}>
-            {loading ? "Cadastrando…" : error ? "Tentar novamente" : "Li e autorizo. Continuar"}
-          </PrimaryCta>
-          <GhostBtn onClick={onBack} disabled={loading}>Voltar</GhostBtn>
-        </div>
-      </div>
-
-      {showNotice && (
-        <div
-          className="fixed inset-0 z-[70] bg-black/85 grid place-items-center px-5"
-          onClick={() => setShowNotice(false)}
-        >
-          <div
-            className="bg-[#0A1730] border border-white/15 rounded-2xl p-6 max-w-md w-full max-h-[80dvh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="font-display text-2xl text-gold">{PRIVACY_NOTICE_TITLE}</h2>
-            <div className="mt-3 space-y-3 text-sm text-white/85">
-              {PRIVACY_NOTICE_PARAGRAPHS.map((p, i) => <p key={i}>{p}</p>)}
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowNotice(false)}
-              className="mt-5 text-xs uppercase tracking-[0.3em] text-white/70 underline underline-offset-4 hover:text-white"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
-    </Screen>
-  );
-}
 
