@@ -844,6 +844,86 @@ function WelcomeTag({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ---------- Step 1b: Quem vai participar ---------- */
+
+const IconPerson = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-full h-full">
+    <circle cx="12" cy="8" r="3.6" />
+    <path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" />
+  </svg>
+);
+const IconCouple = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-full h-full">
+    <circle cx="8.5" cy="8.5" r="3" />
+    <circle cx="15.5" cy="8.5" r="3" />
+    <path d="M3 20c0-3 2.4-5 5.5-5 1.2 0 2.3.3 3.2 1 .9-.7 2-1 3.3-1 3.1 0 5.5 2 5.5 5" />
+  </svg>
+);
+const IconFamily = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-full h-full">
+    <circle cx="6" cy="9" r="2.6" />
+    <circle cx="18" cy="9" r="2.6" />
+    <circle cx="12" cy="7.4" r="2" />
+    <path d="M2.2 20c0-2.8 1.7-4.6 3.8-4.6 1 0 1.8.3 2.5.9" />
+    <path d="M21.8 20c0-2.8-1.7-4.6-3.8-4.6-1 0-1.8.3-2.5.9" />
+    <path d="M8.6 20c0-2.6 1.5-4.3 3.4-4.3s3.4 1.7 3.4 4.3" />
+  </svg>
+);
+
+/**
+ * Etapa imersiva "Quem vai participar?". Substitui o cadastro na jornada
+ * pública atual: a resposta (solo/couple/family) adapta as orientações de
+ * captura e é persistida na captura quando a coluna existir.
+ */
+function PartySelect({
+  onSelect,
+  onBack,
+}: {
+  onSelect: (p: PartySize) => void;
+  onBack: () => void;
+}) {
+  const options: { id: PartySize; label: string; hint: string; icon: React.ReactNode }[] = [
+    { id: "solo", label: "Só eu", hint: "Um protagonista", icon: <IconPerson /> },
+    { id: "couple", label: "Casal", hint: "Dois na neve", icon: <IconCouple /> },
+    { id: "family", label: "Família", hint: "Todo mundo junto", icon: <IconFamily /> },
+  ];
+  return (
+    <Screen aurora>
+      <Header subtitle="Antes da foto" />
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center w-full max-w-4xl py-4 gap-7 sm:gap-9">
+        <div className="flex flex-col items-center gap-3 animate-fade-up">
+          <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl text-snow leading-[1.05] max-w-2xl">
+            Quem vai entrar neste{" "}
+            <span className="font-script text-gold text-[1.2em] leading-none">cartão-postal</span>?
+          </h1>
+          <p className="text-sm sm:text-base text-white/70 max-w-md">
+            Toque em uma opção — as orientações da foto se ajustam para você.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:gap-5 sm:grid-cols-3 w-full animate-fade-up">
+          {options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onSelect(o.id)}
+              className="natal-card px-6 py-8 sm:py-10 min-h-[170px] sm:min-h-[220px] flex flex-col items-center justify-center gap-3 text-center"
+            >
+              <span className="w-14 h-14 sm:w-16 sm:h-16 text-gold">{o.icon}</span>
+              <span className="font-display text-2xl sm:text-3xl text-snow uppercase tracking-wide">
+                {o.label}
+              </span>
+              <span className="natal-eyebrow">{o.hint}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="relative z-10 shrink-0">
+        <GhostBtn onClick={onBack}>Voltar</GhostBtn>
+      </div>
+    </Screen>
+  );
+}
+
 /* ---------- Step 2: Stories (after film pick, prewarms camera) ---------- */
 
 const STORY_DURATIONS_MS = [3000, 4500, 2000];
