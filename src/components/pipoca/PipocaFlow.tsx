@@ -856,9 +856,11 @@ function Header({ subtitle }: { subtitle?: string }) {
           className="h-7 sm:h-9 w-auto opacity-95"
         />
       ) : null}
-      <span className="font-display text-xl sm:text-2xl lg:text-3xl text-snow tracking-wide">
-        {SPONSOR.actionName ?? EXPERIENCE_NAME}
-      </span>
+      {SPONSOR.actionName ?? EXPERIENCE_NAME ? (
+        <span className="font-display text-xl sm:text-2xl lg:text-3xl text-snow tracking-wide">
+          {SPONSOR.actionName ?? EXPERIENCE_NAME}
+        </span>
+      ) : null}
       <div className="brand-stripe w-24 sm:w-32 lg:w-44 rounded-full opacity-90" />
       {subtitle ? (
         <span className="mt-1 text-[10px] sm:text-xs lg:text-sm uppercase tracking-[0.3em] text-gold/85">
