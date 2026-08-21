@@ -850,12 +850,12 @@ const STORY_DURATIONS_MS = [3000, 4500, 2000];
 
 function Stories({
   movie,
-  firstName,
+  party,
   onDone,
   onRestart,
 }: {
   movie: Movie;
-  firstName?: string;
+  party: PartySize;
   onDone: () => void;
   onRestart: () => void;
 }) {
@@ -930,9 +930,9 @@ function Stories({
       />
 
       <div className="relative z-20 flex-1 min-h-0 w-full flex flex-col items-center justify-center max-w-2xl py-3 pointer-events-none">
-        {idx === 0 && <StoryScene movie={movie} firstName={firstName} />}
-        {idx === 1 && <StoryTwoPhotos firstName={firstName} />}
-        {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} firstName={firstName} />}
+        {idx === 0 && <StoryScene movie={movie} />}
+        {idx === 1 && <StoryTwoPhotos party={party} />}
+        {idx === 2 && <StoryPrepare cameraStatus={cameraStatus} />}
       </div>
 
       <div className="relative z-30 shrink-0">
@@ -957,12 +957,11 @@ function Stories({
   );
 }
 
-function StoryScene({ movie, firstName }: { movie: Movie; firstName?: string }) {
-  const prefix = firstName ? `${firstName.toUpperCase()}, seu cenário é` : "Seu cenário é";
+function StoryScene({ movie }: { movie: Movie }) {
   return (
     <div className="flex flex-col items-center gap-3 sm:gap-4 animate-fade-up w-full">
       <span className="text-[10px] sm:text-xs uppercase tracking-[0.35em] text-gold">
-        {prefix}
+        Seu cenário é
       </span>
       <div className="relative w-[78vw] max-w-[360px] sm:max-w-[420px] aspect-[4/5] rounded-2xl overflow-hidden border border-white/12 shadow-[0_30px_80px_-10px_rgba(0,0,0,0.7)] bg-white/5">
         {movie.posterUrl ? (
@@ -986,14 +985,15 @@ function StoryScene({ movie, firstName }: { movie: Movie; firstName?: string }) 
   );
 }
 
-function StoryTwoPhotos({ firstName }: { firstName?: string }) {
+function StoryTwoPhotos({ party }: { party: PartySize }) {
+  const copy = PARTY_COPY[party];
   return (
     <div className="flex flex-col items-center gap-6 sm:gap-7 animate-fade-up max-w-md">
       <h1 className="font-display text-3xl sm:text-5xl text-white leading-[0.95]">
-        {firstName ? `${firstName}, vamos` : "Vamos"} tirar <span className="text-gold">duas fotos</span>
+        Vamos tirar <span className="text-gold">duas fotos</span> {copy.photosTail}
       </h1>
       <p className="text-sm sm:text-base text-white/75 -mt-2">
-        Você pode aparecer sozinho, em casal ou com sua família.
+        {copy.photosNote}
       </p>
       <div className="grid grid-cols-2 gap-4 w-full">
         <div className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-4">
@@ -1019,7 +1019,7 @@ function StoryTwoPhotos({ firstName }: { firstName?: string }) {
   );
 }
 
-function StoryPrepare({ cameraStatus, firstName }: { cameraStatus: ReturnType<typeof getSharedStatus>; firstName?: string }) {
+function StoryPrepare({ cameraStatus }: { cameraStatus: ReturnType<typeof getSharedStatus> }) {
   const camHint =
     cameraStatus === "ready"
       ? "Câmera pronta"
@@ -1035,7 +1035,7 @@ function StoryPrepare({ cameraStatus, firstName }: { cameraStatus: ReturnType<ty
         </svg>
       </div>
       <h1 className="font-display text-4xl sm:text-6xl text-white leading-[0.95]">
-        {firstName ? `${firstName}, ` : ""}<span className="text-gold">prepare-se</span>
+        <span className="text-gold">Prepare-se</span>
       </h1>
       <p className="text-sm sm:text-base text-white/75 max-w-sm">
         A câmera será aberta agora.
@@ -1051,10 +1051,13 @@ function StoryPrepare({ cameraStatus, firstName }: { cameraStatus: ReturnType<ty
 /* ---------- Step 2b: Orient appearance (between identity and appearance captures) ---------- */
 
 function OrientAppearance({
+  party,
   onNext,
 }: {
+  party: PartySize;
   onNext: () => void;
 }) {
+  const copy = PARTY_COPY[party];
   const firedRef = useRef(false);
   useEffect(() => {
     if (firedRef.current) return;
@@ -1078,10 +1081,10 @@ function OrientAppearance({
           </svg>
         </div>
         <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl text-white leading-[0.95] animate-fade-up text-center">
-          Agora, <span className="text-gold">dê um passo para trás</span>
+          Agora, <span className="text-gold">{copy.orientTitle}</span>
         </h1>
         <p className="text-base sm:text-lg text-white/80 max-w-md animate-fade-up text-center">
-          Vamos registrar seu corpo da cintura para cima.
+          {copy.orientBody}
         </p>
       </div>
       <div className="relative z-10 shrink-0">
