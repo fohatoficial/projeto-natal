@@ -19,6 +19,16 @@ import {
   createPipocaGeneration,
   getPipocaGenerationStatus,
 } from "@/lib/pipoca/generation.functions";
+import {
+  preparePipocaPostcardUpload,
+  confirmPipocaPostcard,
+} from "@/lib/pipoca/postcard.functions";
+import {
+  renderPostcard,
+  type PostcardRender,
+} from "@/lib/pipoca/postcard-template";
+import type { PostcardSelection } from "@/lib/pipoca/postcard-messages";
+import { SCENARIOS } from "@/lib/pipoca/scenarios";
 import { deriveIdentityFaceCrop } from "@/lib/pipoca/faceCrop";
 import { EXPERIENCE_NAME, SPONSOR } from "@/lib/pipoca/branding";
 import { PostcardComposer } from "@/components/pipoca/PostcardComposer";
@@ -33,8 +43,10 @@ type Step =
   | "orient_appearance"
   | "camera_appearance"
   | "confirm"
-  | "processing"
   | "postcard"
+  | "postcard_wait"
+  | "postcard_preview"
+  | "postcard_error"
   | "result";
 
 type CameraVariant = "identity" | "appearance";
@@ -92,12 +104,6 @@ const PARTY_COPY: Record<
   },
 };
 
-const LOADING_PHRASES = [
-  "Preparando seu Natal abaixo de zero...",
-  "Fazendo a neve cair sobre Brasília...",
-  "Acendendo as luzes da Catedral...",
-  "Finalizando seu cartão-postal...",
-];
 
 const IconSnowflake = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
@@ -197,15 +203,24 @@ export function PipocaFlow() {
   const [resultPageUrl, setResultPageUrl] = useState<string | null>(null);
   const [postcardUrl, setPostcardUrl] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
+  const [selection, setSelection] = useState<PostcardSelection | null>(null);
+  const [postcardRender, setPostcardRender] = useState<PostcardRender | null>(null);
+  const [postcardSaveError, setPostcardSaveError] = useState<string | null>(null);
+  const [savingPostcard, setSavingPostcard] = useState(false);
+  const [renderFailed, setRenderFailed] = useState(false);
   const identityUploadedRef = useRef(false);
   const appearanceUploadedRef = useRef(false);
   const generationStartedRef = useRef(false);
+  const postcardRenderRef = useRef<PostcardRender | null>(null);
+  const renderingCardRef = useRef(false);
   const { films, loading, error } = usePipocaFilms();
 
   const prepareFn = useServerFn(createPipocaCaptureUpload);
   const confirmFn = useServerFn(confirmPipocaCaptureUpload);
   const createGenFn = useServerFn(createPipocaGeneration);
   const statusGenFn = useServerFn(getPipocaGenerationStatus);
+  const preparePostcardFn = useServerFn(preparePipocaPostcardUpload);
+  const confirmPostcardFn = useServerFn(confirmPipocaPostcard);
   
 
   // Keep refs in sync so the unmount cleanup can revoke without re-running
@@ -222,6 +237,7 @@ export function PipocaFlow() {
     return () => {
       if (identityRef.current) URL.revokeObjectURL(identityRef.current.url);
       if (appearanceRef.current) URL.revokeObjectURL(appearanceRef.current.url);
+      if (postcardRenderRef.current) URL.revokeObjectURL(postcardRenderRef.current.objectUrl);
       // Encerra a câmera ao desmontar o fluxo principal.
       releaseSharedCamera();
     };
@@ -258,6 +274,14 @@ export function PipocaFlow() {
       setResultPageUrl(null);
       setPostcardUrl(null);
       setGenError(null);
+      setSelection(null);
+      if (postcardRenderRef.current) URL.revokeObjectURL(postcardRenderRef.current.objectUrl);
+      postcardRenderRef.current = null;
+      setPostcardRender(null);
+      setPostcardSaveError(null);
+      setSavingPostcard(false);
+      setRenderFailed(false);
+      renderingCardRef.current = false;
       generationStartedRef.current = false;
       setStep("choose");
     });
@@ -352,7 +376,9 @@ export function PipocaFlow() {
       });
       setUploadStatus("idle");
       releaseSharedCamera();
-      transitionTo(() => setStep("processing"));
+      // A geração da fotografia começa IMEDIATAMENTE em background; o
+      // visitante segue direto para a mensagem, sem tela de loading.
+      transitionTo(() => setStep("postcard"));
       void startGeneration(current.sessionId, current.captureId);
     } catch (err) {
       const stage = !current
@@ -371,6 +397,7 @@ export function PipocaFlow() {
   const retryGeneration = useCallback(() => {
     if (!prepared) return;
     setGenError(null);
+    setRenderFailed(false);
     setGenerationId(null);
     setGeneratedUrl(null);
     setPublicToken(null);
@@ -391,16 +418,149 @@ export function PipocaFlow() {
       setPublicToken(null);
       setResultPageUrl(null);
       setGenError(null);
+      setRenderFailed(false);
       setUploadStatus("idle");
       setUploadError(null);
       setStep("camera_identity");
     });
 
+  /* ----- Geração em background: polling silencioso durante a mensagem ----- */
+
+  useEffect(() => {
+    if (!generationId || generatedUrl || genError) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        console.log(`${GEN_LOG} polling (background)`, { generationId });
+        const res = await statusGenFn({ data: { generationId } });
+        if (cancelled) return;
+        if (res.status === "completed") {
+          console.log(`${GEN_LOG} concluída em background`);
+          setGeneratedUrl(res.imageUrl);
+          setPublicToken(res.publicToken);
+          setResultPageUrl(res.resultPageUrl);
+          return;
+        }
+        if (res.status === "failed") {
+          // NÃO interrompe a personalização — o erro só aparece ao pedir o cartão.
+          console.warn(`${GEN_LOG} falhou em background`);
+          setGenError(res.error || "Falha na geração");
+          return;
+        }
+        timer = setTimeout(tick, 2500);
+      } catch (e) {
+        if (cancelled) return;
+        console.warn(`${GEN_LOG} erro ao consultar`, e);
+        timer = setTimeout(tick, 4000);
+      }
+    };
+    timer = setTimeout(tick, 1500);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [generationId, generatedUrl, genError, statusGenFn]);
+
+  /** Monta o cartão-postal no template-mestre e abre a prévia. */
+  const renderAndShow = useCallback(
+    async (sel: PostcardSelection, imageUrl: string) => {
+      if (renderingCardRef.current) return;
+      renderingCardRef.current = true;
+      try {
+        const out = await renderPostcard(imageUrl, {
+          message: sel.message,
+          fontStyle: sel.fontStyle,
+          dividerStyle: sel.dividerStyle,
+        });
+        if (postcardRenderRef.current) URL.revokeObjectURL(postcardRenderRef.current.objectUrl);
+        postcardRenderRef.current = out;
+        setPostcardRender(out);
+        setPostcardSaveError(null);
+        setRenderFailed(false);
+        transitionTo(() => setStep("postcard_preview"));
+      } catch (e) {
+        console.warn(`${GEN_LOG} falha ao montar cartão-postal`, e);
+        setRenderFailed(true);
+        transitionTo(() => setStep("postcard_error"));
+      } finally {
+        renderingCardRef.current = false;
+      }
+    },
+    [],
+  );
+
+  // Espera elegante: assim que a geração conclui, monta e avança sem novo clique.
+  useEffect(() => {
+    if (step !== "postcard_wait") return;
+    if (genError) {
+      transitionTo(() => setStep("postcard_error"));
+      return;
+    }
+    if (generatedUrl && selection) void renderAndShow(selection, generatedUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, genError, generatedUrl, selection, renderAndShow]);
+
+  /** "Ver meu cartão-postal": verifica o status da geração e decide o caminho. */
+  const handlePostcardReady = useCallback(
+    (sel: PostcardSelection) => {
+      console.log(`${UX} mensagem concluída, verificando geração`, {
+        type: sel.messageType,
+        chars: sel.message.length,
+      });
+      setSelection(sel);
+      if (genError) {
+        transitionTo(() => setStep("postcard_error"));
+      } else if (generatedUrl) {
+        // CASO A — geração já concluída durante a personalização.
+        void renderAndShow(sel, generatedUrl);
+      } else {
+        // CASO B — ainda processando: tela elegante de espera com polling.
+        transitionTo(() => setStep("postcard_wait"));
+      }
+    },
+    [genError, generatedUrl, renderAndShow],
+  );
+
+  const finalizePostcard = useCallback(async () => {
+    const render = postcardRenderRef.current;
+    if (!render || !generationId || !selection || savingPostcard) return;
+    setSavingPostcard(true);
+    setPostcardSaveError(null);
+    try {
+      const { path, token } = await preparePostcardFn({ data: { generationId } });
+      const { error: upErr } = await supabase.storage
+        .from("pipoca-generated-scenes")
+        .uploadToSignedUrl(path, token, render.blob, { contentType: "image/jpeg" });
+      if (upErr) throw upErr;
+      const res = await confirmPostcardFn({
+        data: {
+          generationId,
+          path,
+          messageType: selection.messageType,
+          messageText: selection.message,
+          fontStyle: selection.fontStyle,
+          dividerStyle: selection.dividerStyle,
+        },
+      });
+      console.log(`${GEN_LOG} cartão-postal finalizado`);
+      setPostcardUrl(res.postcardUrl);
+      transitionTo(() => setStep("result"));
+    } catch (e) {
+      console.warn(`${GEN_LOG} falha ao finalizar cartão-postal`, e);
+      setPostcardSaveError("Não conseguimos salvar seu cartão-postal. Tente novamente.");
+    } finally {
+      setSavingPostcard(false);
+    }
+  }, [generationId, selection, savingPostcard, preparePostcardFn, confirmPostcardFn]);
+
   return (
     <div className="bg-cinema text-white relative">
       {step === "choose" && (
-        <Welcome
-          film={films[0] ?? null}
+        <ScenarioHome
+          films={films}
           loading={loading}
           error={error}
           onStart={(m) => {
@@ -496,35 +656,23 @@ export function PipocaFlow() {
           }}
         />
       )}
-      {step === "processing" && selected && (
-        <Processing
-          movie={selected}
-          generationId={generationId}
-          errored={Boolean(genError)}
-          pollFn={statusGenFn}
-          onDone={(imageUrl, token, url) => {
-            setGeneratedUrl(imageUrl);
-            setPublicToken(token);
-            setResultPageUrl(url);
-            transitionTo(() => setStep("postcard"));
-          }}
-          onError={(msg) => setGenError(msg)}
-        />
-      )}
-      {step === "postcard" && generatedUrl && generationId && (
+      {step === "postcard" && (
         <Screen aurora>
           <Header subtitle="Sua mensagem de Natal" />
           <div className="relative z-10 flex-1 min-h-0 w-full overflow-y-auto flex items-center">
-            <PostcardComposer
-              photoUrl={generatedUrl}
-              generationId={generationId}
-              onFinalized={(url) => {
-                setPostcardUrl(url);
-                transitionTo(() => setStep("result"));
-              }}
-            />
+            <PostcardComposer initial={selection} onReady={handlePostcardReady} />
           </div>
         </Screen>
+      )}
+      {step === "postcard_wait" && <PostcardWaiting />}
+      {step === "postcard_preview" && postcardRender && (
+        <PostcardPreview
+          imageUrl={postcardRender.objectUrl}
+          saving={savingPostcard}
+          error={postcardSaveError}
+          onEdit={() => transitionTo(() => setStep("postcard"))}
+          onFinalize={() => void finalizePostcard()}
+        />
       )}
       {step === "result" && selected && (
         <Result
@@ -536,10 +684,22 @@ export function PipocaFlow() {
         />
       )}
 
-      {step === "processing" && genError && (
+      {step === "postcard_error" && (
         <GenerationError
-          message={genError}
-          onRetry={retryGeneration}
+          message={
+            genError ??
+            "Não conseguimos montar seu cartão-postal. Toque para tentar novamente."
+          }
+          onRetry={() => {
+            if (genError) {
+              // Nova tentativa preserva cenário, participantes, mensagem e estilo.
+              retryGeneration();
+              transitionTo(() => setStep("postcard_wait"));
+            } else if (generatedUrl && selection) {
+              setRenderFailed(false);
+              void renderAndShow(selection, generatedUrl);
+            }
+          }}
           onRestart={reset}
         />
       )}
